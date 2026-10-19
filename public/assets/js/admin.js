@@ -324,8 +324,24 @@
       input.value = swatch.dataset.color;
       $$(`[data-swatch="${swatch.dataset.swatch}"]`).forEach((el) => el.classList.remove('is-active'));
       swatch.classList.add('is-active');
+      if (swatch.dataset.swatch === 'accent_color') liveAccent(swatch.dataset.color);
     });
   });
+
+  /* Preview an accent colour before saving it. */
+  function liveAccent(color) {
+    if (!/^#[0-9a-f]{6}$/i.test(color || '')) return;
+    document.documentElement.style.setProperty('--admin-accent', color);
+    const label = document.querySelector('[data-accent-label]');
+    if (label) label.textContent = color;
+    const picker = document.getElementById('accent_color');
+    if (picker && picker.value !== color) picker.value = color;
+  }
+  const accentInput = document.getElementById('accent_color');
+  if (accentInput) {
+    accentInput.addEventListener('input', () => liveAccent(accentInput.value));
+    accentInput.addEventListener('change', () => liveAccent(accentInput.value));
+  }
 
   /* ------------------------------------------------------------- editor */
   const editorForm = $('#editorForm');

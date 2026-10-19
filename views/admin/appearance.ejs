@@ -28,7 +28,7 @@
             <span class="label">Accent colour</span>
             <div class="color-row">
               <input type="color" id="accent_color" name="accent_color" value="<%= settings.accent_color || '#0071e3' %>">
-              <span class="text-xs text-muted mono"><%= settings.accent_color || '#0071e3' %></span>
+              <span class="text-xs text-muted mono" data-accent-label><%= settings.accent_color || '#0071e3' %></span>
             </div>
             <div class="color-row" style="margin-top:8px">
               <% presets.forEach(function (preset) { %>
@@ -69,7 +69,7 @@
       <div class="panel__head"><h2>Typography</h2><span class="text-xs text-muted">Bundled, no external requests</span></div>
       <div class="panel__body" style="display:grid;gap:18px">
         <div>
-          <span class="text-xs text-muted" style="display:block;margin-bottom:4px">Display — Instrument Serif</span>
+          <span class="text-xs text-muted" style="display:block;margin-bottom:4px">Display — SF Pro / Inter</span>
           <p class="serif" style="font-size:2.1rem;line-height:1.1;margin:0">The quiet power of doing one thing.</p>
         </div>
         <div>
@@ -99,7 +99,7 @@
             </div>
           </div>
         </div>
-        <p class="text-xs text-muted" style="margin-top:12px">Colours update on save. The accent is used for links, chips and the reading progress bar.</p>
+        <p class="text-xs text-muted" style="margin-top:12px">The preview follows the accent as you pick it; save to apply it across the site.</p>
       </div>
     </div>
 
@@ -107,7 +107,7 @@
       <div class="panel__head"><h2>Fonts &amp; assets</h2></div>
       <div class="panel__body">
         <div class="publish-meta">
-          <div><span>Display</span><b>Instrument Serif</b></div>
+          <div><span>Display</span><b>SF Pro / Inter</b></div>
           <div><span>Text</span><b>Inter Variable</b></div>
           <div><span>Icons</span><b>Inline SVG set</b></div>
           <div><span>CSS</span><b>No framework</b></div>
