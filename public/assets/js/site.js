@@ -351,6 +351,12 @@
     $$('[data-open-newsletter]').forEach((button) => {
       button.addEventListener('click', (event) => {
         event.preventDefault();
+        // Close the mobile drawer first so the dialog is not stacked on it.
+        const drawer = document.getElementById('mobileNav');
+        if (drawer && drawer.classList.contains('is-open')) {
+          drawer.classList.remove('is-open');
+          document.body.style.overflow = '';
+        }
         openPopup();
       });
     });

@@ -204,9 +204,11 @@ face (SF Pro on Apple hardware, Inter elsewhere), tight optical letter-spacing, 
 space, hairline rules and a single accent colour you can change from Appearance.
 
 Buttons follow the Recap demo they were measured against: **8 px corners**, compact 8 × 14 px
-padding, 13 px medium label, `#206BEA` fill and a `#3B7DED` hover with a soft 3 px halo. Small
-buttons drop to 6 × 11 px, large ones to 11 × 20 px, and the newsletter call-to-action uses the
-wider 32 px pill radius. Cards and media have 10 px corners so photography and buttons agree.
+padding, 13 px medium label, `#206BEA` fill and a `#3B7DED` hover with a soft 3 px halo. Every
+subscribe action — header, mobile drawer, popup, newsletter band, article sidebar — uses the
+demo's **32 px pill** (`btn--cta`), while small buttons drop to 6 × 12 px and large ones to
+11 × 20 px. The nav keeps no pill at all: the current page is simply accent-coloured text on a
+32 px hit area. Cards and media have 10 px corners so photography and buttons agree.
 Photography carries the pages — large rounded cards on white or true-black, nothing else competing
 for attention.
 
@@ -228,10 +230,12 @@ all markup, CSS, icons and JavaScript here are original to this project.
 | --- | --- |
 | Home | ![Home](docs/screenshots/home.png) |
 | Story | ![Story](docs/screenshots/article.png) |
+| Story sidebar | ![Story sidebar](docs/screenshots/article-aside.png) |
 | Stories archive | ![Stories](docs/screenshots/stories.png) |
 | Topics | ![Topics](docs/screenshots/categories.png) |
 | Topics mega menu | ![Mega menu](docs/screenshots/mega-menu.png) |
 | Newsletter popup | ![Newsletter](docs/screenshots/newsletter-popup.png) |
+| Newsletter band | ![Newsletter band](docs/screenshots/newsletter-band.png) |
 | Up next | ![Up next](docs/screenshots/up-next.png) |
 | Empty search | ![No results](docs/screenshots/search-empty.png) |
 | Dark mode | ![Dark](docs/screenshots/dark.png) |
