@@ -31,16 +31,18 @@ export async function createApp() {
   app.use((_req, res, next) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-    // The CMS is often embedded in a preview pane served from a different origin
-    // (e.g. https://<port>-<sandbox>.e2b.app), so framing has to be allowed there.
-    // frame-ancestors covers it without the legacy X-Frame-Options header, which
-    // cannot express a wildcard and would block the preview iframe outright.
-    res.setHeader(
-      'Content-Security-Policy',
-      "frame-ancestors 'self' https://*.e2b.app https://*.e2b.app:*",
-    );
+    // Sandbox previews embed the site in an iframe from another origin, so dev
+    // sends no framing restrictions at all (the legacy X-Frame-Options header is
+    // deliberately absent — it cannot express a wildcard and blocks the pane).
+    // Production deployments are same-origin only.
+    if (config.isProd) {
+      res.setHeader('Content-Security-Policy', "frame-ancestors 'self'");
+    }
     next();
   });
+
+  // Browsers ask for /favicon.ico even when an SVG icon is declared.
+  app.get('/favicon.ico', (_req, res) => res.redirect(301, '/assets/img/favicon.svg'));
 
   app.use(
     express.static(PUBLIC_DIR, {
