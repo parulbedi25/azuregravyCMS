@@ -98,6 +98,60 @@
 </section>
 <% } %>
 
+<% if (spotlight && spotlightPosts.length) { %>
+  <section class="section--tight">
+    <div class="container">
+      <div class="section-head">
+        <div>
+          <span class="kicker">Topic spotlight</span>
+          <h2 style="margin-top:8px">The <%= spotlight.name %> file</h2>
+          <% if (spotlight.description) { %><p><%= spotlight.description %></p><% } %>
+        </div>
+        <a class="section-head__link" href="/category/<%= spotlight.slug %>">View all <%= spotlight.name %> <%- h.icon('arrow-right', '', 14) %></a>
+      </div>
+
+      <div class="spotlight">
+        <article class="spotlight__lead" data-reveal>
+          <a class="spotlight__lead-media" href="<%= h.postUrl(spotlightPosts[0]) %>" tabindex="-1" aria-hidden="true">
+            <% if (spotlightPosts[0].featured_image) { %>
+              <img src="<%= h.mediaUrl(spotlightPosts[0].featured_image) %>" alt="" loading="lazy">
+            <% } %>
+          </a>
+          <div class="post-meta">
+            <span><%= h.formatDate(spotlightPosts[0].published_at, 'long') %></span>
+            <span class="dot"></span>
+            <span><%= spotlightPosts[0].reading_time %> min read</span>
+            <span class="dot"></span>
+            <span><%= spotlight.post_count || 0 %> stor<%= (spotlight.post_count || 0) === 1 ? 'y' : 'ies' %> in this topic</span>
+          </div>
+          <h3><a href="<%= h.postUrl(spotlightPosts[0]) %>"><%= spotlightPosts[0].title %></a></h3>
+          <p><%= h.excerptOf(spotlightPosts[0], 190) %></p>
+          <a class="section-head__link" href="<%= h.postUrl(spotlightPosts[0]) %>">Read the story <%- h.icon('arrow-right', '', 13) %></a>
+        </article>
+
+        <div class="spotlight__rows">
+          <% spotlightPosts.slice(1, 5).forEach(function (post, index) { %>
+            <a class="spotlight__row" href="<%= h.postUrl(post) %>" data-reveal style="--reveal-delay:<%= index * 60 %>ms">
+              <% if (post.featured_image) { %>
+                <img src="<%= h.mediaUrl(post.featured_image) %>" alt="" loading="lazy">
+              <% } else { %>
+                <span class="spotlight__ph"><%- h.icon('image', '', 18) %></span>
+              <% } %>
+              <span>
+                <b><%= post.title %></b>
+                <span><%= h.formatDate(post.published_at, 'medium') %> · <%= post.reading_time %> min read</span>
+              </span>
+            </a>
+          <% }); %>
+          <% if (spotlightPosts.length < 2) { %>
+            <p class="muted small">More stories are being filed under this topic.</p>
+          <% } %>
+        </div>
+      </div>
+    </div>
+  </section>
+<% } %>
+
 <section class="section">
   <div class="container">
     <div class="section-head">

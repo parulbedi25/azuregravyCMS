@@ -3,6 +3,7 @@ import { asyncRoute, setFlash } from '../../lib/http.js';
 import { requireRole } from '../../lib/auth.js';
 import { loadSettings, saveSettings, settingFrom } from '../../lib/settings.js';
 import { invalidateNavigation } from '../../services/navigation.js';
+import { listCategories } from '../../services/posts.js';
 import { getDb } from '../../db/index.js';
 import { renderMarkdown } from '../../lib/markdown.js';
 import { readingTime, slugify } from '../../lib/text.js';
@@ -15,7 +16,7 @@ const router = Router();
 
 const SETTING_GROUPS: Record<string, string[]> = {
   general: ['site_title', 'site_tagline', 'site_description', 'site_url', 'contact_email', 'timezone', 'date_format'],
-  appearance: ['logo_text', 'logo_mark', 'accent_color', 'default_theme', 'homepage_layout', 'homepage_featured_count'],
+  appearance: ['logo_text', 'logo_mark', 'accent_color', 'default_theme', 'homepage_layout', 'homepage_featured_count', 'spotlight_category', 'auto_load_next', 'before_you_go'],
   reading: ['posts_per_page', 'show_reading_time', 'show_author_box', 'show_related_posts', 'show_toc'],
   discussion: ['allow_comments', 'comment_moderation', 'comment_notify_email'],
   newsletter: ['newsletter_enabled', 'newsletter_heading', 'newsletter_text'],
@@ -79,8 +80,9 @@ router.get(
       adminDescription: 'Type, colour and the shape of the front page.',
       page: 'appearance',
       settings,
+      categories: (await listCategories({ withCounts: true })).filter((category) => (category.post_count ?? 0) > 0),
       presets: [
-        { name: 'Blue', value: '#0071e3' },
+        { name: 'Blue', value: '#206bea' },
         { name: 'Ink', value: '#1d1d1f' },
         { name: 'Sky', value: '#0a84ff' },
         { name: 'Forest', value: '#1f7a53' },
@@ -97,10 +99,13 @@ router.post(
   asyncRoute(async (req, res) => {
     await saveSettings({
       logo_text: str(req.body.logo_text, 'Azure Gravy'),
-      accent_color: str(req.body.accent_color, '#0071e3'),
+      accent_color: str(req.body.accent_color, '#206bea'),
       default_theme: str(req.body.default_theme, 'light'),
       homepage_layout: str(req.body.homepage_layout, 'editorial'),
       homepage_featured_count: str(req.body.homepage_featured_count, '1'),
+      spotlight_category: str(req.body.spotlight_category, ''),
+      auto_load_next: req.body.auto_load_next ? '1' : '0',
+      before_you_go: req.body.before_you_go ? '1' : '0',
       posts_per_page: str(req.body.posts_per_page, '9'),
       show_reading_time: req.body.show_reading_time ? '1' : '0',
       show_author_box: req.body.show_author_box ? '1' : '0',

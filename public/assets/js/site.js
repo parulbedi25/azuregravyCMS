@@ -326,6 +326,156 @@
     pre.appendChild(button);
   });
 
+
+  /* ----------------------------------------------------- newsletter popup */
+  const popup = $('#newsletterPopup');
+  let popupTimer = null;
+
+  function openPopup() {
+    if (!popup) return;
+    popup.hidden = false;
+    document.body.classList.add('pop-open');
+    const input = popup.querySelector('input[type="email"]');
+    if (input) setTimeout(() => input.focus({ preventScroll: true }), 80);
+    try { localStorage.setItem('gravy-letter', 'seen'); } catch (error) { /* ignore */ }
+    window.clearTimeout(popupTimer);
+  }
+
+  function closePopup() {
+    if (!popup) return;
+    popup.hidden = true;
+    document.body.classList.remove('pop-open');
+  }
+
+  if (popup) {
+    $$('[data-open-newsletter]').forEach((button) => {
+      button.addEventListener('click', (event) => {
+        event.preventDefault();
+        openPopup();
+      });
+    });
+    $$('[data-close-newsletter]', popup).forEach((el) => el.addEventListener('click', closePopup));
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && !popup.hidden) closePopup();
+    });
+
+    // Invite the reader once: after 18 seconds, or half way down the page.
+    let seen = false;
+    try { seen = localStorage.getItem('gravy-letter') === 'seen'; } catch (error) { /* ignore */ }
+    if (!seen && !window.location.pathname.startsWith('/admin')) {
+      const maybeOpen = () => {
+        if (!popup.hidden || seen) return;
+        seen = true;
+        openPopup();
+        window.removeEventListener('scroll', onScrollPop);
+      };
+      const onScrollPop = () => {
+        const scrolled = window.scrollY / Math.max(1, document.body.scrollHeight - window.innerHeight);
+        if (scrolled > 0.55) maybeOpen();
+      };
+      window.addEventListener('scroll', onScrollPop, { passive: true });
+      popupTimer = window.setTimeout(maybeOpen, 18000);
+    }
+  }
+
+  /* ------------------------------------------------------ before you go */
+  const byeBar = $('#byeBar');
+  if (byeBar) {
+    const key = byeBar.dataset.byeKey || 'bye';
+    let dismissed = false;
+    try { dismissed = localStorage.getItem(key) === '1'; } catch (error) { /* ignore */ }
+
+    if (!dismissed) {
+      byeBar.hidden = false;
+      const reveal = () => {
+        const scrolled = window.scrollY / Math.max(1, document.body.scrollHeight - window.innerHeight);
+        if (scrolled > 0.5) {
+          byeBar.classList.add('is-visible');
+          window.removeEventListener('scroll', reveal);
+        }
+      };
+      window.addEventListener('scroll', reveal, { passive: true });
+      reveal();
+    }
+
+    const dismiss = (event) => {
+      if (event) event.preventDefault();
+      byeBar.classList.remove('is-visible');
+      try { localStorage.setItem(key, '1'); } catch (error) { /* ignore */ }
+      setTimeout(() => { byeBar.hidden = true; }, 450);
+    };
+    $$('[data-dismiss-bye]', byeBar).forEach((button) => button.addEventListener('click', dismiss));
+  }
+
+  /* ------------------------------------------------------------- up next */
+  const upNext = $('[data-up-next]');
+  if (upNext) {
+    const target = $('#upNextContent');
+    let loaded = false;
+
+    async function loadNext(trigger) {
+      if (loaded || !target) return;
+      loaded = true;
+      const button = upNext.querySelector('[data-load-next]');
+      if (button) {
+        button.disabled = true;
+        button.textContent = 'Loading…';
+      }
+      try {
+        const response = await fetch(upNext.dataset.nextUrl, { headers: { Accept: 'application/json' } });
+        if (!response.ok) throw new Error('Failed');
+        const data = await response.json();
+        if (!data || !data.html) throw new Error('Empty');
+        target.innerHTML = `
+          <div class="up-next__loaded-head">
+            <span class="kicker">Next story</span>
+            <h2><a href="${data.url}">${data.title}</a></h2>
+            <div class="up-next__meta">${data.meta}</div>
+          </div>
+          <div class="prose">${data.html}</div>
+          <div class="up-next__more">
+            <a class="btn btn--accent btn--sm" href="${data.url}">Read the whole story</a>
+            <a class="btn btn--ghost btn--sm" href="/stories">More stories</a>
+          </div>`;
+        target.hidden = false;
+        if (button) button.closest('.up-next__actions').remove();
+        target.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      } catch (error) {
+        loaded = false;
+        if (button) {
+          button.disabled = false;
+          button.textContent = 'Keep reading';
+        }
+        toast('Could not load the next story. Open it instead.', 'error');
+      }
+      if (trigger) trigger.removeEventListener('click', onClickNext);
+    }
+
+    function onClickNext(event) {
+      event.preventDefault();
+      loadNext();
+    }
+
+    const nextButton = upNext.querySelector('[data-load-next]');
+    if (nextButton) nextButton.addEventListener('click', onClickNext);
+
+    // Auto-load when the reader reaches the end of the piece.
+    if ('IntersectionObserver' in window) {
+      const observer = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            if (entry.isIntersecting) {
+              observer.disconnect();
+              loadNext();
+            }
+          });
+        },
+        { rootMargin: '0px 0px 240px 0px', threshold: 0 },
+      );
+      observer.observe(upNext);
+    }
+  }
+
   /* ------------------------------------------------------------ back to top */
   $$('[data-to-top]').forEach((button) => {
     button.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));

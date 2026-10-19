@@ -132,8 +132,17 @@ startup. `./data/` and `public/uploads/` are ignored by git.
 
 ### Front end
 
-- Magazine home page: lead story, editor's picks, topic grid, latest stream, "Up next", newsletter
-  block.
+- Magazine home page: lead story, editor's picks, topic grid, a **topic spotlight** (one category
+  opened up with a lead and a compact list), latest stream, newsletter block.
+- **Up next / auto-load**: reaching the end of a story pulls the next piece inline, with the full
+  rendered body, so a reader can keep going without a page load.
+- **Before you go** bar: a dismissible next-story prompt that slides up past the halfway point and
+  remembers the reader's choice per story.
+- **Newsletter popup**: opens from every Subscribe button, after 18 seconds, or halfway down the
+  page — once per browser, ESC/backdrop to close.
+- **Topics mega menu**: image, description and story counts for each category, straight from the
+  database.
+- Empty states everywhere: a search box, topic chips and a way back instead of a dead end.
 - Story page: reading progress bar, sticky share rail, author card, tags, previous/next story,
   related reading, threaded comments.
 - Archive, category, tag, author, search and paginated story lists; `/page/2` style pagination.
@@ -192,7 +201,12 @@ No front-end build step: the CSS and JS are hand-written and served as-is.
 
 The visual language is laid out like a magazine but drawn like Apple.com: one sans-serif display
 face (SF Pro on Apple hardware, Inter elsewhere), tight optical letter-spacing, generous white
-space, hairline rules, slim pill buttons and a single accent colour you can change from Appearance.
+space, hairline rules and a single accent colour you can change from Appearance.
+
+Buttons follow the Recap demo they were measured against: **8 px corners**, compact 8 × 14 px
+padding, 13 px medium label, `#206BEA` fill and a `#3B7DED` hover with a soft 3 px halo. Small
+buttons drop to 6 × 11 px, large ones to 11 × 20 px, and the newsletter call-to-action uses the
+wider 32 px pill radius. Cards and media have 10 px corners so photography and buttons agree.
 Photography carries the pages — large rounded cards on white or true-black, nothing else competing
 for attention.
 
@@ -216,12 +230,17 @@ all markup, CSS, icons and JavaScript here are original to this project.
 | Story | ![Story](docs/screenshots/article.png) |
 | Stories archive | ![Stories](docs/screenshots/stories.png) |
 | Topics | ![Topics](docs/screenshots/categories.png) |
+| Topics mega menu | ![Mega menu](docs/screenshots/mega-menu.png) |
+| Newsletter popup | ![Newsletter](docs/screenshots/newsletter-popup.png) |
+| Up next | ![Up next](docs/screenshots/up-next.png) |
+| Empty search | ![No results](docs/screenshots/search-empty.png) |
 | Dark mode | ![Dark](docs/screenshots/dark.png) |
 | Dashboard | ![Dashboard](docs/screenshots/admin.png) |
 | Editor | ![Editor](docs/screenshots/editor.png) |
 | Dark studio | ![Dark studio](docs/screenshots/admin-dark.png) |
 | Appearance | ![Appearance](docs/screenshots/appearance.png) |
 | Mobile | ![Mobile](docs/screenshots/mobile.png) |
+| Mobile spotlight | ![Mobile spotlight](docs/screenshots/mobile-spotlight.png) |
 
 The rest — sign in, media library, comments, people, subscribers, system, search, archive and the
 mobile studio — are in [`docs/screenshots`](docs/screenshots).

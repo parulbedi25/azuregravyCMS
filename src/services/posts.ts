@@ -195,14 +195,26 @@ export async function getAdjacentPosts(post: Post): Promise<{ previous: Post | n
   const db = await getDb();
   const [previous, next] = await Promise.all([
     db.query<Post>(
-      `SELECT p.id, p.title, p.slug, p.featured_image_id, m.path AS featured_image
+      `SELECT p.id, p.title, p.slug, p.excerpt, p.featured_image_id, p.published_at, p.reading_time,
+              m.path AS featured_image,
+              (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id AND c.status = 'approved') AS comment_count,
+              (SELECT c.name FROM categories c JOIN post_categories pc ON pc.category_id = c.id
+                WHERE pc.post_id = p.id ORDER BY c.sort_order LIMIT 1) AS category_name,
+              (SELECT c.slug FROM categories c JOIN post_categories pc ON pc.category_id = c.id
+                WHERE pc.post_id = p.id ORDER BY c.sort_order LIMIT 1) AS category_slug
          FROM posts p LEFT JOIN media m ON m.id = p.featured_image_id
         WHERE p.type = 'post' AND p.status = 'published' AND p.published_at < ?
         ORDER BY p.published_at DESC LIMIT 1`,
       [post.published_at ?? post.created_at],
     ),
     db.query<Post>(
-      `SELECT p.id, p.title, p.slug, p.featured_image_id, m.path AS featured_image
+      `SELECT p.id, p.title, p.slug, p.excerpt, p.featured_image_id, p.published_at, p.reading_time,
+              m.path AS featured_image,
+              (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id AND c.status = 'approved') AS comment_count,
+              (SELECT c.name FROM categories c JOIN post_categories pc ON pc.category_id = c.id
+                WHERE pc.post_id = p.id ORDER BY c.sort_order LIMIT 1) AS category_name,
+              (SELECT c.slug FROM categories c JOIN post_categories pc ON pc.category_id = c.id
+                WHERE pc.post_id = p.id ORDER BY c.sort_order LIMIT 1) AS category_slug
          FROM posts p LEFT JOIN media m ON m.id = p.featured_image_id
         WHERE p.type = 'post' AND p.status = 'published' AND p.published_at > ?
         ORDER BY p.published_at ASC LIMIT 1`,

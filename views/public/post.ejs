@@ -103,6 +103,40 @@
         <% } %>
       </nav>
 
+      <% if (adjacent.next && settings.auto_load_next !== '0') { %>
+        <section class="up-next" data-up-next data-next-url="/stories/<%= post.slug %>/next">
+          <div class="up-next__card">
+            <a class="up-next__media" href="/stories/<%= adjacent.next.slug %>" tabindex="-1" aria-hidden="true">
+              <% if (adjacent.next.featured_image) { %>
+                <img src="<%= h.mediaUrl(adjacent.next.featured_image) %>" alt="" loading="lazy">
+              <% } %>
+            </a>
+            <div class="up-next__body">
+              <span class="kicker">Up next</span>
+              <h3><a href="/stories/<%= adjacent.next.slug %>"><%= adjacent.next.title %></a></h3>
+              <div class="up-next__meta">
+                <% if (adjacent.next.category_name) { %>
+                  <a href="/category/<%= adjacent.next.category_slug %>"><%= adjacent.next.category_name %></a>
+                  <span class="dot"></span>
+                <% } %>
+                <span><%= h.formatDate(adjacent.next.published_at, 'long') %></span>
+                <span class="dot"></span>
+                <span><%= adjacent.next.reading_time %> min read</span>
+                <% if (adjacent.next.comment_count) { %>
+                  <span class="dot"></span>
+                  <span><%= adjacent.next.comment_count %> comment<%= adjacent.next.comment_count === 1 ? '' : 's' %></span>
+                <% } %>
+              </div>
+              <div class="up-next__actions">
+                <button class="btn btn--accent btn--sm" type="button" data-load-next>Keep reading</button>
+                <a class="btn btn--ghost btn--sm" href="/stories/<%= adjacent.next.slug %>">Open story</a>
+              </div>
+            </div>
+          </div>
+          <div class="up-next__loaded" id="upNextContent" hidden></div>
+        </section>
+      <% } %>
+
       <section class="comments" id="comments">
         <div class="comments__head">
           <h2>Conversation</h2>
@@ -213,4 +247,27 @@
       </div>
     </div>
   </section>
+<% } %>
+
+<% if (adjacent.next && settings.before_you_go !== '0') { %>
+  <div class="bye-bar" id="byeBar" hidden data-bye-key="bye:<%= post.slug %>">
+    <div class="bye-bar__inner">
+      <span class="bye-bar__label">Before you go</span>
+      <a class="bye-bar__post" href="/stories/<%= adjacent.next.slug %>">
+        <% if (adjacent.next.featured_image) { %>
+          <img src="<%= h.mediaUrl(adjacent.next.featured_image) %>" alt="" loading="lazy">
+        <% } else { %>
+          <span class="bye-bar__thumb"></span>
+        <% } %>
+        <span class="bye-bar__text">
+          <b><%= adjacent.next.title %></b>
+          <span><%= adjacent.next.reading_time %> min read<% if (adjacent.next.category_name) { %> · <%= adjacent.next.category_name %><% } %></span>
+        </span>
+      </a>
+      <a class="btn btn--accent btn--sm" href="/stories/<%= adjacent.next.slug %>">Read next</a>
+      <button class="icon-btn" type="button" data-dismiss-bye aria-label="Dismiss this suggestion">
+        <%- h.icon('close', '', 15) %>
+      </button>
+    </div>
+  </div>
 <% } %>

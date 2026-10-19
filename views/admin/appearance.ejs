@@ -27,12 +27,12 @@
           <div class="field">
             <span class="label">Accent colour</span>
             <div class="color-row">
-              <input type="color" id="accent_color" name="accent_color" value="<%= settings.accent_color || '#0071e3' %>">
-              <span class="text-xs text-muted mono" data-accent-label><%= settings.accent_color || '#0071e3' %></span>
+              <input type="color" id="accent_color" name="accent_color" value="<%= settings.accent_color || '#206bea' %>">
+              <span class="text-xs text-muted mono" data-accent-label><%= settings.accent_color || '#206bea' %></span>
             </div>
             <div class="color-row" style="margin-top:8px">
               <% presets.forEach(function (preset) { %>
-                <button class="swatch <%= (settings.accent_color || '#0071e3') === preset.value ? 'is-active' : '' %>"
+                <button class="swatch <%= (settings.accent_color || '#206bea') === preset.value ? 'is-active' : '' %>"
                         type="button" style="background:<%= preset.value %>" title="<%= preset.name %>"
                         data-swatch="accent_color" data-color="<%= preset.value %>"></button>
               <% }); %>
@@ -55,11 +55,22 @@
           <label class="field"><span>Stories per page</span><input class="input" type="number" name="posts_per_page" min="3" max="36" value="<%= settings.posts_per_page || 9 %>"></label>
           <label class="field"><span>Featured slots</span><input class="input" type="number" name="homepage_featured_count" min="1" max="3" value="<%= settings.homepage_featured_count || 1 %>"></label>
         </div>
+        <label class="field"><span>Category spotlight</span>
+          <select class="select" name="spotlight_category">
+            <option value="">Automatic — the fullest topic</option>
+            <% (typeof categories !== 'undefined' ? categories : []).forEach(function (category) { %>
+              <option value="<%= category.slug %>" <%= settings.spotlight_category === category.slug ? 'selected' : '' %>><%= category.name %> (<%= category.post_count || 0 %>)</option>
+            <% }); %>
+          </select>
+          <span class="hint">Featured at the top of a topic on the home page.</span>
+        </label>
         <div class="grid" style="grid-template-columns:repeat(2,1fr);gap:4px">
           <label class="switch"><input type="checkbox" name="show_reading_time" <%= settings.show_reading_time !== '0' ? 'checked' : '' %>><span class="switch__track"></span><span class="switch__text"><b>Reading time</b><span>“6 min read” chips.</span></span></label>
           <label class="switch"><input type="checkbox" name="show_author_box" <%= settings.show_author_box !== '0' ? 'checked' : '' %>><span class="switch__track"></span><span class="switch__text"><b>Author box</b><span>Bio under each story.</span></span></label>
           <label class="switch"><input type="checkbox" name="show_related_posts" <%= settings.show_related_posts !== '0' ? 'checked' : '' %>><span class="switch__track"></span><span class="switch__text"><b>Related stories</b><span>Three suggestions at the end.</span></span></label>
           <label class="switch"><input type="checkbox" name="show_toc" <%= settings.show_toc !== '0' ? 'checked' : '' %>><span class="switch__track"></span><span class="switch__text"><b>Table of contents</b><span>Outline for long reads.</span></span></label>
+          <label class="switch"><input type="checkbox" name="auto_load_next" <%= settings.auto_load_next !== '0' ? 'checked' : '' %>><span class="switch__track"></span><span class="switch__text"><b>Up next</b><span>Load the next story inline at the end.</span></span></label>
+          <label class="switch"><input type="checkbox" name="before_you_go" <%= settings.before_you_go !== '0' ? 'checked' : '' %>><span class="switch__track"></span><span class="switch__text"><b>Before you go</b><span>Dismissible next-story bar.</span></span></label>
         </div>
         <button class="btn btn--accent btn--sm" type="submit"><%- h.icon('save', '', 14) %> Save appearance</button>
       </div>

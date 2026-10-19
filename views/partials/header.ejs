@@ -38,11 +38,24 @@
         <% if (navCategories.length) { %>
           <li class="has-dropdown">
             <a href="/categories">Topics <%- h.icon('chevron-down', '', 13) %></a>
-            <div class="dropdown">
-              <% navCategories.slice(0, 7).forEach(function (category) { %>
-                <a href="/category/<%= category.slug %>"><%= category.name %><span><%= category.post_count || 0 %></span></a>
+            <div class="mega">
+              <% navCategories.slice(0, 6).forEach(function (category) { %>
+                <a class="mega__item" href="/category/<%= category.slug %>">
+                  <% if (category.image) { %>
+                    <img class="mega__thumb" src="<%= h.mediaUrl(category.image) %>" alt="" loading="lazy">
+                  <% } else { %>
+                    <span class="mega__thumb"></span>
+                  <% } %>
+                  <span class="mega__body">
+                    <b><%= category.name %></b>
+                    <span><%= category.description || (category.post_count || 0) + ' stories' %></span>
+                  </span>
+                </a>
               <% }); %>
-              <a href="/categories"><b style="font-weight:560">All topics</b><span><%- h.icon('arrow-right', '', 13) %></span></a>
+              <div class="mega__foot">
+                <span><%= navCategories.length %> topics, <%= navCategories.reduce(function (sum, item) { return sum + (item.post_count || 0); }, 0) %> stories</span>
+                <a class="section-head__link" href="/categories">All topics <%- h.icon('arrow-right', '', 13) %></a>
+              </div>
             </div>
           </li>
         <% } %>
@@ -62,7 +75,7 @@
       <% if (currentUser) { %>
         <a class="icon-btn" href="/admin" aria-label="Open studio" title="Studio"><%- h.icon('layout', '', 18) %></a>
       <% } %>
-      <a class="btn btn--accent" href="#newsletter">Subscribe</a>
+      <button class="btn btn--accent" type="button" data-open-newsletter>Subscribe</button>
       <button class="icon-btn nav-toggle" type="button" data-open-menu aria-label="Open menu"><%- h.icon('menu', '', 18) %></button>
     </div>
   </div>
@@ -92,6 +105,7 @@
       </div>
     </div>
     <div class="mobile-nav__foot">
+      <button class="btn btn--accent btn--block" type="button" data-open-newsletter>Subscribe to the letter</button>
       <button class="btn btn--ghost btn--block" type="button" data-theme-toggle>Toggle appearance</button>
       <% if (currentUser) { %>
         <a class="btn btn--accent btn--block" href="/admin">Open Studio</a>

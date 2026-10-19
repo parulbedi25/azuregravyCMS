@@ -1,0 +1,22 @@
+<% if (settings.newsletter_enabled !== '0') { %>
+  <div class="pop" id="newsletterPopup" hidden>
+    <div class="pop__scrim" data-close-newsletter></div>
+    <div class="pop__card" role="dialog" aria-modal="true" aria-labelledby="newsletterPopupTitle">
+      <button class="pop__close" type="button" data-close-newsletter aria-label="Close">
+        <%- h.icon('close', '', 16) %>
+      </button>
+      <span class="kicker">The letter</span>
+      <h2 id="newsletterPopupTitle"><%= settings.newsletter_heading || 'The Sunday Letter' %></h2>
+      <p><%= settings.newsletter_text || 'One thoughtful letter each week. No noise, ever.' %></p>
+      <form class="pop__form" method="post" action="/newsletter">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <input type="hidden" name="redirect" value="<%= currentPath %>">
+        <div class="pop__row">
+          <input class="input" type="email" name="email" placeholder="you@example.com" required autocomplete="email" aria-label="Email address">
+          <button class="btn btn--accent" type="submit">Subscribe</button>
+        </div>
+        <span class="pop__hint"><%- h.icon('shield', '', 12) %> No spam. Unsubscribe in one click.</span>
+      </form>
+    </div>
+  </div>
+<% } %>

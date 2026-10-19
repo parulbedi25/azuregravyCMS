@@ -4,7 +4,7 @@ import { getDb } from '../db/index.js';
 import { asyncRoute, clientIp, pageParam, paginate, setFlash, verifyCsrf } from '../lib/http.js';
 import { renderMarkdown } from '../lib/markdown.js';
 import { articleJsonLd } from '../lib/seo.js';
-import { safeUrl } from '../lib/text.js';
+import { escapeHtml, formatDate, safeUrl } from '../lib/text.js';
 import {
   approvedCommentsTree, addComment,
 } from '../services/comments.js';
@@ -120,6 +120,15 @@ router.get(
 
     const grid = await listPosts({ type: 'post', page, perPage, sort: 'newest', excludeId: featuredId });
 
+    // Topic spotlight: the chosen category, or the fullest one.
+    const spotlight =
+      withCounts.find((category) => category.slug === settings.spotlight_category) ??
+      [...withCounts].sort((a, b) => (b.post_count ?? 0) - (a.post_count ?? 0))[0] ??
+      null;
+    const spotlightPosts = spotlight
+      ? (await listPosts({ type: 'post', page: 1, perPage: 5, category: spotlight.slug, sort: 'newest' })).posts
+      : [];
+
     res.render('public/home', {
       layout: 'layouts/public',
       title: 'Home',
@@ -131,6 +140,8 @@ router.get(
       pickPosts,
       categories: withCounts,
       mostRead: mostRead.posts,
+      spotlight,
+      spotlightPosts,
       tags,
       authors,
       grid: grid.posts,
@@ -222,6 +233,28 @@ router.get(
         logo: res.locals.settings.logo_image || undefined,
       }),
     });
+  }),
+);
+
+router.get(
+  '/stories/:slug/next',
+  asyncRoute(async (req, res) => {
+    const post = await getPostBySlug(req.params.slug, { type: 'post' });
+    if (!post) return res.status(404).json({ error: 'not_found' });
+    const { next } = await getAdjacentPosts(post);
+    if (!next) return res.status(404).json({ error: 'no_next' });
+
+    const full = await getPostBySlug(next.slug, { type: 'post' });
+    if (!full) return res.status(404).json({ error: 'no_next' });
+
+    const { html } = renderMarkdown(full.content);
+    const meta = [
+      full.author_name ? escapeHtml(full.author_name) : '',
+      full.published_at ? escapeHtml(formatDate(full.published_at, 'long')) : '',
+      `${full.reading_time} min read`,
+    ].filter(Boolean).join(' <span class="dot"></span> ');
+
+    res.json({ title: full.title, url: `/stories/${full.slug}`, html, meta });
   }),
 );
 

@@ -40,10 +40,23 @@
 
   <% if (posts.length === 0) { %>
     <div class="empty">
-      <%- h.icon('file-text', 'empty__icon', 44) %>
-      <h3>Nothing here yet</h3>
-      <p><%= search ? 'No stories matched that search. Try a shorter phrase.' : 'This corner of the journal is still being written.' %></p>
-      <a class="btn btn--ghost mt-8" href="/stories">Browse all stories</a>
+      <%- h.icon('search', 'empty__icon', 44) %>
+      <h3><%= search ? 'No stories matched “' + search + '”' : 'Nothing here yet' %></h3>
+      <p><%= search ? 'Try a shorter phrase, or start from a topic below.' : 'This corner of the journal is still being written.' %></p>
+      <div class="empty__suggest">
+        <form class="sort-form" method="get" action="/search" role="search">
+          <input class="input" type="search" name="q" value="<%= search %>" placeholder="Search the archive…" aria-label="Search stories">
+          <button class="btn btn--accent btn--sm" type="submit">Search</button>
+        </form>
+        <% if (categories.length) { %>
+          <div class="tag-cloud">
+            <% categories.filter(function (item) { return (item.post_count || 0) > 0; }).slice(0, 6).forEach(function (item) { %>
+              <a href="/category/<%= item.slug %>"><%= item.name %><span><%= item.post_count %></span></a>
+            <% }); %>
+          </div>
+        <% } %>
+        <a class="btn btn--ghost mt-8" href="/stories">Browse all stories</a>
+      </div>
     </div>
   <% } else { %>
     <div class="grid grid--3">
