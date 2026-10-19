@@ -1,0 +1,81 @@
+<section class="page-head">
+  <div class="container">
+    <nav class="breadcrumbs" aria-label="Breadcrumb">
+      <a href="/">Home</a> <span>/</span>
+      <span><%= heading %></span>
+    </nav>
+    <div class="page-head__inner">
+      <div>
+        <span class="kicker"><%= category ? 'Category' : (tag ? 'Tag' : (author ? 'Author' : (search ? 'Search' : 'Library'))) %></span>
+        <h1 style="margin-top:10px"><%= heading %></h1>
+        <% if (subheading) { %><p><%= subheading %></p><% } %>
+      </div>
+      <div class="row row--wrap" style="gap:10px">
+        <span class="chip chip--accent"><%= total %> stor<%= total === 1 ? 'y' : 'ies' %></span>
+        <% if (search) { %><a class="chip" href="<%= basePath %>">Clear search</a><% } %>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="container">
+  <% if (categories.length && !category) { %>
+    <div class="filter-row">
+      <span class="filter-row__label">Topics</span>
+      <a class="chip <%= !query.category ? 'chip--accent' : '' %>" href="<%= basePath %>">All</a>
+      <% categories.filter(function (item) { return (item.post_count || 0) > 0; }).forEach(function (item) { %>
+        <a class="chip <%= category && category.slug === item.slug ? 'chip--accent' : '' %>" href="/category/<%= item.slug %>"><%= item.name %><span class="muted" style="margin-left:2px"><%= item.post_count %></span></a>
+      <% }); %>
+      <form class="sort-form" method="get" action="<%= basePath %>">
+        <% if (search) { %><input type="hidden" name="q" value="<%= search %>"><% } %>
+        <label class="visually-hidden" for="sort">Sort stories</label>
+        <select class="select" name="sort" id="sort" onchange="this.form.submit()">
+          <option value="newest" <%= sort === 'newest' ? 'selected' : '' %>>Newest first</option>
+          <option value="oldest" <%= sort === 'oldest' ? 'selected' : '' %>>Oldest first</option>
+          <option value="popular" <%= sort === 'popular' ? 'selected' : '' %>>Most read</option>
+        </select>
+      </form>
+    </div>
+  <% } %>
+
+  <% if (posts.length === 0) { %>
+    <div class="empty">
+      <%- h.icon('search', 'empty__icon', 44) %>
+      <h3><%= search ? 'No stories matched “' + search + '”' : 'Nothing here yet' %></h3>
+      <p><%= search ? 'Try a shorter phrase, or start from a topic below.' : 'This corner of the journal is still being written.' %></p>
+      <div class="empty__suggest">
+        <form class="sort-form" method="get" action="/search" role="search">
+          <input class="input" type="search" name="q" value="<%= search %>" placeholder="Search the archive…" aria-label="Search stories">
+          <button class="btn btn--accent btn--sm" type="submit">Search</button>
+        </form>
+        <% if (categories.length) { %>
+          <div class="tag-cloud">
+            <% categories.filter(function (item) { return (item.post_count || 0) > 0; }).slice(0, 6).forEach(function (item) { %>
+              <a href="/category/<%= item.slug %>"><%= item.name %><span><%= item.post_count %></span></a>
+            <% }); %>
+          </div>
+        <% } %>
+        <a class="btn btn--ghost mt-8" href="/stories">Browse all stories</a>
+      </div>
+    </div>
+  <% } else { %>
+    <div class="grid grid--3">
+      <% posts.forEach(function (post, index) { %>
+        <%- include('../partials/post-card', { post: post, variant: index === 0 && pagination.page === 1 ? 'feature' : 'default', reveal: true, delay: index * 60 }) %>
+      <% }); %>
+    </div>
+
+    <%- include('../partials/pagination', { pagination: pagination, basePath: basePath }) %>
+
+    <% if (tags.length) { %>
+      <div class="section-head" style="margin-top:56px">
+        <div><span class="kicker">Keep exploring</span><h2 style="margin-top:8px;font-size:1.4rem">Popular tags</h2></div>
+      </div>
+      <div class="tag-cloud">
+        <% tags.filter(function (item) { return (item.post_count || 0) > 0; }).slice(0, 24).forEach(function (item) { %>
+          <a href="/tag/<%= item.slug %>">#<%= item.name %><span><%= item.post_count %></span></a>
+        <% }); %>
+      </div>
+    <% } %>
+  <% } %>
+</section>

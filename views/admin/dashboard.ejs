@@ -1,0 +1,189 @@
+<%
+  const hour = new Date().getUTCHours();
+  const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+  const maxViews = Math.max(1, ...stats.views.series.map(function (point) { return point.views; }));
+%>
+
+<div class="admin-page-head">
+  <div>
+    <h1><%= greeting %>, <%= currentUser.name.split(' ')[0] %>.</h1>
+    <p><%= h.formatDate(new Date(), 'long') %> · <%= stats.publishingStreak > 0 ? stats.publishingStreak + '-day publishing streak' : 'The page is quiet — publish something today' %></p>
+  </div>
+  <div class="admin-page-head__actions">
+    <a class="btn btn--ghost btn--sm" href="/admin/media"><%- h.icon('upload', '', 14) %> Upload</a>
+    <a class="btn btn--accent btn--sm" href="/admin/posts/new"><%- h.icon('plus', '', 14) %> New story</a>
+  </div>
+</div>
+
+<div class="stat-grid">
+  <a class="stat-card" href="/admin/posts?status=published">
+    <div class="stat-card__top">
+      <span class="stat-card__label">Published</span>
+      <span class="stat-card__icon"><%- h.icon('file-text', '', 15) %></span>
+    </div>
+    <span class="stat-card__value"><%= h.formatNumber(stats.posts.published) %></span>
+    <span class="stat-card__foot"><%= stats.posts.draft %> draft<%= stats.posts.draft === 1 ? '' : 's' %> · <%= stats.posts.scheduled %> scheduled</span>
+  </a>
+
+  <a class="stat-card" href="/admin/tools">
+    <div class="stat-card__top">
+      <span class="stat-card__label">Views · 30 days</span>
+      <span class="stat-card__icon"><%- h.icon('trending', '', 15) %></span>
+    </div>
+    <span class="stat-card__value"><%= h.formatNumber(stats.views.last30) %></span>
+    <span class="stat-card__foot">
+      <span class="trend <%= stats.views.delta >= 0 ? 'trend--up' : 'trend--down' %>">
+        <%- h.icon(stats.views.delta >= 0 ? 'arrow-up-right' : 'arrow-down-right', '', 12) %>
+        <%= Math.abs(stats.views.delta) %>%
+      </span>
+      vs previous 15 days
+    </span>
+  </a>
+
+  <a class="stat-card" href="/admin/comments">
+    <div class="stat-card__top">
+      <span class="stat-card__label">Comments</span>
+      <span class="stat-card__icon"><%- h.icon('comment', '', 15) %></span>
+    </div>
+    <span class="stat-card__value"><%= h.formatNumber(stats.comments.total) %></span>
+    <span class="stat-card__foot">
+      <% if (stats.comments.pending) { %>
+        <span class="pill pill--pending"><%= stats.comments.pending %> awaiting review</span>
+      <% } else { %>
+        <span class="pill pill--approved">All caught up</span>
+      <% } %>
+    </span>
+  </a>
+
+  <a class="stat-card" href="/admin/subscribers">
+    <div class="stat-card__top">
+      <span class="stat-card__label">Subscribers</span>
+      <span class="stat-card__icon"><%- h.icon('mail', '', 15) %></span>
+    </div>
+    <span class="stat-card__value"><%= h.formatNumber(stats.subscribers.confirmed) %></span>
+    <span class="stat-card__foot"><%= stats.subscribers.total %> on the list<%= stats.subscribers.total - stats.subscribers.confirmed > 0 ? ' · ' + (stats.subscribers.total - stats.subscribers.confirmed) + ' pending' : '' %></span>
+  </a>
+</div>
+
+<div class="dash-grid">
+  <div class="panel">
+    <div class="panel__head">
+      <div>
+        <h2>Readership, last 30 days</h2>
+        <p>Page views across published stories</p>
+      </div>
+      <span class="pill pill--plain"><%= h.formatNumber(stats.views.total) %> all-time</span>
+    </div>
+    <div class="panel__body">
+      <div class="chart" role="img" aria-label="Daily page views for the last 30 days">
+        <% stats.views.series.forEach(function (point, index) { %>
+          <div class="chart__bar" data-label="<%= point.label %>: <%= point.views %> views" title="<%= point.label %> — <%= point.views %> views">
+            <span style="height: <%= Math.max(2, Math.round((point.views / maxViews) * 100)) %>%"></span>
+            <% if (index % 5 === 0 || index === stats.views.series.length - 1) { %><small><%= point.label %></small><% } %>
+          </div>
+        <% }); %>
+      </div>
+      <div class="chart-legend">
+        <span>Peak day: <%= h.formatNumber(maxViews) %> views</span>
+        <span>Source: first-party page views</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="stack-16">
+    <div class="panel">
+      <div class="panel__head"><h2>Quick actions</h2></div>
+      <div class="panel__body">
+        <div class="quick-actions">
+          <a class="quick-action" href="/admin/posts/new"><%- h.icon('pen', '', 16) %> Write a story</a>
+          <a class="quick-action" href="/admin/posts/new?type=page"><%- h.icon('files', '', 16) %> New page</a>
+          <a class="quick-action" href="/admin/media"><%- h.icon('image-plus', '', 16) %> Add media</a>
+          <a class="quick-action" href="/admin/categories"><%- h.icon('layout', '', 16) %> Categories</a>
+          <a class="quick-action" href="/admin/subscribers"><%- h.icon('mail', '', 16) %> Subscribers</a>
+          <a class="quick-action" href="/admin/settings"><%- h.icon('sliders', '', 16) %> Settings</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel__head">
+        <h2>In progress</h2>
+        <a class="text-xs text-muted" href="/admin/posts?status=draft">View all</a>
+      </div>
+      <div class="panel__body panel__body--flush">
+        <% if (stats.recentDrafts.length === 0) { %>
+          <div class="empty-state" style="padding:28px 16px">
+            <%- h.icon('file-text') %>
+            <p>Nothing in progress. A clean desk.</p>
+          </div>
+        <% } else { %>
+          <ul class="activity-list">
+            <% stats.recentDrafts.forEach(function (post) { %>
+              <li>
+                <span class="activity-dot" style="background:<%= post.status === 'scheduled' ? '#8b5cf6' : '#b4741b' %>"></span>
+                <span>
+                  <a href="/admin/posts/<%= post.id %>/edit" style="font-weight:540"><%= post.title %></a>
+                  <span class="text-xs text-muted" style="display:block;text-transform:capitalize"><%= post.status %><% if (post.status === 'scheduled' && post.published_at) { %> for <%= h.formatDateTime(post.published_at) %><% } else { %> · edited <%= h.timeAgo(post.updated_at) %><% } %></span>
+                </span>
+              </li>
+            <% }); %>
+          </ul>
+        <% } %>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="admin-grid-2" style="margin-top:14px">
+  <div class="panel">
+    <div class="panel__head">
+      <div><h2>Most read stories</h2><p>All time</p></div>
+      <a class="text-xs text-muted" href="/admin/posts?sort=popular">All stories</a>
+    </div>
+    <div class="table-wrap">
+      <table class="table">
+        <tbody>
+          <% stats.topPosts.forEach(function (post, index) { %>
+            <tr>
+              <td style="width:26px"><span class="text-xs text-muted"><%= String(index + 1).padStart(2, '0') %></span></td>
+              <td>
+                <div class="cell-title">
+                  <% if (post.featured_image) { %><img src="<%= h.mediaUrl(post.featured_image) %>" alt="" loading="lazy"><% } %>
+                  <div class="cell-title__text">
+                    <b><a href="/admin/posts/<%= post.id %>/edit"><%= post.title %></a></b>
+                    <small><%= post.category_name || 'Uncategorised' %></small>
+                  </div>
+                </div>
+              </td>
+              <td class="nowrap text-xs text-muted" style="text-align:right"><%= h.formatNumber(post.views) %> views</td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel__head">
+      <h2>Recent activity</h2>
+      <a class="text-xs text-muted" href="/admin/tools">System log</a>
+    </div>
+    <ul class="activity-list">
+      <% activity.forEach(function (entry) { %>
+        <li>
+          <span class="activity-dot <%= entry.action.startsWith('comment') ? 'activity-dot--comment' : (entry.action.startsWith('media') ? 'activity-dot--media' : (entry.action.startsWith('user') ? 'activity-dot--user' : '')) %>"></span>
+          <span>
+            <b><%= entry.user_name || 'System' %></b>
+            <span class="text-muted"><%= entry.action.replace(':', ' ') %></span>
+            <% if (entry.subject) { %><span class="text-muted">— <%= h.truncate(entry.subject, 52) %></span><% } %>
+          </span>
+          <time><%= h.timeAgo(entry.created_at) %></time>
+        </li>
+      <% }); %>
+    </ul>
+    <div style="padding:12px 18px;border-top:1px solid var(--admin-line);display:flex;gap:8px;flex-wrap:wrap">
+      <span class="pill pill--plain"><%- h.icon('database', '', 12) %> <%= dbInfo.engine %></span>
+      <span class="pill pill--plain"><%= dbInfo.version %></span>
+    </div>
+  </div>
+</div>

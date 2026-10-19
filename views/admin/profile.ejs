@@ -1,0 +1,59 @@
+<div class="admin-page-head">
+  <div>
+    <h1>Your profile</h1>
+    <p>This is what readers see on your author page and under your stories.</p>
+  </div>
+  <div class="admin-page-head__actions">
+    <a class="btn btn--ghost btn--sm" href="/author/<%= currentUser.id %>" target="_blank" rel="noopener"><%- h.icon('external', '', 14) %> Public profile</a>
+  </div>
+</div>
+
+<div class="admin-grid-side">
+  <form class="panel" method="post" action="/admin/profile">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <div class="panel__head"><h2>Profile details</h2></div>
+    <div class="panel__body form-grid">
+      <div class="form-grid form-grid--2">
+        <label class="field"><span>Name</span><input class="input" name="name" value="<%= currentUser.name %>" required></label>
+        <label class="field"><span>Email</span><input class="input" type="email" name="email" value="<%= currentUser.email %>" required></label>
+      </div>
+      <label class="field"><span>Bio</span><textarea class="textarea" name="bio" rows="4" placeholder="A couple of sentences about you and what you write."><%= currentUser.bio || '' %></textarea></label>
+      <div class="form-grid form-grid--2">
+        <label class="field"><span>Website</span><input class="input" name="website" value="<%= currentUser.website || '' %>" placeholder="https://"></label>
+        <label class="field"><span>Twitter / X</span><input class="input" name="twitter" value="<%= currentUser.twitter || '' %>" placeholder="handle"></label>
+      </div>
+      <div class="form-grid form-grid--2">
+        <label class="field"><span>LinkedIn</span><input class="input" name="linkedin" value="<%= currentUser.linkedin || '' %>" placeholder="https://linkedin.com/in/…"></label>
+        <label class="field"><span>Avatar URL</span><input class="input" name="avatar" value="<%= currentUser.avatar || '' %>" placeholder="/uploads/…"></label>
+      </div>
+      <div class="row row--between">
+        <span class="text-xs text-muted">Role: <b style="text-transform:capitalize"><%= currentUser.role %></b> — ask an admin to change it.</span>
+        <button class="btn btn--accent btn--sm" type="submit"><%- h.icon('save', '', 14) %> Save profile</button>
+      </div>
+    </div>
+  </form>
+
+  <div class="stack-16">
+    <div class="panel">
+      <div class="panel__head"><h2>Change password</h2></div>
+      <form class="panel__body form-grid" method="post" action="/admin/profile/password">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <label class="field"><span>Current password</span><input class="input" type="password" name="current_password" required autocomplete="current-password"></label>
+        <label class="field"><span>New password</span><input class="input" type="password" name="new_password" required minlength="8" autocomplete="new-password"></label>
+        <label class="field"><span>Confirm new password</span><input class="input" type="password" name="confirm_password" required minlength="8" autocomplete="new-password"></label>
+        <button class="btn btn--ghost btn--sm" type="submit"><%- h.icon('key', '', 14) %> Update password</button>
+      </form>
+    </div>
+
+    <div class="panel">
+      <div class="panel__body" style="display:grid;gap:12px;justify-items:start">
+        <%- include('../partials/avatar', { avatar: currentUser.avatar, name: currentUser.name, size: 'xl' }) %>
+        <div>
+          <b style="display:block"><%= currentUser.name %></b>
+          <span class="text-xs text-muted">Joined <%= h.formatDate(currentUser.created_at, 'medium') %></span>
+        </div>
+        <p class="text-xs text-muted" style="margin:0">Signed in as <b><%= currentUser.email %></b></p>
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,72 @@
+<div class="admin-page-head">
+  <div>
+    <h1>People</h1>
+    <p><%= users.length %> accounts · admins manage everything, editors write and moderate, authors own their stories</p>
+  </div>
+  <div class="admin-page-head__actions">
+    <a class="btn btn--accent btn--sm" href="/admin/users/new"><%- h.icon('plus', '', 14) %> Invite a writer</a>
+  </div>
+</div>
+
+<div class="panel">
+  <div class="table-wrap">
+    <table class="table">
+      <thead>
+        <tr><th>Person</th><th>Role</th><th>Stories</th><th>Published</th><th>Last sign-in</th><th>Joined</th><th style="width:90px"></th></tr>
+      </thead>
+      <tbody>
+        <% users.forEach(function (user) { %>
+          <tr>
+            <td>
+              <div class="cell-title" style="min-width:220px">
+                <%- include('../partials/avatar', { avatar: user.avatar, name: user.name }) %>
+                <div class="cell-title__text">
+                  <b><%= user.name %><% if (user.id === currentUser.id) { %> <span class="text-xs text-muted">(you)</span><% } %></b>
+                  <small><%= user.email %></small>
+                </div>
+              </div>
+            </td>
+            <td><span class="pill pill--role"><%= user.role %></span></td>
+            <td class="text-xs"><%= user.post_count || 0 %></td>
+            <td class="text-xs"><%= user.published_count || 0 %></td>
+            <td class="text-xs text-muted"><%= user.last_login_at ? h.timeAgo(user.last_login_at) : 'never' %></td>
+            <td class="text-xs text-muted"><%= h.formatDate(user.created_at, 'medium') %></td>
+            <td>
+              <div class="cell-actions">
+                <a class="row-action" href="/author/<%= user.id %>" target="_blank" rel="noopener" title="Public profile"><%- h.icon('external', '', 14) %></a>
+                <a class="row-action" href="/admin/users/<%= user.id %>" title="Edit"><%- h.icon('pen', '', 14) %></a>
+                <% if (user.id !== currentUser.id) { %>
+                  <form method="post" action="/admin/users/<%= user.id %>/delete" data-confirm="Delete <%= user.name %>? Their stories will be deleted too.">
+                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                    <button class="row-action row-action--danger" type="submit" title="Delete"><%- h.icon('trash', '', 14) %></button>
+                  </form>
+                <% } %>
+              </div>
+            </td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="admin-grid-3" style="margin-top:14px">
+  <div class="panel">
+    <div class="panel__body">
+      <span class="pill pill--role">Admin</span>
+      <p class="text-sm text-muted" style="margin:10px 0 0">Full access: settings, users, appearance, system tools and every story.</p>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="panel__body">
+      <span class="pill pill--role">Editor</span>
+      <p class="text-sm text-muted" style="margin:10px 0 0">Can write, edit and publish anything, moderate comments and manage media and navigation.</p>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="panel__body">
+      <span class="pill pill--role">Author</span>
+      <p class="text-sm text-muted" style="margin:10px 0 0">Writes and manages their own stories, uploads media and edits their profile.</p>
+    </div>
+  </div>
+</div>

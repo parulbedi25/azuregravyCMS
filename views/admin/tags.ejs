@@ -1,0 +1,55 @@
+<div class="admin-page-head">
+  <div>
+    <h1>Tags</h1>
+    <p><%= tags.length %> tags in use across the publication</p>
+  </div>
+</div>
+
+<div class="admin-grid-side">
+  <div class="panel">
+    <div class="panel__head"><h2>All tags</h2><span class="text-xs text-muted">Click a name to rename</span></div>
+    <div class="table-wrap">
+      <table class="table">
+        <thead><tr><th>Tag</th><th>Slug</th><th>Stories</th><th style="width:90px"></th></tr></thead>
+        <tbody>
+          <% tags.forEach(function (tag) { %>
+            <tr>
+              <td>
+                <form method="post" action="/admin/tags/<%= tag.id %>" class="row">
+                  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                  <input class="input input-sm" name="name" value="<%= tag.name %>" style="max-width:220px">
+                  <input type="hidden" name="description" value="<%= tag.description || '' %>">
+                  <button class="row-action" type="submit" title="Rename"><%- h.icon('check', '', 13) %></button>
+                </form>
+              </td>
+              <td class="mono text-xs text-muted">#<%= tag.slug %></td>
+              <td><a class="text-xs" href="/admin/posts?q=<%= encodeURIComponent(tag.name) %>"><%= tag.post_count || 0 %></a></td>
+              <td>
+                <div class="cell-actions">
+                  <a class="row-action" href="/tag/<%= tag.slug %>" target="_blank" rel="noopener" title="View"><%- h.icon('eye', '', 14) %></a>
+                  <form method="post" action="/admin/tags/<%= tag.id %>/delete" data-confirm="Delete the tag “<%= tag.name %>”?">
+                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                    <button class="row-action row-action--danger" type="submit" title="Delete"><%- h.icon('trash', '', 14) %></button>
+                  </form>
+                </div>
+              </td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="panel" style="position:sticky;top:calc(var(--admin-topbar) + 16px)">
+    <div class="panel__head"><h2>Add a tag</h2></div>
+    <form class="panel__body form-grid" method="post" action="/admin/tags">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <label class="field"><span>Name</span><input class="input" name="name" placeholder="e.g. slow living" required></label>
+      <label class="field"><span>Description</span><textarea class="textarea" name="description" rows="3" placeholder="Optional context for the tag archive."></textarea></label>
+      <button class="btn btn--accent btn--sm" type="submit"><%- h.icon('plus', '', 14) %> Create tag</button>
+    </form>
+    <div class="panel__body" style="border-top:1px solid var(--admin-line)">
+      <p class="text-xs text-muted" style="margin:0">Tags are also created automatically when you add them on a story — type freely in the editor.</p>
+    </div>
+  </div>
+</div>

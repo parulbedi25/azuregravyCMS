@@ -1,0 +1,19 @@
+<% if (pagination.pageCount > 1) { %>
+  <nav class="pagination" aria-label="Pagination">
+    <a class="<%= pagination.hasPrev ? '' : 'is-disabled' %>" href="<%= basePath %><%= pagination.hasPrev ? qs({ page: pagination.page - 1 }) : '' %>" aria-label="Previous page" <%= pagination.hasPrev ? '' : 'aria-disabled="true"' %>>
+      <%- h.icon('arrow-left', '', 15) %>
+    </a>
+    <% pagination.pages.forEach(function (item) { %>
+      <% if (item === '…') { %>
+        <span class="ellipsis">…</span>
+      <% } else if (item === pagination.page) { %>
+        <span class="is-current" aria-current="page"><%= item %></span>
+      <% } else { %>
+        <a href="<%= basePath %><%= qs({ page: item }) %>"><%= item %></a>
+      <% } %>
+    <% }); %>
+    <a class="<%= pagination.hasNext ? '' : 'is-disabled' %>" href="<%= basePath %><%= pagination.hasNext ? qs({ page: pagination.page + 1 }) : '' %>" aria-label="Next page" <%= pagination.hasNext ? '' : 'aria-disabled="true"' %>>
+      <%- h.icon('arrow-right', '', 15) %>
+    </a>
+  </nav>
+<% } %>

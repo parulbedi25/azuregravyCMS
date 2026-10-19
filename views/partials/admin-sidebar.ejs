@@ -1,0 +1,75 @@
+<%
+  const nav = [
+    { group: 'Overview', items: [
+      { key: 'dashboard', label: 'Dashboard', url: '/admin', icon: 'home' },
+    ]},
+    { group: 'Content', items: [
+      { key: 'posts', label: 'Stories', url: '/admin/posts', icon: 'file-text', count: navCounts.drafts || 0 },
+      { key: 'pages', label: 'Pages', url: '/admin/posts?type=page', icon: 'files' },
+      { key: 'categories', label: 'Categories', url: '/admin/categories', icon: 'layout' },
+      { key: 'tags', label: 'Tags', url: '/admin/tags', icon: 'tag' },
+      { key: 'media', label: 'Media', url: '/admin/media', icon: 'image' },
+    ]},
+    { group: 'Community', items: [
+      { key: 'comments', label: 'Comments', url: '/admin/comments', icon: 'comment', count: navCounts.pending || 0, hot: true },
+      { key: 'subscribers', label: 'Subscribers', url: '/admin/subscribers', icon: 'mail' },
+      { key: 'messages', label: 'Inbox', url: '/admin/messages', icon: 'message-square', count: navCounts.unread || 0 },
+    ]},
+    { group: 'Publication', items: [
+      { key: 'appearance', label: 'Appearance', url: '/admin/appearance', icon: 'palette', adminOnly: true },
+      { key: 'menus', label: 'Navigation', url: '/admin/menus', icon: 'list', editorOnly: true },
+      { key: 'redirects', label: 'Redirects', url: '/admin/redirects', icon: 'corner-down-right', editorOnly: true },
+      { key: 'settings', label: 'Settings', url: '/admin/settings', icon: 'settings', adminOnly: true },
+      { key: 'users', label: 'People', url: '/admin/users', icon: 'users', adminOnly: true },
+      { key: 'tools', label: 'System', url: '/admin/tools', icon: 'database', adminOnly: true },
+    ]},
+  ];
+%>
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar__brand">
+    <a class="brand" href="/admin">
+      <span class="brand__mark"><%= h.setting('logo_text', 'G').slice(0, 1) %></span>
+      <span class="brand__name"><%= h.setting('logo_text', siteName) %></span>
+    </a>
+    <span class="badge-studio">Studio</span>
+    <button class="icon-btn sidebar__close" type="button" data-close-sidebar aria-label="Close menu" style="border:0;background:transparent;color:#a7adbb"><%- h.icon('close', '', 16) %></button>
+  </div>
+
+  <div class="sidebar__scroll">
+    <% nav.forEach(function (section) { %>
+      <div class="nav-group">
+        <div class="nav-group__title"><span><%= section.group %></span></div>
+        <% section.items.forEach(function (item) { %>
+          <% if (item.adminOnly && !can.admin) return; %>
+          <% if (item.editorOnly && !can.editor) return; %>
+          <a href="<%= item.url %>" class="<%= page === item.key ? 'is-active' : '' %>">
+            <%- h.icon(item.icon) %>
+            <span><%= item.label %></span>
+            <% if (item.count) { %><span class="nav-group__count <%= item.hot ? 'nav-group__count--hot' : '' %>"><%= item.count %></span><% } %>
+          </a>
+        <% }); %>
+      </div>
+    <% }); %>
+
+    <div class="nav-group" style="margin-bottom: 4px">
+      <div class="nav-group__title"><span>Shortcuts</span></div>
+      <a href="/admin/posts/new"><%- h.icon('plus') %><span>New story</span></a>
+      <a href="/admin/media"><%- h.icon('upload') %><span>Upload media</span></a>
+      <a href="/" target="_blank" rel="noopener"><%- h.icon('external') %><span>View site</span></a>
+    </div>
+  </div>
+
+  <div class="sidebar__foot">
+    <div class="sidebar-user">
+      <%- include('../partials/avatar', { avatar: currentUser.avatar, name: currentUser.name }) %>
+      <span class="sidebar-user__meta">
+        <b><%= currentUser.name %></b>
+        <span><%= currentUser.role %></span>
+      </span>
+      <form method="post" action="/admin/logout">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <button class="icon-btn" type="submit" aria-label="Sign out" title="Sign out"><%- h.icon('log-out', '', 15) %></button>
+      </form>
+    </div>
+  </div>
+</aside>

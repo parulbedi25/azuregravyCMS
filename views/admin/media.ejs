@@ -1,0 +1,87 @@
+<div class="admin-page-head">
+  <div>
+    <h1>Media library</h1>
+    <p><%= stats.total %> images · <%= (stats.bytes / 1024 / 1024).toFixed(1) %> MB stored</p>
+  </div>
+  <div class="admin-page-head__actions">
+    <a class="btn btn--ghost btn--sm" href="/admin/media?type=image"><%- h.icon('grid', '', 14) %> Grid</a>
+  </div>
+</div>
+
+<form method="post" action="/admin/media" enctype="multipart/form-data">
+  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+  <label class="dropzone" id="dropzone">
+    <%- h.icon('upload', '', 26) %>
+    <span><b>Drop images here</b> or click to browse</span>
+    <span class="text-xs">JPG, PNG, WebP, GIF or AVIF · up to 12 MB each · multiple files welcome</span>
+    <input type="file" id="mediaFileInput" name="files" accept="image/*" multiple hidden>
+  </label>
+</form>
+
+<div class="media-toolbar">
+  <form method="get" action="/admin/media" class="flex gap-8" style="flex:1;flex-wrap:wrap">
+    <label class="search-field">
+      <%- h.icon('search', '', 15) %>
+      <input class="input" type="search" name="q" value="<%= search %>" placeholder="Search by name or alt text…">
+    </label>
+    <select class="select" name="type" data-auto-submit style="width:auto">
+      <option value="all" <%= type === 'all' ? 'selected' : '' %>>All files</option>
+      <option value="image" <%= type === 'image' ? 'selected' : '' %>>Images</option>
+    </select>
+    <button class="btn btn--soft btn--sm" type="submit">Search</button>
+    <% if (search) { %><a class="btn btn--ghost btn--sm" href="/admin/media">Clear</a><% } %>
+  </form>
+</div>
+
+<% if (media.length === 0) { %>
+  <div class="panel"><div class="empty-state">
+    <%- h.icon('image') %>
+    <h3>The library is empty</h3>
+    <p>Upload a few images to use as covers, inline figures and social cards.</p>
+  </div></div>
+<% } else { %>
+  <div class="media-grid">
+    <% media.forEach(function (item) { %>
+      <div class="media-item">
+        <a class="media-item__thumb" href="<%= item.path %>" target="_blank" rel="noopener">
+          <img src="<%= item.path %>" alt="<%= item.alt_text || item.original_name %>" loading="lazy">
+          <span class="media-item__ext"><%= (item.mime_type.split('/')[1] || 'img').toUpperCase() %></span>
+        </a>
+        <div class="media-item__actions">
+          <button type="button" data-copy="<%= item.path %>" title="Copy URL"><%- h.icon('copy', '', 13) %></button>
+          <button type="button" data-pick-media="unused" hidden></button>
+        </div>
+        <div class="media-item__meta">
+          <b title="<%= item.original_name %>"><%= item.original_name %></b>
+          <span><%= item.width || '?' %> × <%= item.height || '?' %> · <%= (item.size / 1024).toFixed(0) %> KB</span>
+        </div>
+        <form method="post" action="/admin/media/<%= item.id %>" class="row" style="padding:0 10px 10px;gap:6px">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <input type="hidden" name="redirect" value="/admin/media">
+          <input class="input input-sm" name="alt_text" value="<%= item.alt_text || '' %>" placeholder="Alt text" style="font-size:.74rem;padding:5px 8px">
+          <button class="row-action" type="submit" title="Save alt text"><%- h.icon('check', '', 13) %></button>
+        </form>
+        <form method="post" action="/admin/media/<%= item.id %>/delete" style="position:absolute;bottom:0;right:0" data-confirm="Delete this image? Stories using it will lose the image.">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <input type="hidden" name="redirect" value="/admin/media">
+          <button class="row-action row-action--danger" type="submit" title="Delete" style="margin:6px"><%- h.icon('trash', '', 13) %></button>
+        </form>
+      </div>
+    <% }); %>
+  </div>
+
+  <% if (pagination.pageCount > 1) { %>
+    <div class="pager" style="border:0">
+      <span>Showing <%= pagination.from %>–<%= pagination.to %> of <%= pagination.total %></span>
+      <div class="pager__links">
+        <a class="<%= pagination.hasPrev ? '' : 'is-disabled' %>" href="/admin/media<%= qs({ page: pagination.page - 1 }) %>"><%- h.icon('chevron-left', '', 13) %></a>
+        <% pagination.pages.forEach(function (item) { %>
+          <% if (item === '…') { %><span>…</span><% } else { %>
+            <a class="<%= item === pagination.page ? 'is-current' : '' %>" href="/admin/media<%= qs({ page: item }) %>"><%= item %></a>
+          <% } %>
+        <% }); %>
+        <a class="<%= pagination.hasNext ? '' : 'is-disabled' %>" href="/admin/media<%= qs({ page: pagination.page + 1 }) %>"><%- h.icon('chevron-right', '', 13) %></a>
+      </div>
+    </div>
+  <% } %>
+<% } %>

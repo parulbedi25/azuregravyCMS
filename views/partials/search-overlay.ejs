@@ -1,0 +1,16 @@
+<div class="search-overlay" id="searchOverlay" role="dialog" aria-modal="true" aria-label="Search">
+  <div class="search-panel">
+    <form action="/search" method="get" role="search">
+      <%- h.icon('search', '', 20) %>
+      <input type="search" name="q" id="searchInput" placeholder="Search stories, topics and authors…" autocomplete="off" aria-label="Search">
+      <kbd>Esc</kbd>
+    </form>
+    <div class="search-panel__hints">
+      <span>Try a topic</span>
+      <% navCategories.slice(0, 5).forEach(function (category) { %>
+        <a class="chip" href="/search?q=<%= encodeURIComponent(category.name) %>"><%= category.name %></a>
+      <% }); %>
+    </div>
+    <div class="search-panel__results" id="searchResults" aria-live="polite"></div>
+  </div>
+</div>

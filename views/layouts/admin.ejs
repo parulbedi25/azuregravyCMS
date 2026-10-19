@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en" data-theme="<%= typeof theme !== 'undefined' ? theme : 'light' %>">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title><%= title %> · <%= siteName %> Studio</title>
+  <link rel="icon" href="/assets/img/favicon.svg" type="image/svg+xml">
+  <link rel="preload" href="/assets/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/assets/css/base.css">
+  <link rel="stylesheet" href="/assets/css/admin.css">
+  <%- typeof accentStyles !== 'undefined' ? accentStyles : '' %>
+  <script>
+    (function () {
+      try {
+        var stored = localStorage.getItem('gravy-theme');
+        if (stored) document.documentElement.dataset.theme = stored;
+      } catch (e) {}
+    })();
+  </script>
+</head>
+<body class="admin-body" data-page="<%= page %>">
+  <div class="admin-shell">
+    <%- include('../partials/admin-sidebar') %>
+
+    <div class="admin-main">
+      <%- include('../partials/admin-topbar') %>
+      <div class="admin-content">
+        <%- body %>
+      </div>
+    </div>
+  </div>
+
+  <% if (flash && flash.length) { %>
+    <div class="toast-stack" id="toastStack">
+      <% flash.forEach(function (item) { %>
+        <div class="toast toast--<%= item.type %>" role="status">
+          <%- h.icon(item.type === 'error' ? 'alert-circle' : (item.type === 'success' ? 'check-circle' : 'info'), '', 18) %>
+          <span><%= item.message %></span>
+          <button class="toast__close" data-toast-close aria-label="Dismiss"><%- h.icon('close', '', 14) %></button>
+        </div>
+      <% }); %>
+    </div>
+  <% } %>
+
+  <div class="modal" id="mediaModal" aria-hidden="true">
+    <div class="modal__scrim" data-close-modal></div>
+    <div class="modal__dialog" role="dialog" aria-modal="true" aria-label="Choose an image">
+      <div class="modal__head">
+        <h2>Choose an image</h2>
+        <button class="icon-btn" type="button" data-close-modal aria-label="Close"><%- h.icon('close', '', 16) %></button>
+      </div>
+      <div class="modal__body">
+        <div class="media-toolbar">
+          <label class="search-field w-full">
+            <%- h.icon('search', '', 15) %>
+            <input class="input" type="search" id="modalMediaSearch" placeholder="Search the library…">
+          </label>
+          <label class="btn btn--soft btn--sm" style="cursor:pointer">
+            <%- h.icon('upload', '', 14) %> Upload
+            <input type="file" id="modalMediaUpload" accept="image/*" hidden multiple>
+          </label>
+        </div>
+        <div class="media-grid" id="modalMediaGrid"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="bulk-bar" id="bulkBar">
+    <span id="bulkCount">0 selected</span>
+    <select id="bulkAction">
+      <option value="publish">Publish</option>
+      <option value="draft">Move to drafts</option>
+      <option value="sticky">Mark as sticky</option>
+      <option value="unsticky">Remove sticky</option>
+      <option value="trash">Move to trash</option>
+      <option value="restore">Restore</option>
+      <option value="delete">Delete permanently</option>
+    </select>
+    <button class="btn" type="button" id="bulkApply">Apply</button>
+  </div>
+
+  <form id="bulkForm" method="post" class="hide">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <input type="hidden" name="action" id="bulkFormAction">
+    <input type="hidden" name="ids" id="bulkFormIds">
+    <input type="hidden" name="redirect" value="<%= currentPath + (Object.keys(query).length ? '?' + new URLSearchParams(Object.entries(query).filter(([,v]) => typeof v === 'string')).toString() : '') %>">
+  </form>
+
+  <script src="/assets/js/admin.js" defer></script>
+  <%- typeof extraScripts !== 'undefined' ? extraScripts : '' %>
+</body>
+</html>

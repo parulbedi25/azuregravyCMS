@@ -1,0 +1,266 @@
+<section class="container">
+  <div class="home-intro">
+    <div>
+      <span class="kicker">The independent edition</span>
+      <h1><%= h.setting('site_tagline', 'A publication for people who make things.') %></h1>
+    </div>
+    <div>
+      <p><%= h.setting('site_description') %></p>
+      <div class="home-intro__meta">
+        <span><%= stats.posts %> stories</span>
+        <span class="dot"></span>
+        <span><%= stats.categories %> topics</span>
+        <span class="dot"></span>
+        <span><%= stats.writers %> writers</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="hero">
+    <div class="hero__grid">
+      <% if (featured) { %>
+        <a class="hero-card" href="<%= h.postUrl(featured) %>" data-reveal>
+          <% if (featured.featured_image) { %>
+            <img class="hero-card__media" src="<%= h.mediaUrl(featured.featured_image) %>" alt="" fetchpriority="high">
+          <% } else { %>
+            <span class="hero-card__media" style="background: linear-gradient(140deg, var(--accent), #10151f)"></span>
+          <% } %>
+          <div class="hero-card__top">
+            <% if (featured.is_sticky) { %><span class="chip"><%- h.icon('star', '', 12) %> Editors' pick</span><% } %>
+            <% if (featured.category_name) { %><span class="chip"><%= featured.category_name %></span><% } %>
+          </div>
+          <div class="hero-card__body">
+            <h2><%= featured.title %></h2>
+            <p><%= h.excerptOf(featured, 200) %></p>
+            <div class="hero-card__meta">
+              <%- include('../partials/avatar', { avatar: featured.author_avatar, name: featured.author_name || 'Azure Gravy' }) %>
+              <span><%= featured.author_name || 'Azure Gravy' %></span>
+              <span class="dot"></span>
+              <time datetime="<%= h.isoDate(featured.published_at) %>"><%= h.formatDate(featured.published_at, 'long') %></time>
+              <span class="dot"></span>
+              <span><%= featured.reading_time %> min read</span>
+            </div>
+          </div>
+        </a>
+      <% } %>
+
+      <aside class="hero-side" data-reveal style="--reveal-delay:120ms">
+        <div class="hero-side__head">
+          <h2>The latest</h2>
+          <span>Updated <%= h.timeAgo(latestRest[0] ? latestRest[0].published_at : null) || 'today' %></span>
+        </div>
+        <% latestRest.forEach(function (post, index) { %>
+          <a class="latest-item" href="<%= h.postUrl(post) %>">
+            <span class="latest-item__index"><%= String(index + 1).padStart(2, '0') %></span>
+            <span class="latest-item__body">
+              <span class="latest-item__cat"><%= post.category_name || 'Story' %></span>
+              <h3><%= post.title %></h3>
+              <span class="latest-item__meta">
+                <time datetime="<%= h.isoDate(post.published_at) %>"><%= h.formatDate(post.published_at, 'medium') %></time>
+                <span class="dot"></span>
+                <span><%= post.reading_time %> min</span>
+              </span>
+            </span>
+          </a>
+        <% }); %>
+        <% if (latestRest.length === 0) { %>
+          <p class="muted small">New stories are on the way.</p>
+        <% } %>
+      </aside>
+    </div>
+  </div>
+</section>
+
+<% if (categories.length) { %>
+<section class="section--tight">
+  <div class="container">
+    <div class="section-head">
+      <div>
+        <span class="kicker">Browse</span>
+        <h2 style="margin-top:8px">Read by category</h2>
+      </div>
+      <a class="section-head__link" href="/categories">All topics <%- h.icon('arrow-right', '', 14) %></a>
+    </div>
+    <div class="category-strip">
+      <% categories.slice(0, 6).forEach(function (category, index) { %>
+        <a class="category-tile" href="/category/<%= category.slug %>" data-reveal style="--reveal-delay:<%= index * 50 %>ms">
+          <% if (category.image) { %>
+            <img src="<%= h.mediaUrl(category.image) %>" alt="" loading="lazy">
+          <% } %>
+          <span class="category-tile__label">
+            <b><%= category.name %></b>
+            <span><%= category.post_count || 0 %> stor<%= (category.post_count || 0) === 1 ? 'y' : 'ies' %></span>
+          </span>
+        </a>
+      <% }); %>
+    </div>
+  </div>
+</section>
+<% } %>
+
+<% if (spotlight && spotlightPosts.length) { %>
+  <section class="section--tight">
+    <div class="container">
+      <div class="section-head">
+        <div>
+          <span class="kicker">Topic spotlight</span>
+          <h2 style="margin-top:8px">The <%= spotlight.name %> file</h2>
+          <% if (spotlight.description) { %><p><%= spotlight.description %></p><% } %>
+        </div>
+        <a class="section-head__link" href="/category/<%= spotlight.slug %>">View all <%= spotlight.name %> <%- h.icon('arrow-right', '', 14) %></a>
+      </div>
+
+      <div class="spotlight">
+        <article class="spotlight__lead" data-reveal>
+          <a class="spotlight__lead-media" href="<%= h.postUrl(spotlightPosts[0]) %>" tabindex="-1" aria-hidden="true">
+            <% if (spotlightPosts[0].featured_image) { %>
+              <img src="<%= h.mediaUrl(spotlightPosts[0].featured_image) %>" alt="" loading="lazy">
+            <% } %>
+          </a>
+          <div class="post-meta">
+            <span><%= h.formatDate(spotlightPosts[0].published_at, 'long') %></span>
+            <span class="dot"></span>
+            <span><%= spotlightPosts[0].reading_time %> min read</span>
+            <span class="dot"></span>
+            <span><%= spotlight.post_count || 0 %> stor<%= (spotlight.post_count || 0) === 1 ? 'y' : 'ies' %> in this topic</span>
+          </div>
+          <h3><a href="<%= h.postUrl(spotlightPosts[0]) %>"><%= spotlightPosts[0].title %></a></h3>
+          <p><%= h.excerptOf(spotlightPosts[0], 190) %></p>
+          <a class="section-head__link" href="<%= h.postUrl(spotlightPosts[0]) %>">Read the story <%- h.icon('arrow-right', '', 13) %></a>
+        </article>
+
+        <div class="spotlight__rows">
+          <% spotlightPosts.slice(1, 5).forEach(function (post, index) { %>
+            <a class="spotlight__row" href="<%= h.postUrl(post) %>" data-reveal style="--reveal-delay:<%= index * 60 %>ms">
+              <% if (post.featured_image) { %>
+                <img src="<%= h.mediaUrl(post.featured_image) %>" alt="" loading="lazy">
+              <% } else { %>
+                <span class="spotlight__ph"><%- h.icon('image', '', 18) %></span>
+              <% } %>
+              <span>
+                <b><%= post.title %></b>
+                <span><%= h.formatDate(post.published_at, 'medium') %> · <%= post.reading_time %> min read</span>
+              </span>
+            </a>
+          <% }); %>
+          <% if (spotlightPosts.length < 2) { %>
+            <p class="muted small">More stories are being filed under this topic.</p>
+          <% } %>
+        </div>
+      </div>
+    </div>
+  </section>
+<% } %>
+
+<section class="section">
+  <div class="container">
+    <div class="section-head">
+      <div>
+        <span class="kicker">Editor's picks</span>
+        <h2 style="margin-top:8px">Worth your coffee break</h2>
+        <p>Three pieces we keep coming back to.</p>
+      </div>
+      <a class="section-head__link" href="/stories">All stories <%- h.icon('arrow-right', '', 14) %></a>
+    </div>
+
+    <div class="editorial">
+      <div class="stack" style="--stack: 30px">
+        <% pickPosts.slice(0, 1).forEach(function (post) { %>
+          <%- include('../partials/post-card', { post: post, variant: 'feature', reveal: true }) %>
+        <% }); %>
+        <% if (pickPosts.length > 1) { %>
+          <div class="grid grid--2">
+            <% pickPosts.slice(1, 3).forEach(function (post, index) { %>
+              <%- include('../partials/post-card', { post: post, reveal: true, delay: (index + 1) * 80 }) %>
+            <% }); %>
+          </div>
+        <% } %>
+      </div>
+
+      <aside class="stack" style="--stack: 20px">
+        <div class="side-panel">
+          <div class="side-panel__head">
+            <h3>Most read</h3>
+            <%- h.icon('trending', '', 16) %>
+          </div>
+          <ol class="rank-list">
+            <% mostRead.forEach(function (post) { %>
+              <li>
+                <div>
+                  <a href="<%= h.postUrl(post) %>"><%= post.title %></a>
+                  <small><%= h.formatNumber(post.views) %> views · <%= post.category_name || 'Story' %></small>
+                </div>
+              </li>
+            <% }); %>
+          </ol>
+        </div>
+
+        <div class="side-panel">
+          <div class="side-panel__head">
+            <h3>Trending tags</h3>
+            <a class="muted small" href="/categories">All</a>
+          </div>
+          <div class="tag-cloud">
+            <% tags.forEach(function (tag) { %>
+              <a href="/tag/<%= tag.slug %>">#<%= tag.name %><span><%= tag.post_count %></span></a>
+            <% }); %>
+          </div>
+        </div>
+
+        <% if (authors.length) { %>
+          <div class="side-panel">
+            <div class="side-panel__head"><h3>Written by</h3></div>
+            <div class="stack" style="--stack: 14px">
+              <% authors.slice(0, 3).forEach(function (author) { %>
+                <a class="author-spotlight" href="/author/<%= author.id %>" style="display:grid;grid-template-columns:auto 1fr;justify-items:start;text-align:left;gap:12px;padding:12px;background:transparent">
+                  <%- include('../partials/avatar', { avatar: author.avatar, name: author.name, size: 'lg' }) %>
+                  <div>
+                    <h3 style="font-size:0.95rem"><%= author.name %></h3>
+                    <p style="font-size:0.78rem;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden"><%= author.bio || 'Writing for ' + siteName %></p>
+                  </div>
+                </a>
+              <% }); %>
+            </div>
+          </div>
+        <% } %>
+      </aside>
+    </div>
+  </div>
+</section>
+
+<section class="container" id="newsletter">
+  <div class="newsletter-band">
+    <div>
+      <span class="kicker">The letter</span>
+      <h2><%= h.setting('newsletter_heading', 'The Sunday Letter') %></h2>
+      <p><%= h.setting('newsletter_text') %></p>
+    </div>
+    <form class="newsletter-form" method="post" action="/newsletter">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <input type="hidden" name="redirect" value="/">
+      <div class="newsletter-form__row">
+        <input type="email" name="email" placeholder="you@example.com" required aria-label="Email address">
+        <button class="btn btn--accent btn--cta" type="submit">Subscribe <%- h.icon('arrow-right', '', 15) %></button>
+      </div>
+      <small><%- h.icon('shield', '', 13) %> No spam. Unsubscribe in one click.</small>
+    </form>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <div class="section-head">
+      <div>
+        <span class="kicker">Fresh off the press</span>
+        <h2 style="margin-top:8px">More from the journal</h2>
+      </div>
+      <a class="section-head__link" href="/stories">View all stories <%- h.icon('arrow-right', '', 14) %></a>
+    </div>
+    <div class="grid grid--3">
+      <% grid.forEach(function (post, index) { %>
+        <%- include('../partials/post-card', { post: post, reveal: true, delay: index * 60 }) %>
+      <% }); %>
+    </div>
+    <%- include('../partials/pagination', { pagination: pagination, basePath: '/' }) %>
+  </div>
+</section>

@@ -1,0 +1,36 @@
+<div class="admin-page-head">
+  <div>
+    <div class="row" style="gap:8px;margin-bottom:4px">
+      <a class="text-xs text-muted" href="/admin/posts/<%= post.id %>/edit">← Back to editor</a>
+    </div>
+    <h1>Revisions</h1>
+    <p><%= post.title %> · <%= revisions.length %> saved versions</p>
+  </div>
+  <div class="admin-page-head__actions">
+    <a class="btn btn--ghost btn--sm" href="<%= h.postUrl(post) %>" target="_blank" rel="noopener"><%- h.icon('eye', '', 14) %> View live</a>
+  </div>
+</div>
+
+<div class="stack-16">
+  <% revisions.forEach(function (revision, index) { %>
+    <div class="panel">
+      <div class="panel__head">
+        <div>
+          <h2 style="font-size:.92rem"><%= revision.title %></h2>
+          <p><%= h.formatDateTime(revision.created_at) %> · <%= revision.author_name || 'Unknown' %> · <%= revision.content.split(/\s+/).length %> words<%= index === 0 ? ' · current' : '' %></p>
+        </div>
+        <% if (index !== 0) { %>
+          <form method="post" action="/admin/posts/<%= post.id %>/revisions/<%= revision.id %>/restore" data-confirm="Restore this version? The current text will remain in history.">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <button class="btn btn--ghost btn--sm" type="submit"><%- h.icon('undo', '', 13) %> Restore</button>
+          </form>
+        <% } else { %>
+          <span class="pill pill--published">current</span>
+        <% } %>
+      </div>
+      <div class="panel__body">
+        <pre class="mono" style="margin:0;white-space:pre-wrap;font-size:.78rem;line-height:1.6;color:var(--admin-ink-2);max-height:220px;overflow:auto"><%= revision.content.slice(0, 1400) %><%= revision.content.length > 1400 ? '\n…' : '' %></pre>
+      </div>
+    </div>
+  <% }); %>
+</div>

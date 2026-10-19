@@ -1,0 +1,28 @@
+<header class="admin-topbar">
+  <button class="icon-btn admin-menu-btn" type="button" data-open-sidebar aria-label="Open menu"><%- h.icon('menu', '', 18) %></button>
+
+  <div class="admin-topbar__title">
+    <a href="/admin">Studio</a>
+    <span class="sep">/</span>
+    <h1><%= adminTitle %></h1>
+  </div>
+
+  <form class="topbar-search" method="get" action="/admin/posts" role="search">
+    <%- h.icon('search', '', 15) %>
+    <input type="search" name="q" placeholder="Search stories…" value="<%= typeof query.q === 'string' ? query.q : '' %>" aria-label="Search stories">
+    <kbd>/</kbd>
+  </form>
+
+  <div class="admin-topbar__actions">
+    <button class="icon-btn" type="button" data-theme-toggle aria-label="Toggle theme" title="Toggle theme"><span class="ttx ttx--moon"><%- h.icon('moon', '', 17) %></span><span class="ttx ttx--sun"><%- h.icon('sun', '', 17) %></span></button>
+    <a class="icon-btn" href="/" target="_blank" rel="noopener" aria-label="View site" title="View site"><%- h.icon('external', '', 17) %></a>
+    <a class="icon-btn dot-badge" href="/admin/comments" data-count="<%= navCounts.pending || 0 %>" aria-label="Pending comments" title="Pending comments" style="<%= navCounts.pending ? '' : 'display:none' %>"><%- h.icon('comment', '', 17) %></a>
+    <a class="topbar-avatar" href="/admin/profile" aria-label="Your profile">
+      <%- include('../partials/avatar', { avatar: currentUser.avatar, name: currentUser.name }) %>
+      <span class="topbar-avatar__meta text-xs text-muted" style="line-height:1.25">
+        <b style="display:block;color:var(--admin-ink);font-size:.8rem"><%= currentUser.name %></b>
+        <span style="text-transform:capitalize"><%= currentUser.role %></span>
+      </span>
+    </a>
+  </div>
+</header>

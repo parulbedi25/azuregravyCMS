@@ -1,0 +1,273 @@
+<%
+  const shareUrl = encodeURIComponent((settings.site_url || '') + '/stories/' + post.slug);
+  const shareTitle = encodeURIComponent(post.title);
+  const author = { name: post.author_name || 'Azure Gravy', avatar: post.author_avatar, bio: post.author_bio };
+%>
+
+<section class="container article-header">
+  <div class="article-header__inner">
+    <nav class="breadcrumbs" aria-label="Breadcrumb">
+      <a href="/">Home</a> <span>/</span>
+      <% if (post.category_slug) { %>
+        <a href="/category/<%= post.category_slug %>"><%= post.category_name %></a> <span>/</span>
+      <% } %>
+      <span><%= h.truncate(post.title, 48) %></span>
+    </nav>
+
+    <div class="row row--wrap" style="gap:8px">
+      <% if (post.category_slug) { %>
+        <a class="chip chip--accent" href="/category/<%= post.category_slug %>"><%= post.category_name %></a>
+      <% } %>
+      <% if (settings.show_reading_time !== '0') { %>
+        <span class="chip chip--plain"><%- h.icon('clock', '', 12) %> <%= post.reading_time %> min read</span>
+      <% } %>
+      <% if (post.comment_count > 0) { %>
+        <span class="chip chip--plain"><%- h.icon('comment', '', 12) %> <%= post.comment_count %></span>
+      <% } %>
+    </div>
+
+    <h1><%= post.title %></h1>
+    <% if (post.excerpt) { %><p class="dek"><%= post.excerpt %></p><% } %>
+
+    <div class="article-meta">
+      <a class="article-meta__author" href="/author/<%= post.author_id %>">
+        <%- include('../partials/avatar', { avatar: author.avatar, name: author.name, size: 'lg' }) %>
+        <span>
+          <b><%= author.name %></b>
+          <span><time datetime="<%= h.isoDate(post.published_at) %>"><%= h.formatDate(post.published_at, 'long') %></time></span>
+        </span>
+      </a>
+      <div class="article-meta__actions">
+        <span class="share-label">Share</span>
+        <a class="icon-btn" href="https://twitter.com/intent/tweet?url=<%= shareUrl %>&text=<%= shareTitle %>" target="_blank" rel="noopener" aria-label="Share on Twitter"><%- h.icon('twitter', '', 16) %></a>
+        <a class="icon-btn" href="https://www.linkedin.com/sharing/share-offsite/?url=<%= shareUrl %>" target="_blank" rel="noopener" aria-label="Share on LinkedIn"><%- h.icon('linkedin', '', 16) %></a>
+        <a class="icon-btn" href="https://www.facebook.com/sharer/sharer.php?u=<%= shareUrl %>" target="_blank" rel="noopener" aria-label="Share on Facebook"><%- h.icon('facebook', '', 16) %></a>
+        <button class="icon-btn" type="button" data-copy-link aria-label="Copy link"><%- h.icon('link', '', 16) %></button>
+        <button class="icon-btn" type="button" data-bookmark aria-label="Save for later"><%- h.icon('bookmark', '', 16) %></button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<% if (post.featured_image) { %>
+  <div class="container article-hero">
+    <figure>
+      <img src="<%= h.mediaUrl(post.featured_image) %>" alt="<%= post.title %>" width="1600" height="900" fetchpriority="high">
+      <% if (post.category_name) { %><figcaption><%= post.category_name %> · <%= h.formatDate(post.published_at, 'long') %></figcaption><% } %>
+    </figure>
+  </div>
+<% } %>
+
+<div class="container">
+  <div class="article-layout">
+    <div class="article-layout__main">
+      <div class="prose" id="articleBody">
+        <%- contentHtml %>
+      </div>
+
+      <% if (post.tags && post.tags.length) { %>
+        <div class="article-tags">
+          <% post.tags.forEach(function (tag) { %>
+            <a class="chip" href="/tag/<%= tag.slug %>">#<%= tag.name %></a>
+          <% }); %>
+        </div>
+      <% } %>
+
+      <% if (settings.show_author_box !== '0') { %>
+        <div class="author-box">
+          <%- include('../partials/avatar', { avatar: author.avatar, name: author.name, size: 'xl' }) %>
+          <div>
+            <span class="role">Written by</span>
+            <h3><%= author.name %></h3>
+            <p><%= author.bio || 'Part of the ' + siteName + ' writing team.' %></p>
+            <div class="author-box__links">
+              <a href="/author/<%= post.author_id %>">All stories <%- h.icon('arrow-right', '', 13) %></a>
+              <% if (post.author_avatar) { %><a href="/author/<%= post.author_id %>">Profile</a><% } %>
+            </div>
+          </div>
+        </div>
+      <% } %>
+
+      <nav class="post-nav" aria-label="More stories">
+        <% if (adjacent.previous) { %>
+          <a href="/stories/<%= adjacent.previous.slug %>">
+            <span>← Previous</span>
+            <b><%= adjacent.previous.title %></b>
+          </a>
+        <% } else { %><span></span><% } %>
+        <% if (adjacent.next) { %>
+          <a href="/stories/<%= adjacent.next.slug %>">
+            <span>Next →</span>
+            <b><%= adjacent.next.title %></b>
+          </a>
+        <% } %>
+      </nav>
+
+      <% if (adjacent.next && settings.auto_load_next !== '0') { %>
+        <section class="up-next" data-up-next data-next-url="/stories/<%= post.slug %>/next">
+          <div class="up-next__card">
+            <a class="up-next__media" href="/stories/<%= adjacent.next.slug %>" tabindex="-1" aria-hidden="true">
+              <% if (adjacent.next.featured_image) { %>
+                <img src="<%= h.mediaUrl(adjacent.next.featured_image) %>" alt="" loading="lazy">
+              <% } %>
+            </a>
+            <div class="up-next__body">
+              <span class="kicker">Up next</span>
+              <h3><a href="/stories/<%= adjacent.next.slug %>"><%= adjacent.next.title %></a></h3>
+              <div class="up-next__meta">
+                <% if (adjacent.next.category_name) { %>
+                  <a href="/category/<%= adjacent.next.category_slug %>"><%= adjacent.next.category_name %></a>
+                  <span class="dot"></span>
+                <% } %>
+                <span><%= h.formatDate(adjacent.next.published_at, 'long') %></span>
+                <span class="dot"></span>
+                <span><%= adjacent.next.reading_time %> min read</span>
+                <% if (adjacent.next.comment_count) { %>
+                  <span class="dot"></span>
+                  <span><%= adjacent.next.comment_count %> comment<%= adjacent.next.comment_count === 1 ? '' : 's' %></span>
+                <% } %>
+              </div>
+              <div class="up-next__actions">
+                <button class="btn btn--accent btn--sm" type="button" data-load-next>Keep reading</button>
+                <a class="btn btn--ghost btn--sm" href="/stories/<%= adjacent.next.slug %>">Open story</a>
+              </div>
+            </div>
+          </div>
+          <div class="up-next__loaded" id="upNextContent" hidden></div>
+        </section>
+      <% } %>
+
+      <section class="comments" id="comments">
+        <div class="comments__head">
+          <h2>Conversation</h2>
+          <span class="muted small"><%= commentTotal %> comment<%= commentTotal === 1 ? '' : 's' %></span>
+        </div>
+
+        <% if (comments.length === 0) { %>
+          <p class="muted small">No comments yet. Start the conversation below.</p>
+        <% } else { %>
+          <ul class="comment-list">
+            <% comments.forEach(function (comment) { %>
+              <%- include('../partials/comment', { comment: comment }) %>
+            <% }); %>
+          </ul>
+        <% } %>
+
+        <% if (allowComments) { %>
+          <form class="comment-form" method="post" action="/stories/<%= post.slug %>/comments" id="commentForm">
+            <h3>Leave a comment</h3>
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <input type="hidden" name="parent_id" id="commentParent" value="">
+            <div id="replyNotice" class="alert alert--info hide">
+              <span>Replying to a comment. <button type="button" class="link-btn" data-cancel-reply>Cancel</button></span>
+            </div>
+            <div class="comment-form__row">
+              <label class="field"><span>Name</span>
+                <input class="input" type="text" name="name" required value="<%= currentUser ? currentUser.name : '' %>" autocomplete="name">
+              </label>
+              <label class="field"><span>Email <span class="muted">(never published)</span></span>
+                <input class="input" type="email" name="email" value="<%= currentUser ? currentUser.email : '' %>" autocomplete="email">
+              </label>
+            </div>
+            <label class="field"><span>Comment</span>
+              <textarea class="textarea" name="content" rows="4" required placeholder="Share what you think…"></textarea>
+            </label>
+            <label class="visually-hidden" aria-hidden="true">Website
+              <input type="text" name="website" tabindex="-1" autocomplete="off">
+            </label>
+            <div class="row row--between">
+              <span class="muted small">Be kind. Markdown is not supported in comments.</span>
+              <button class="btn btn--accent" type="submit">Post comment <%- h.icon('send', '', 15) %></button>
+            </div>
+          </form>
+        <% } else { %>
+          <div class="alert">Comments are closed on this story.</div>
+        <% } %>
+      </section>
+    </div>
+
+    <aside class="article-layout__aside">
+      <% if (toc.length > 1) { %>
+        <nav class="toc" aria-label="On this page">
+          <h4>On this page</h4>
+          <ol>
+            <% toc.forEach(function (item) { %>
+              <li class="<%= item.level === 3 ? 'toc-h3' : '' %>"><a href="#<%= item.id %>"><%= item.text %></a></li>
+            <% }); %>
+          </ol>
+        </nav>
+      <% } %>
+
+      <div class="aside-card">
+        <h4>Share this story</h4>
+        <div class="aside-share">
+          <a class="icon-btn" href="https://twitter.com/intent/tweet?url=<%= shareUrl %>&text=<%= shareTitle %>" target="_blank" rel="noopener" aria-label="Twitter"><%- h.icon('twitter', '', 16) %></a>
+          <a class="icon-btn" href="https://www.linkedin.com/sharing/share-offsite/?url=<%= shareUrl %>" target="_blank" rel="noopener" aria-label="LinkedIn"><%- h.icon('linkedin', '', 16) %></a>
+          <a class="icon-btn" href="https://www.facebook.com/sharer/sharer.php?u=<%= shareUrl %>" target="_blank" rel="noopener" aria-label="Facebook"><%- h.icon('facebook', '', 16) %></a>
+          <button class="icon-btn" type="button" data-copy-link aria-label="Copy link"><%- h.icon('link', '', 16) %></button>
+        </div>
+      </div>
+
+      <div class="aside-card">
+        <h4><%= h.setting('newsletter_heading', 'The Sunday Letter') %></h4>
+        <p>The best of the week, in one letter. Free, and easy to leave.</p>
+        <form method="post" action="/newsletter" class="stack" style="--stack: 8px; margin-top: 12px">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <input type="hidden" name="redirect" value="/stories/<%= post.slug %>">
+          <input class="input" type="email" name="email" placeholder="you@example.com" required aria-label="Email address">
+          <button class="btn btn--accent btn--cta btn--block btn--sm" type="submit">Subscribe</button>
+        </form>
+      </div>
+
+      <% if (categories.length) { %>
+        <div class="aside-card">
+          <h4>More topics</h4>
+          <div class="tag-cloud">
+            <% categories.filter(function (item) { return item.slug !== post.category_slug && (item.post_count || 0) > 0; }).slice(0, 6).forEach(function (item) { %>
+              <a href="/category/<%= item.slug %>"><%= item.name %></a>
+            <% }); %>
+          </div>
+        </div>
+      <% } %>
+    </aside>
+  </div>
+</div>
+
+<% if (related.length) { %>
+  <section class="section">
+    <div class="container">
+      <div class="section-head">
+        <div><span class="kicker">Keep reading</span><h2 style="margin-top:8px">Related stories</h2></div>
+        <a class="section-head__link" href="/stories">All stories <%- h.icon('arrow-right', '', 14) %></a>
+      </div>
+      <div class="grid grid--3">
+        <% related.forEach(function (item, index) { %>
+          <%- include('../partials/post-card', { post: item, reveal: true, delay: index * 60 }) %>
+        <% }); %>
+      </div>
+    </div>
+  </section>
+<% } %>
+
+<% if (adjacent.next && settings.before_you_go !== '0') { %>
+  <div class="bye-bar" id="byeBar" hidden data-bye-key="bye:<%= post.slug %>">
+    <div class="bye-bar__inner">
+      <span class="bye-bar__label">Before you go</span>
+      <a class="bye-bar__post" href="/stories/<%= adjacent.next.slug %>">
+        <% if (adjacent.next.featured_image) { %>
+          <img src="<%= h.mediaUrl(adjacent.next.featured_image) %>" alt="" loading="lazy">
+        <% } else { %>
+          <span class="bye-bar__thumb"></span>
+        <% } %>
+        <span class="bye-bar__text">
+          <b><%= adjacent.next.title %></b>
+          <span><%= adjacent.next.reading_time %> min read<% if (adjacent.next.category_name) { %> · <%= adjacent.next.category_name %><% } %></span>
+        </span>
+      </a>
+      <a class="btn btn--accent btn--sm" href="/stories/<%= adjacent.next.slug %>">Read next</a>
+      <button class="icon-btn" type="button" data-dismiss-bye aria-label="Dismiss this suggestion">
+        <%- h.icon('close', '', 15) %>
+      </button>
+    </div>
+  </div>
+<% } %>

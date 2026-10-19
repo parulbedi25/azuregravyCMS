@@ -1,0 +1,61 @@
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer-top">
+      <div class="footer-brand">
+        <a class="brand" href="/">
+          <span class="brand__mark"><%= h.setting('logo_text', 'G').slice(0, 1) %></span>
+          <span class="brand__name"><%= h.setting('logo_text', siteName) %></span>
+        </a>
+        <p><%= h.setting('footer_about', settings.site_description || '') %></p>
+        <div class="footer-socials">
+          <% if (h.setting('social_twitter')) { %><a class="icon-btn" href="<%= h.setting('social_twitter') %>" target="_blank" rel="noopener" aria-label="Twitter"><%- h.icon('twitter', '', 16) %></a><% } %>
+          <% if (h.setting('social_instagram')) { %><a class="icon-btn" href="<%= h.setting('social_instagram') %>" target="_blank" rel="noopener" aria-label="Instagram"><%- h.icon('instagram', '', 16) %></a><% } %>
+          <% if (h.setting('social_linkedin')) { %><a class="icon-btn" href="<%= h.setting('social_linkedin') %>" target="_blank" rel="noopener" aria-label="LinkedIn"><%- h.icon('linkedin', '', 16) %></a><% } %>
+          <% if (h.setting('social_youtube')) { %><a class="icon-btn" href="<%= h.setting('social_youtube') %>" target="_blank" rel="noopener" aria-label="YouTube"><%- h.icon('youtube', '', 16) %></a><% } %>
+          <a class="icon-btn" href="/feed.xml" aria-label="RSS"><%- h.icon('rss', '', 16) %></a>
+        </div>
+      </div>
+
+      <div class="footer-col">
+        <h4>Explore</h4>
+        <ul>
+          <% menus.footer.forEach(function (item) { %>
+            <li><a href="<%= item.url %>"><%= item.label %></a></li>
+          <% }); %>
+        </ul>
+      </div>
+
+      <div class="footer-col">
+        <h4>Topics</h4>
+        <ul>
+          <% navCategories.slice(0, 5).forEach(function (category) { %>
+            <li><a href="/category/<%= category.slug %>"><%= category.name %></a></li>
+          <% }); %>
+        </ul>
+      </div>
+
+      <div class="footer-col">
+        <h4>The publication</h4>
+        <ul>
+          <li><a href="/about">About <%= siteName %></a></li>
+          <li><a href="/contact">Contact</a></li>
+          <li><a href="/archive">Archive</a></li>
+          <li><a href="/feed.xml">RSS feed</a></li>
+          <% if (currentUser) { %><li><a href="/admin">Studio</a></li><% } else { %><li><a href="/admin/login">Writer sign in</a></li><% } %>
+        </ul>
+      </div>
+    </div>
+
+    <div class="footer-bottom">
+      <span><%= (h.setting('footer_copyright') || '© {year} ' + siteName).replace('{year}', String(h.year)) %></span>
+      <nav aria-label="Legal">
+        <% menus.legal.forEach(function (item) { %>
+          <a href="<%= item.url %>"><%= item.label %></a>
+        <% }); %>
+      </nav>
+      <button class="to-top" type="button" data-to-top>
+        Back to top <%- h.icon('arrow-up', '', 14) %>
+      </button>
+    </div>
+  </div>
+</footer>

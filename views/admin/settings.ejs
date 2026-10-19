@@ -1,0 +1,145 @@
+<%
+  const tabs = [
+    ['general', 'General', 'settings'],
+    ['appearance', 'Reading', 'book'],
+    ['discussion', 'Discussion', 'comment'],
+    ['newsletter', 'Newsletter', 'mail'],
+    ['seo', 'SEO', 'globe'],
+    ['social', 'Footer & social', 'link'],
+  ];
+  const active = tab || 'general';
+%>
+
+<div class="admin-page-head">
+  <div>
+    <h1>Settings</h1>
+    <p>Publication identity, reading experience, comments, newsletter and SEO.</p>
+  </div>
+</div>
+
+<div class="admin-grid-side">
+  <div class="panel">
+    <div class="filter-bar" style="gap:2px">
+      <% tabs.forEach(function (item) { %>
+        <a href="/admin/settings?tab=<%= item[0] %>" class="chip <%= active === item[0] ? 'chip--accent' : '' %>" data-tab-link>
+          <%- h.icon(item[2], '', 12) %> <%= item[1] %>
+        </a>
+      <% }); %>
+    </div>
+
+    <form method="post" action="/admin/settings" class="panel__body form-grid">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <input type="hidden" name="tab" value="<%= active %>">
+
+      <% if (active === 'general') { %>
+        <div class="form-grid form-grid--2">
+          <label class="field"><span>Site title</span><input class="input" name="site_title" value="<%= settings.site_title || '' %>"></label>
+          <label class="field"><span>Tagline</span><input class="input" name="site_tagline" value="<%= settings.site_tagline || '' %>"></label>
+        </div>
+        <label class="field"><span>Description</span><textarea class="textarea" name="site_description" rows="3"><%= settings.site_description || '' %></textarea>
+          <span class="hint">Used in search results, the RSS feed and social cards.</span>
+        </label>
+        <div class="form-grid form-grid--2">
+          <label class="field"><span>Public site URL</span><input class="input" name="site_url" value="<%= settings.site_url || '' %>" placeholder="https://your-domain.com"></label>
+          <label class="field"><span>Contact email</span><input class="input" type="email" name="contact_email" value="<%= settings.contact_email || '' %>"></label>
+        </div>
+        <div class="form-grid form-grid--2">
+          <label class="field"><span>Timezone label</span><input class="input" name="timezone" value="<%= settings.timezone || 'UTC' %>"></label>
+          <label class="field">
+            <span>Date format</span>
+            <select class="select" name="date_format">
+              <option value="long" <%= settings.date_format === 'long' ? 'selected' : '' %>>October 19, 2026</option>
+              <option value="medium" <%= settings.date_format === 'medium' ? 'selected' : '' %>>Oct 19, 2026</option>
+              <option value="short" <%= settings.date_format === 'short' ? 'selected' : '' %>>Oct 19</option>
+            </select>
+          </label>
+        </div>
+      <% } %>
+
+      <% if (active === 'appearance') { %>
+        <div class="form-grid form-grid--2">
+          <label class="field"><span>Stories per page</span><input class="input" type="number" name="posts_per_page" value="<%= settings.posts_per_page || '9' %>" min="3" max="36"></label>
+          <label class="field"><span>Homepage layout</span>
+            <select class="select" name="homepage_layout">
+              <option value="editorial" <%= settings.homepage_layout === 'editorial' ? 'selected' : '' %>>Editorial (feature + list)</option>
+              <option value="grid" <%= settings.homepage_layout === 'grid' ? 'selected' : '' %>>Grid</option>
+            </select>
+          </label>
+        </div>
+        <label class="field"><span>Featured stories on the home page</span><input class="input" type="number" name="homepage_featured_count" value="<%= settings.homepage_featured_count || '1' %>" min="1" max="3"></label>
+        <div class="form-section">
+          <h3>Story furniture</h3>
+          <p>Small pieces shown around each article.</p>
+          <div class="grid" style="gap:4px">
+            <label class="switch"><input type="checkbox" name="show_reading_time" <%= settings.show_reading_time !== '0' ? 'checked' : '' %>><span class="switch__track"></span><span class="switch__text"><b>Reading time</b><span>Show the estimated read time.</span></span></label>
+            <label class="switch"><input type="checkbox" name="show_author_box" <%= settings.show_author_box !== '0' ? 'checked' : '' %>><span class="switch__track"></span><span class="switch__text"><b>Author box</b><span>A short bio under each story.</span></span></label>
+            <label class="switch"><input type="checkbox" name="show_related_posts" <%= settings.show_related_posts !== '0' ? 'checked' : '' %>><span class="switch__track"></span><span class="switch__text"><b>Related stories</b><span>Suggest three more pieces at the end.</span></span></label>
+            <label class="switch"><input type="checkbox" name="show_toc" <%= settings.show_toc !== '0' ? 'checked' : '' %>><span class="switch__track"></span><span class="switch__text"><b>Table of contents</b><span>Sticky outline on long articles.</span></span></label>
+          </div>
+        </div>
+      <% } %>
+
+      <% if (active === 'discussion') { %>
+        <label class="switch"><input type="checkbox" name="allow_comments" <%= settings.allow_comments !== '0' ? 'checked' : '' %>><span class="switch__track"></span><span class="switch__text"><b>Enable comments</b><span>Turn off to close comments everywhere.</span></span></label>
+        <label class="switch"><input type="checkbox" name="comment_moderation" <%= settings.comment_moderation !== '0' ? 'checked' : '' %>><span class="switch__track"></span><span class="switch__text"><b>Hold for moderation</b><span>New comments wait for approval before appearing.</span></span></label>
+        <label class="field"><span>Notification email</span><input class="input" type="email" name="comment_notify_email" value="<%= settings.comment_notify_email || '' %>" placeholder="where to send moderation notices"><span class="hint">Stored for your email integration; nothing is sent automatically.</span></label>
+      <% } %>
+
+      <% if (active === 'newsletter') { %>
+        <label class="switch"><input type="checkbox" name="newsletter_enabled" <%= settings.newsletter_enabled !== '0' ? 'checked' : '' %>><span class="switch__track"></span><span class="switch__text"><b>Show the newsletter band</b><span>Displayed on the home page and in article sidebars.</span></span></label>
+        <label class="field"><span>Heading</span><input class="input" name="newsletter_heading" value="<%= settings.newsletter_heading || '' %>"></label>
+        <label class="field"><span>Copy</span><textarea class="textarea" name="newsletter_text" rows="3"><%= settings.newsletter_text || '' %></textarea></label>
+      <% } %>
+
+      <% if (active === 'seo') { %>
+        <label class="field"><span>Default social image</span><input class="input" name="seo_default_image" value="<%= settings.seo_default_image || '' %>" placeholder="/assets/seed/misc/og-default.webp"><span class="hint">Used when a story has no featured image.</span></label>
+        <label class="field"><span>Analytics snippet</span><textarea class="textarea mono" name="analytics_snippet" rows="4" placeholder="&lt;script&gt;…&lt;/script&gt;"><%= settings.analytics_snippet || '' %></textarea><span class="hint">Injected into the public layout. Keep it small and privacy-friendly.</span></label>
+        <div class="alert alert--info"><span class="text-sm">Sitemap: <b>/sitemap.xml</b> · RSS: <b>/feed.xml</b> · robots: <b>/robots.txt</b></span></div>
+      <% } %>
+
+      <% if (active === 'social') { %>
+        <div class="form-grid form-grid--2">
+          <label class="field"><span>Twitter / X</span><input class="input" name="social_twitter" value="<%= settings.social_twitter || '' %>" placeholder="https://twitter.com/you"></label>
+          <label class="field"><span>Instagram</span><input class="input" name="social_instagram" value="<%= settings.social_instagram || '' %>" placeholder="https://instagram.com/you"></label>
+          <label class="field"><span>LinkedIn</span><input class="input" name="social_linkedin" value="<%= settings.social_linkedin || '' %>" placeholder="https://linkedin.com/company/you"></label>
+          <label class="field"><span>YouTube</span><input class="input" name="social_youtube" value="<%= settings.social_youtube || '' %>" placeholder="https://youtube.com/@you"></label>
+        </div>
+        <label class="field"><span>Footer about text</span><textarea class="textarea" name="footer_about" rows="3"><%= settings.footer_about || '' %></textarea></label>
+        <label class="field"><span>Copyright line</span><input class="input" name="footer_copyright" value="<%= settings.footer_copyright || '' %>"><span class="hint">Use <code>{year}</code> for the current year.</span></label>
+      <% } %>
+
+      <div class="row row--between" style="border-top:1px solid var(--admin-line);padding-top:16px">
+        <a class="text-xs" href="/admin/appearance" style="color:var(--admin-accent)">Design &amp; logo →</a>
+        <button class="btn btn--accent btn--sm" type="submit"><%- h.icon('save', '', 14) %> Save settings</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="stack-16">
+    <div class="panel">
+      <div class="panel__head"><h2>Quick reference</h2></div>
+      <div class="panel__body stack-10">
+        <div class="publish-meta">
+          <div><span>Site</span><b><%= settings.site_title %></b></div>
+          <div><span>URL</span><b class="truncate" style="max-width:160px"><%= settings.site_url || 'request host' %></b></div>
+          <div><span>Theme</span><b style="text-transform:capitalize"><%= settings.default_theme || 'light' %></b></div>
+          <div><span>Per page</span><b><%= settings.posts_per_page || 9 %></b></div>
+        </div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel__head"><h2>Appearance</h2></div>
+      <div class="panel__body">
+        <p class="text-sm text-muted" style="margin-top:0">Logo text, accent colour and the default theme live on the Appearance page.</p>
+        <a class="btn btn--ghost btn--sm btn--block" href="/admin/appearance">Open appearance <%- h.icon('arrow-right', '', 13) %></a>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel__head"><h2>System</h2></div>
+      <div class="panel__body">
+        <p class="text-sm text-muted" style="margin-top:0">Database details, activity log and maintenance tools.</p>
+        <a class="btn btn--ghost btn--sm btn--block" href="/admin/tools">Open system <%- h.icon('arrow-right', '', 13) %></a>
+      </div>
+    </div>
+  </div>
+</div>
