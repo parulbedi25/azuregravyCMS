@@ -35,7 +35,10 @@ export async function createApp() {
     // (e.g. https://<port>-<sandbox>.e2b.app), so framing has to be allowed there.
     // frame-ancestors covers it without the legacy X-Frame-Options header, which
     // cannot express a wildcard and would block the preview iframe outright.
-    res.setHeader('Content-Security-Policy', "frame-ancestors 'self' https://*.e2b.app");
+    res.setHeader(
+      'Content-Security-Policy',
+      "frame-ancestors 'self' https://*.e2b.app https://*.e2b.app:*",
+    );
     next();
   });
 
