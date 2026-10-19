@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en" data-theme="<%= typeof theme !== 'undefined' ? theme : 'light' %>">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title><%= title %> · <%= siteName %> Studio</title>
+  <link rel="icon" href="/assets/img/favicon.svg" type="image/svg+xml">
+  <link rel="preload" href="/assets/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/assets/css/base.css">
+  <link rel="stylesheet" href="/assets/css/admin.css">
+</head>
+<body class="admin-body">
+  <%- body %>
+  <script src="/assets/js/site.js" defer></script>
+</body>
+</html>

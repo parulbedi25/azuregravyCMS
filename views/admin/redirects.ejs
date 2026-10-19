@@ -1,0 +1,57 @@
+<div class="admin-page-head">
+  <div>
+    <h1>Redirects</h1>
+    <p><%= redirects.length %> rules · old links keep working when a slug changes</p>
+  </div>
+</div>
+
+<div class="admin-grid-side">
+  <div class="panel">
+    <div class="panel__head"><h2>Active rules</h2><span class="text-xs text-muted">Automatic rules are created when you rename a published story</span></div>
+    <% if (redirects.length === 0) { %>
+      <div class="empty-state"><%- h.icon('corner-down-right') %><h3>No redirects yet</h3><p>Add one on the right, or let the CMS create them for you when slugs change.</p></div>
+    <% } else { %>
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th>From</th><th>To</th><th>Type</th><th>Hits</th><th style="width:60px"></th></tr></thead>
+          <tbody>
+            <% redirects.forEach(function (redirect) { %>
+              <tr>
+                <td class="mono text-xs"><%= redirect.from_path %></td>
+                <td class="mono text-xs"><%= redirect.to_path %></td>
+                <td><span class="pill pill--plain"><%= redirect.status_code %></span></td>
+                <td class="text-xs text-muted"><%= redirect.hits %></td>
+                <td>
+                  <form method="post" action="/admin/redirects/<%= redirect.id %>/delete" data-confirm="Delete this redirect?">
+                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                    <button class="row-action row-action--danger" type="submit" title="Delete"><%- h.icon('trash', '', 14) %></button>
+                  </form>
+                </td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </div>
+
+  <div class="panel" style="position:sticky;top:calc(var(--admin-topbar) + 16px)">
+    <div class="panel__head"><h2>Add a redirect</h2></div>
+    <form class="panel__body form-grid" method="post" action="/admin/redirects">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <label class="field"><span>Old path</span><input class="input" name="from_path" placeholder="/stories/old-slug" required></label>
+      <label class="field"><span>New path</span><input class="input" name="to_path" placeholder="/stories/new-slug" required></label>
+      <label class="field">
+        <span>Type</span>
+        <select class="select" name="status_code">
+          <option value="301">301 — permanent</option>
+          <option value="302">302 — temporary</option>
+        </select>
+      </label>
+      <button class="btn btn--accent btn--sm" type="submit"><%- h.icon('plus', '', 14) %> Add redirect</button>
+    </form>
+    <div class="panel__body" style="border-top:1px solid var(--admin-line)">
+      <p class="text-xs text-muted" style="margin:0">301 tells search engines the move is permanent. Use 302 only for short-lived changes.</p>
+    </div>
+  </div>
+</div>

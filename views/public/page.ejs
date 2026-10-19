@@ -1,0 +1,39 @@
+<section class="container article-header">
+  <div class="article-header__inner">
+    <nav class="breadcrumbs" aria-label="Breadcrumb"><a href="/">Home</a> <span>/</span> <span><%= post.title %></span></nav>
+    <span class="kicker">Page</span>
+    <h1><%= post.title %></h1>
+    <% if (post.excerpt) { %><p class="dek"><%= post.excerpt %></p><% } %>
+  </div>
+</section>
+
+<% if (post.featured_image) { %>
+  <div class="container article-hero">
+    <figure><img src="<%= h.mediaUrl(post.featured_image) %>" alt="<%= post.title %>"></figure>
+  </div>
+<% } %>
+
+<div class="container">
+  <div class="article-layout">
+    <div class="article-layout__main">
+      <div class="prose"><%- contentHtml %></div>
+    </div>
+    <aside class="article-layout__aside">
+      <% if (toc.length > 1) { %>
+        <nav class="toc" aria-label="On this page">
+          <h4>On this page</h4>
+          <ol>
+            <% toc.forEach(function (item) { %>
+              <li class="<%= item.level === 3 ? 'toc-h3' : '' %>"><a href="#<%= item.id %>"><%= item.text %></a></li>
+            <% }); %>
+          </ol>
+        </nav>
+      <% } %>
+      <div class="aside-card">
+        <h4>Get in touch</h4>
+        <p>Questions, corrections, or a story tip? We read everything.</p>
+        <a class="btn btn--ghost btn--sm btn--block" href="/contact" style="margin-top:10px">Contact us <%- h.icon('arrow-right', '', 14) %></a>
+      </div>
+    </aside>
+  </div>
+</div>

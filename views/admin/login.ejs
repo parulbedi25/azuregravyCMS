@@ -1,0 +1,59 @@
+<div class="auth-shell">
+  <div class="auth-form-side">
+    <div class="auth-card">
+      <a class="brand" href="/">
+        <span class="brand__mark"><%= h.setting('logo_text', 'G').slice(0, 1) %></span>
+        <span class="brand__name"><%= h.setting('logo_text', siteName) %></span>
+      </a>
+      <div>
+        <h1>Welcome<br>back.</h1>
+        <p>Sign in to the Studio to write, edit and publish.</p>
+      </div>
+
+      <% if (flash && flash.length) { %>
+        <% flash.forEach(function (item) { %>
+          <div class="alert alert--<%= item.type %>" role="alert"><%= item.message %></div>
+        <% }); %>
+      <% } %>
+
+      <form method="post" action="/admin/login">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <input type="hidden" name="next" value="<%= next %>">
+        <label class="field"><span>Email</span>
+          <input class="input" type="email" name="email" required autofocus autocomplete="username" value="<%= email %>" placeholder="you@publication.com">
+        </label>
+        <label class="field"><span>Password</span>
+          <input class="input" type="password" name="password" required autocomplete="current-password" placeholder="••••••••">
+        </label>
+        <button class="btn btn--accent btn--block" type="submit">Sign in <%- h.icon('arrow-right', '', 15) %></button>
+      </form>
+
+      <div class="auth-hint">
+        <b>Demo access</b><br>
+        <code>admin@azuregravy.local</code> · <code>gravy123</code>
+      </div>
+
+      <p class="text-xs text-muted">
+        <a href="/" style="color:var(--admin-accent)">← Back to the publication</a>
+      </p>
+    </div>
+  </div>
+
+  <div class="auth-art">
+    <a class="brand" href="/">
+      <span class="brand__mark" style="background:#fff;color:#0e1015"><%= h.setting('logo_text', 'G').slice(0, 1) %></span>
+      <span class="brand__name" style="color:#fff;font-family:var(--font-serif);font-size:1.7rem"><%= h.setting('logo_text', siteName) %></span>
+    </a>
+    <div>
+      <p class="auth-art__quote">“Write for the reader who is paying attention, not the one who is scrolling.”</p>
+      <p class="auth-art__sub">A complete editorial workspace — stories, media, comments, newsletters and analytics, built on Node.js, TypeScript and MariaDB.</p>
+    </div>
+    <div class="auth-art__badges">
+      <span>Draft → Publish workflow</span>
+      <span>Markdown editor</span>
+      <span>Media library</span>
+      <span>Moderation queue</span>
+      <span>SEO tools</span>
+    </div>
+  </div>
+</div>

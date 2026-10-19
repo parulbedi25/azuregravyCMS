@@ -1,0 +1,48 @@
+<div class="admin-page-head">
+  <div>
+    <h1>Inbox</h1>
+    <p><%= messages.filter(function (m) { return !m.is_read; }).length %> unread · messages from the contact form</p>
+  </div>
+</div>
+
+<% if (messages.length === 0) { %>
+  <div class="panel"><div class="empty-state">
+    <%- h.icon('message-square') %>
+    <h3>No messages yet</h3>
+    <p>When a reader uses the contact page, their note lands here.</p>
+    <a class="btn btn--ghost btn--sm" href="/contact" target="_blank" rel="noopener">View contact page</a>
+  </div></div>
+<% } else { %>
+  <div class="stack-16">
+    <% messages.forEach(function (message) { %>
+      <div class="panel" style="<%= message.is_read ? '' : 'border-color:color-mix(in srgb, var(--admin-accent) 34%, var(--admin-line))' %>">
+        <div class="panel__head">
+          <div style="min-width:0">
+            <div class="row" style="gap:8px">
+              <%- include('../partials/avatar', { avatar: null, name: message.name }) %>
+              <h2 style="font-size:.92rem"><%= message.name %></h2>
+              <% if (!message.is_read) { %><span class="pill pill--scheduled">new</span><% } %>
+            </div>
+            <p style="margin-left:38px"><%= message.email %> · <%= h.timeAgo(message.created_at) %></p>
+          </div>
+          <div class="row" style="gap:4px">
+            <a class="row-action" href="mailto:<%= message.email %>?subject=Re: <%= encodeURIComponent(message.subject || 'your message') %>" title="Reply by email"><%- h.icon('send', '', 14) %></a>
+            <form method="post" action="/admin/messages/<%= message.id %>">
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+              <input type="hidden" name="is_read" value="<%= message.is_read ? '0' : '1' %>">
+              <button class="row-action" type="submit" title="Mark as <%= message.is_read ? 'unread' : 'read' %>"><%- h.icon(message.is_read ? 'mail' : 'check', '', 14) %></button>
+            </form>
+            <form method="post" action="/admin/messages/<%= message.id %>/delete" data-confirm="Delete this message?">
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+              <button class="row-action row-action--danger" type="submit" title="Delete"><%- h.icon('trash', '', 14) %></button>
+            </form>
+          </div>
+        </div>
+        <div class="panel__body">
+          <% if (message.subject) { %><b style="display:block;margin-bottom:6px"><%= message.subject %></b><% } %>
+          <p class="text-sm" style="margin:0;white-space:pre-line;line-height:1.65"><%= message.message %></p>
+        </div>
+      </div>
+    <% }); %>
+  </div>
+<% } %>

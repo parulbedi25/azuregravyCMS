@@ -1,0 +1,16 @@
+<li class="comment" id="comment-<%= comment.id %>">
+  <div class="comment__head">
+    <span class="avatar avatar--initials" style="background: <%= h.colorFromSeed(comment.author_name) %>"><%= h.initials(comment.author_name) %></span>
+    <b><%= comment.author_name %></b>
+    <time datetime="<%= h.isoDate(comment.created_at) %>"><%= h.timeAgo(comment.created_at) %></time>
+  </div>
+  <div class="comment__body"><%= comment.content %></div>
+  <button class="comment__reply link-btn" type="button" data-reply-to="<%= comment.id %>" data-reply-name="<%= comment.author_name %>">Reply</button>
+  <% if (comment.children && comment.children.length) { %>
+    <ul class="comment-list">
+      <% comment.children.forEach(function (child) { %>
+        <%- include('comment', { comment: child }) %>
+      <% }); %>
+    </ul>
+  <% } %>
+</li>

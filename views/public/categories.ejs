@@ -1,0 +1,44 @@
+<section class="page-head">
+  <div class="container">
+    <nav class="breadcrumbs" aria-label="Breadcrumb"><a href="/">Home</a> <span>/</span> <span>Topics</span></nav>
+    <div class="page-head__inner">
+      <div>
+        <span class="kicker">The map</span>
+        <h1 style="margin-top:10px">Every topic,<br>in one place.</h1>
+        <p>Pick a thread and follow it. Each category collects the stories we have filed under it.</p>
+      </div>
+      <span class="chip chip--accent"><%= categories.length %> topics</span>
+    </div>
+  </div>
+</section>
+
+<section class="container">
+  <div class="grid grid--3">
+    <% categories.forEach(function (category, index) { %>
+      <a class="category-card" href="/category/<%= category.slug %>" data-reveal style="--reveal-delay:<%= index * 50 %>ms">
+        <% if (category.image) { %>
+          <img src="<%= h.mediaUrl(category.image) %>" alt="" loading="lazy">
+        <% } else { %>
+          <span style="background: <%= category.color %>"></span>
+        <% } %>
+        <div class="category-card__body">
+          <span class="category-card__count"><%= category.post_count || 0 %> stor<%= (category.post_count || 0) === 1 ? "y" : "ies" %></span>
+          <h2><%= category.name %></h2>
+          <p><%= category.description || 'Stories filed under ' + category.name + '.' %></p>
+          <span class="category-card__link">Explore <%- h.icon('arrow-right', '', 14) %></span>
+        </div>
+      </a>
+    <% }); %>
+  </div>
+
+  <% if (tags.length) { %>
+    <div class="section-head" style="margin-top:56px">
+      <div><span class="kicker">Index</span><h2 style="margin-top:8px;font-size:1.5rem">All tags</h2></div>
+    </div>
+    <div class="tag-cloud">
+      <% tags.forEach(function (tag) { %>
+        <a href="/tag/<%= tag.slug %>">#<%= tag.name %><span><%= tag.post_count %></span></a>
+      <% }); %>
+    </div>
+  <% } %>
+</section>

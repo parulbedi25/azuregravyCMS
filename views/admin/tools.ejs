@@ -1,0 +1,104 @@
+<div class="admin-page-head">
+  <div>
+    <h1>System</h1>
+    <p>Database health, exports and the activity log.</p>
+  </div>
+  <div class="admin-page-head__actions">
+    <form method="post" action="/admin/tools/export">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <button class="btn btn--ghost btn--sm" type="submit"><%- h.icon('download', '', 14) %> Export JSON</button>
+    </form>
+  </div>
+</div>
+
+<div class="stat-grid">
+  <div class="stat-card">
+    <div class="stat-card__top"><span class="stat-card__label">Database</span><span class="stat-card__icon"><%- h.icon('database', '', 15) %></span></div>
+    <span class="stat-card__value" style="font-size:1.1rem"><%= dbInfo.version %></span>
+    <span class="stat-card__foot"><%= dbInfo.engine %></span>
+  </div>
+  <div class="stat-card">
+    <div class="stat-card__top"><span class="stat-card__label">Storage</span><span class="stat-card__icon"><%- h.icon('folder', '', 15) %></span></div>
+    <span class="stat-card__value" style="font-size:1.1rem"><%= dbInfo.location %></span>
+    <span class="stat-card__foot">driver: <%= dbInfo.driver %></span>
+  </div>
+  <div class="stat-card">
+    <div class="stat-card__top"><span class="stat-card__label">Content</span><span class="stat-card__icon"><%- h.icon('file-text', '', 15) %></span></div>
+    <span class="stat-card__value"><%= counts.posts %></span>
+    <span class="stat-card__foot"><%= counts.pages %> pages · <%= counts.media %> images</span>
+  </div>
+  <div class="stat-card">
+    <div class="stat-card__top"><span class="stat-card__label">Sessions</span><span class="stat-card__icon"><%- h.icon('key', '', 15) %></span></div>
+    <span class="stat-card__value"><%= counts.sessions %></span>
+    <span class="stat-card__foot"><%= counts.users %> accounts · <%= counts.subscribers %> subscribers</span>
+  </div>
+</div>
+
+<div class="admin-grid-2" style="margin-top:14px">
+  <div class="panel">
+    <div class="panel__head"><div><h2>Maintenance</h2><p>Safe to run any time.</p></div></div>
+    <div class="panel__body stack-10">
+      <form method="post" action="/admin/tools/rebuild-content" class="row row--between" style="gap:12px;padding:12px;border:1px solid var(--admin-line);border-radius:10px">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <div>
+          <b class="text-sm" style="display:block">Rebuild rendered HTML</b>
+          <span class="text-xs text-muted">Re-render markdown, recalculate reading times.</span>
+        </div>
+        <button class="btn btn--soft btn--sm" type="submit">Run</button>
+      </form>
+      <form method="post" action="/admin/tools/auto-redirects" class="row row--between" style="gap:12px;padding:12px;border:1px solid var(--admin-line);border-radius:10px">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <div>
+          <b class="text-sm" style="display:block">Generate redirects from titles</b>
+          <span class="text-xs text-muted">Create 301s where slugs drifted from headlines.</span>
+        </div>
+        <button class="btn btn--soft btn--sm" type="submit">Run</button>
+      </form>
+      <form method="post" action="/admin/tools/prune-sessions" class="row row--between" style="gap:12px;padding:12px;border:1px solid var(--admin-line);border-radius:10px">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <div>
+          <b class="text-sm" style="display:block">Clear expired sessions</b>
+          <span class="text-xs text-muted">Housekeeping for the session store.</span>
+        </div>
+        <button class="btn btn--soft btn--sm" type="submit">Run</button>
+      </form>
+    </div>
+    <div class="panel__foot">
+      <span class="text-xs text-muted">Seed command</span>
+      <code class="text-xs mono">npm run db:seed -- --reset</code>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel__head"><h2>Content counts</h2></div>
+    <div class="table-wrap">
+      <table class="table">
+        <tbody>
+          <tr><td class="text-sm">Stories</td><td class="text-xs text-muted" style="text-align:right"><%= counts.posts %></td></tr>
+          <tr><td class="text-sm">Pages</td><td class="text-xs text-muted" style="text-align:right"><%= counts.pages %></td></tr>
+          <tr><td class="text-sm">Comments</td><td class="text-xs text-muted" style="text-align:right"><%= counts.comments %></td></tr>
+          <tr><td class="text-sm">Media items</td><td class="text-xs text-muted" style="text-align:right"><%= counts.media %></td></tr>
+          <tr><td class="text-sm">Subscribers</td><td class="text-xs text-muted" style="text-align:right"><%= counts.subscribers %></td></tr>
+          <tr><td class="text-sm">Accounts</td><td class="text-xs text-muted" style="text-align:right"><%= counts.users %></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="panel__foot">
+      <span class="text-xs text-muted">Auto-publishing runs on every request</span>
+      <span class="pill pill--published">scheduler active</span>
+    </div>
+  </div>
+</div>
+
+<div class="panel" style="margin-top:14px">
+  <div class="panel__head"><h2>Activity log</h2><span class="text-xs text-muted">Last 20 events</span></div>
+  <ul class="activity-list">
+    <% activity.forEach(function (entry) { %>
+      <li>
+        <span class="activity-dot"></span>
+        <span><b><%= entry.user_name || 'System' %></b> <span class="text-muted"><%= entry.action %></span><% if (entry.subject) { %> — <%= entry.subject %><% } %></span>
+        <time><%= h.formatDateTime(entry.created_at) %></time>
+      </li>
+    <% }); %>
+  </ul>
+</div>

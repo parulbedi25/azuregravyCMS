@@ -1,0 +1,79 @@
+<div class="admin-page-head">
+  <div>
+    <h1>Subscribers</h1>
+    <p><%= byStatus.confirmed || 0 %> confirmed · <%= byStatus.unsubscribed || 0 %> unsubscribed</p>
+  </div>
+  <div class="admin-page-head__actions">
+    <a class="btn btn--ghost btn--sm" href="/admin/subscribers/export.csv"><%- h.icon('download', '', 14) %> Export CSV</a>
+  </div>
+</div>
+
+<div class="admin-grid-side">
+  <div class="panel">
+    <div class="filter-bar">
+      <form method="get" action="/admin/subscribers" class="search-field">
+        <%- h.icon('search', '', 14) %>
+        <input class="input" type="search" name="q" value="<%= search %>" placeholder="Search email or name…">
+      </form>
+      <span class="pill pill--plain" style="margin-left:auto"><%= pagination.total %> people</span>
+    </div>
+
+    <% if (subscribers.length === 0) { %>
+      <div class="empty-state">
+        <%- h.icon('mail') %>
+        <h3>No subscribers yet</h3>
+        <p>Add one on the right, or share the newsletter form on the site.</p>
+      </div>
+    <% } else { %>
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th>Email</th><th>Name</th><th>Status</th><th>Since</th><th style="width:60px"></th></tr></thead>
+          <tbody>
+            <% subscribers.forEach(function (subscriber) { %>
+              <tr>
+                <td><b style="font-weight:520"><%= subscriber.email %></b></td>
+                <td class="text-xs text-muted"><%= subscriber.name || '—' %></td>
+                <td><span class="pill pill--<%= subscriber.status %>"><%= subscriber.status %></span></td>
+                <td class="text-xs text-muted"><%= h.formatDate(subscriber.created_at, 'medium') %></td>
+                <td>
+                  <form method="post" action="/admin/subscribers/<%= subscriber.id %>/delete" data-confirm="Remove <%= subscriber.email %> from the list?">
+                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                    <button class="row-action row-action--danger" type="submit" title="Remove"><%- h.icon('trash', '', 14) %></button>
+                  </form>
+                </td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+      <% if (pagination.pageCount > 1) { %>
+        <div class="pager">
+          <span>Page <%= pagination.page %> of <%= pagination.pageCount %></span>
+          <div class="pager__links">
+            <a class="<%= pagination.hasPrev ? '' : 'is-disabled' %>" href="/admin/subscribers<%= qs({ page: pagination.page - 1 }) %>">←</a>
+            <a class="<%= pagination.hasNext ? '' : 'is-disabled' %>" href="/admin/subscribers<%= qs({ page: pagination.page + 1 }) %>">→</a>
+          </div>
+        </div>
+      <% } %>
+    <% } %>
+  </div>
+
+  <div class="stack-16">
+    <div class="panel">
+      <div class="panel__head"><h2>Add subscriber</h2></div>
+      <form class="panel__body form-grid" method="post" action="/admin/subscribers">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <label class="field"><span>Email</span><input class="input" type="email" name="email" required placeholder="reader@example.com"></label>
+        <label class="field"><span>Name <span class="text-xs text-muted">(optional)</span></span><input class="input" name="name" placeholder="First name"></label>
+        <button class="btn btn--accent btn--sm" type="submit"><%- h.icon('plus', '', 14) %> Add to list</button>
+      </form>
+    </div>
+    <div class="panel">
+      <div class="panel__head"><h2>The letter</h2></div>
+      <div class="panel__body">
+        <p class="text-sm text-muted" style="margin-top:0">The newsletter signup lives on the home page and every story. Edit its copy and visibility in settings.</p>
+        <a class="btn btn--ghost btn--sm btn--block" href="/admin/settings?tab=newsletter">Newsletter settings <%- h.icon('arrow-right', '', 13) %></a>
+      </div>
+    </div>
+  </div>
+</div>

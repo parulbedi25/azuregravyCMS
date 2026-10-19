@@ -1,0 +1,118 @@
+<div class="admin-page-head">
+  <div>
+    <h1>Appearance</h1>
+    <p>Type, colour and the shape of the front page — without touching a stylesheet.</p>
+  </div>
+  <div class="admin-page-head__actions">
+    <a class="btn btn--ghost btn--sm" href="/" target="_blank" rel="noopener"><%- h.icon('eye', '', 14) %> Preview site</a>
+  </div>
+</div>
+
+<form method="post" action="/admin/appearance" class="admin-grid-side">
+  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+
+  <div class="stack-16">
+    <div class="panel">
+      <div class="panel__head"><div><h2>Identity</h2><p>How the masthead reads across the site.</p></div></div>
+      <div class="panel__body form-grid">
+        <label class="field"><span>Wordmark</span><input class="input" name="logo_text" value="<%= settings.logo_text || 'Azure Gravy' %>" placeholder="Azure Gravy"><span class="hint">Set in the site's display face. Keep it short.</span></label>
+        <div class="form-grid form-grid--2">
+          <label class="field"><span>Default theme</span>
+            <select class="select" name="default_theme">
+              <option value="light" <%= settings.default_theme !== 'dark' ? 'selected' : '' %>>Light</option>
+              <option value="dark" <%= settings.default_theme === 'dark' ? 'selected' : '' %>>Dark</option>
+            </select>
+            <span class="hint">Readers can toggle; this is the default.</span>
+          </label>
+          <div class="field">
+            <span class="label">Accent colour</span>
+            <div class="color-row">
+              <input type="color" id="accent_color" name="accent_color" value="<%= settings.accent_color || '#0071e3' %>">
+              <span class="text-xs text-muted mono"><%= settings.accent_color || '#0071e3' %></span>
+            </div>
+            <div class="color-row" style="margin-top:8px">
+              <% presets.forEach(function (preset) { %>
+                <button class="swatch <%= (settings.accent_color || '#0071e3') === preset.value ? 'is-active' : '' %>"
+                        type="button" style="background:<%= preset.value %>" title="<%= preset.name %>"
+                        data-swatch="accent_color" data-color="<%= preset.value %>"></button>
+              <% }); %>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel__head"><div><h2>Front page</h2><p>The rhythm of the home page.</p></div></div>
+      <div class="panel__body form-grid">
+        <div class="form-grid form-grid--3">
+          <label class="field"><span>Layout</span>
+            <select class="select" name="homepage_layout">
+              <option value="editorial" <%= settings.homepage_layout !== 'grid' ? 'selected' : '' %>>Editorial</option>
+              <option value="grid" <%= settings.homepage_layout === 'grid' ? 'selected' : '' %>>Grid</option>
+            </select>
+          </label>
+          <label class="field"><span>Stories per page</span><input class="input" type="number" name="posts_per_page" min="3" max="36" value="<%= settings.posts_per_page || 9 %>"></label>
+          <label class="field"><span>Featured slots</span><input class="input" type="number" name="homepage_featured_count" min="1" max="3" value="<%= settings.homepage_featured_count || 1 %>"></label>
+        </div>
+        <div class="grid" style="grid-template-columns:repeat(2,1fr);gap:4px">
+          <label class="switch"><input type="checkbox" name="show_reading_time" <%= settings.show_reading_time !== '0' ? 'checked' : '' %>><span class="switch__track"></span><span class="switch__text"><b>Reading time</b><span>“6 min read” chips.</span></span></label>
+          <label class="switch"><input type="checkbox" name="show_author_box" <%= settings.show_author_box !== '0' ? 'checked' : '' %>><span class="switch__track"></span><span class="switch__text"><b>Author box</b><span>Bio under each story.</span></span></label>
+          <label class="switch"><input type="checkbox" name="show_related_posts" <%= settings.show_related_posts !== '0' ? 'checked' : '' %>><span class="switch__track"></span><span class="switch__text"><b>Related stories</b><span>Three suggestions at the end.</span></span></label>
+          <label class="switch"><input type="checkbox" name="show_toc" <%= settings.show_toc !== '0' ? 'checked' : '' %>><span class="switch__track"></span><span class="switch__text"><b>Table of contents</b><span>Outline for long reads.</span></span></label>
+        </div>
+        <button class="btn btn--accent btn--sm" type="submit"><%- h.icon('save', '', 14) %> Save appearance</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel__head"><h2>Typography</h2><span class="text-xs text-muted">Bundled, no external requests</span></div>
+      <div class="panel__body" style="display:grid;gap:18px">
+        <div>
+          <span class="text-xs text-muted" style="display:block;margin-bottom:4px">Display — Instrument Serif</span>
+          <p class="serif" style="font-size:2.1rem;line-height:1.1;margin:0">The quiet power of doing one thing.</p>
+        </div>
+        <div>
+          <span class="text-xs text-muted" style="display:block;margin-bottom:4px">Body — Inter</span>
+          <p style="margin:0;max-width:60ch;font-size:.95rem;line-height:1.65">A publication for people who make things. Set in Inter at 16–19px with a 1.7 line height for comfortable long-form reading.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="stack-16" style="position:sticky;top:calc(var(--admin-topbar) + 16px)">
+    <div class="panel">
+      <div class="panel__head"><h2>Live preview</h2></div>
+      <div class="panel__body">
+        <div class="side-card" style="border-radius:10px;overflow:hidden">
+          <div style="padding:14px 16px;border-bottom:1px solid var(--admin-line);display:flex;align-items:center;justify-content:space-between">
+            <span class="serif" style="font-size:1.35rem"><%= settings.logo_text || 'Azure Gravy' %></span>
+            <span class="flex gap-8" style="gap:10px;font-size:.7rem;color:var(--admin-ink-3)"><span>Home</span><span>Stories</span><span>Topics</span></span>
+          </div>
+          <div style="padding:16px">
+            <span class="pill pill--role" style="font-size:.6rem">Independent edition</span>
+            <p class="serif" style="font-size:1.5rem;line-height:1.1;margin:8px 0 10px"><%= settings.site_tagline || 'A publication for people who make things.' %></p>
+            <div style="height:78px;border-radius:8px;background:linear-gradient(135deg, var(--admin-accent), color-mix(in srgb, var(--admin-accent) 30%, #0b0c0f))"></div>
+            <div style="display:flex;gap:6px;margin-top:10px;align-items:center">
+              <span style="width:20px;height:20px;border-radius:50%;background:var(--admin-accent-soft);display:grid;place-items:center;font-size:.55rem;color:var(--admin-accent);font-weight:700">AC</span>
+              <span style="font-size:.66rem;color:var(--admin-ink-3)">Avery Cole · 6 min read</span>
+            </div>
+          </div>
+        </div>
+        <p class="text-xs text-muted" style="margin-top:12px">Colours update on save. The accent is used for links, chips and the reading progress bar.</p>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel__head"><h2>Fonts &amp; assets</h2></div>
+      <div class="panel__body">
+        <div class="publish-meta">
+          <div><span>Display</span><b>Instrument Serif</b></div>
+          <div><span>Text</span><b>Inter Variable</b></div>
+          <div><span>Icons</span><b>Inline SVG set</b></div>
+          <div><span>CSS</span><b>No framework</b></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</form>

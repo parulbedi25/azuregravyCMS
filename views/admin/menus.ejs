@@ -1,0 +1,66 @@
+<div class="admin-page-head">
+  <div>
+    <h1>Navigation</h1>
+    <p>Primary links sit in the header, footer links above the copyright, legal links at the very bottom.</p>
+  </div>
+</div>
+
+<div class="stack-16">
+  <% locations.forEach(function (location) { %>
+    <% const sectionItems = items.filter(function (item) { return item.location === location; }); %>
+    <div class="panel">
+      <div class="panel__head">
+        <div>
+          <h2 style="text-transform:capitalize"><%= location %> menu</h2>
+          <p><%= sectionItems.length %> link<%= sectionItems.length === 1 ? '' : 's' %><%= location === 'primary' ? ' · keep this to five or six' : '' %></p>
+        </div>
+      </div>
+      <% if (sectionItems.length) { %>
+        <div class="table-wrap">
+          <table class="table">
+            <thead><tr><th>Label</th><th>URL</th><th>Order</th><th>Opens</th><th>Visible</th><th style="width:80px"></th></tr></thead>
+            <tbody>
+              <% sectionItems.forEach(function (item) { %>
+                <tr>
+                  <td colspan="6" style="padding:0">
+                    <form method="post" action="/admin/menus/<%= item.id %>" style="display:grid;grid-template-columns:1.2fr 1.6fr 70px 100px 90px 80px;gap:10px;align-items:center;padding:10px 14px">
+                      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                      <input type="hidden" name="location" value="<%= location %>">
+                      <input class="input input-sm" name="label" value="<%= item.label %>" required>
+                      <input class="input input-sm mono" name="url" value="<%= item.url %>" required style="font-size:.78rem">
+                      <input class="input input-sm" type="number" name="sort_order" value="<%= item.sort_order %>">
+                      <select class="select input-sm" name="target">
+                        <option value="_self" <%= item.target === '_self' ? 'selected' : '' %>>Same tab</option>
+                        <option value="_blank" <%= item.target === '_blank' ? 'selected' : '' %>>New tab</option>
+                      </select>
+                      <label class="checkbox text-xs"><input type="checkbox" name="is_active" <%= item.is_active ? 'checked' : '' %>> Shown</label>
+                      <div class="row" style="gap:2px">
+                        <button class="row-action" type="submit" title="Save"><%- h.icon('check', '', 14) %></button>
+                        <button class="row-action row-action--danger" type="submit" formaction="/admin/menus/<%= item.id %>/delete"
+                                title="Delete" data-confirm="Remove this link?"><%- h.icon('trash', '', 14) %></button>
+                      </div>
+                    </form>
+                  </td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+      <% } else { %>
+        <div class="empty-state" style="padding:24px"><p>No links in this menu yet.</p></div>
+      <% } %>
+
+      <form method="post" action="/admin/menus" class="panel__foot" style="display:grid;grid-template-columns:1fr 1.4fr 70px 90px auto;gap:10px;align-items:end">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <input type="hidden" name="location" value="<%= location %>">
+        <input type="hidden" name="is_active" value="1">
+        <input type="hidden" name="target" value="_self">
+        <label class="field"><span class="text-xs">New link label</span><input class="input input-sm" name="label" placeholder="Contact" required></label>
+        <label class="field"><span class="text-xs">URL</span><input class="input input-sm" name="url" placeholder="/contact" required></label>
+        <label class="field"><span class="text-xs">Order</span><input class="input input-sm" type="number" name="sort_order" value="<%= sectionItems.length %>"></label>
+        <span></span>
+        <button class="btn btn--soft btn--sm" type="submit"><%- h.icon('plus', '', 13) %> Add</button>
+      </form>
+    </div>
+  <% }); %>
+</div>

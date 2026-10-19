@@ -1,0 +1,285 @@
+/**
+ * One canonical MariaDB schema. It is applied to whichever driver is active:
+ *   - `embedded` → real MariaDB 13 compiled to WebAssembly (lite4mariadb)
+ *   - `mysql`    → a MariaDB/MySQL server over the wire (mysql2)
+ *
+ * Everything is InnoDB + utf8mb4 so foreign keys, transactions and emoji all work.
+ */
+export const SCHEMA_STATEMENTS: string[] = [
+  `CREATE TABLE IF NOT EXISTS schema_migrations (
+    version INT UNSIGNED NOT NULL PRIMARY KEY,
+    applied_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+  `CREATE TABLE IF NOT EXISTS users (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(120) NOT NULL,
+    email VARCHAR(190) NOT NULL UNIQUE,
+    password_hash VARCHAR(255) NOT NULL,
+    role ENUM('admin','editor','author') NOT NULL DEFAULT 'author',
+    bio TEXT NULL,
+    avatar VARCHAR(255) NULL,
+    website VARCHAR(255) NULL,
+    twitter VARCHAR(120) NULL,
+    linkedin VARCHAR(255) NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    last_login_at DATETIME NULL
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+  `CREATE TABLE IF NOT EXISTS settings (
+    setting_key VARCHAR(120) NOT NULL PRIMARY KEY,
+    setting_value LONGTEXT NULL,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+  `CREATE TABLE IF NOT EXISTS categories (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(120) NOT NULL,
+    slug VARCHAR(140) NOT NULL UNIQUE,
+    description TEXT NULL,
+    parent_id BIGINT UNSIGNED NULL,
+    image VARCHAR(255) NULL,
+    color VARCHAR(24) NOT NULL DEFAULT '#2f5bd7',
+    sort_order INT NOT NULL DEFAULT 0,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_categories_parent FOREIGN KEY (parent_id) REFERENCES categories(id) ON DELETE SET NULL
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+  `CREATE TABLE IF NOT EXISTS tags (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(120) NOT NULL,
+    slug VARCHAR(140) NOT NULL UNIQUE,
+    description TEXT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+  `CREATE TABLE IF NOT EXISTS media (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    filename VARCHAR(255) NOT NULL,
+    path VARCHAR(255) NOT NULL,
+    original_name VARCHAR(255) NOT NULL,
+    mime_type VARCHAR(120) NOT NULL,
+    size INT UNSIGNED NOT NULL DEFAULT 0,
+    width INT UNSIGNED NULL,
+    height INT UNSIGNED NULL,
+    alt_text VARCHAR(255) NULL,
+    caption VARCHAR(500) NULL,
+    title VARCHAR(255) NULL,
+    uploaded_by BIGINT UNSIGNED NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_media_created (created_at)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+  `CREATE TABLE IF NOT EXISTS posts (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    type ENUM('post','page') NOT NULL DEFAULT 'post',
+    title VARCHAR(255) NOT NULL,
+    slug VARCHAR(255) NOT NULL UNIQUE,
+    excerpt TEXT NULL,
+    content MEDIUMTEXT NOT NULL,
+    content_html MEDIUMTEXT NULL,
+    featured_image_id BIGINT UNSIGNED NULL,
+    og_image_id BIGINT UNSIGNED NULL,
+    status ENUM('draft','published','scheduled','private','trash') NOT NULL DEFAULT 'draft',
+    author_id BIGINT UNSIGNED NOT NULL,
+    parent_id BIGINT UNSIGNED NULL,
+    template VARCHAR(64) NOT NULL DEFAULT 'default',
+    is_sticky TINYINT(1) NOT NULL DEFAULT 0,
+    allow_comments TINYINT(1) NOT NULL DEFAULT 1,
+    views BIGINT UNSIGNED NOT NULL DEFAULT 0,
+    reading_time SMALLINT UNSIGNED NOT NULL DEFAULT 1,
+    seo_title VARCHAR(255) NULL,
+    seo_description VARCHAR(320) NULL,
+    published_at DATETIME NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_posts_listing (type, status, published_at),
+    INDEX idx_posts_author (author_id),
+    INDEX idx_posts_slug (slug),
+    CONSTRAINT fk_posts_author FOREIGN KEY (author_id) REFERENCES users(id) ON DELETE CASCADE,
+    CONSTRAINT fk_posts_parent FOREIGN KEY (parent_id) REFERENCES posts(id) ON DELETE SET NULL
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+  `CREATE TABLE IF NOT EXISTS post_categories (
+    post_id BIGINT UNSIGNED NOT NULL,
+    category_id BIGINT UNSIGNED NOT NULL,
+    PRIMARY KEY (post_id, category_id),
+    INDEX idx_pc_category (category_id),
+    CONSTRAINT fk_pc_post FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE,
+    CONSTRAINT fk_pc_category FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+  `CREATE TABLE IF NOT EXISTS post_tags (
+    post_id BIGINT UNSIGNED NOT NULL,
+    tag_id BIGINT UNSIGNED NOT NULL,
+    PRIMARY KEY (post_id, tag_id),
+    INDEX idx_pt_tag (tag_id),
+    CONSTRAINT fk_pt_post FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE,
+    CONSTRAINT fk_pt_tag FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+  `CREATE TABLE IF NOT EXISTS revisions (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    post_id BIGINT UNSIGNED NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    content MEDIUMTEXT NOT NULL,
+    excerpt TEXT NULL,
+    author_id BIGINT UNSIGNED NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_revisions_post (post_id, created_at),
+    CONSTRAINT fk_revisions_post FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+  `CREATE TABLE IF NOT EXISTS comments (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    post_id BIGINT UNSIGNED NOT NULL,
+    parent_id BIGINT UNSIGNED NULL,
+    author_name VARCHAR(120) NOT NULL,
+    author_email VARCHAR(190) NULL,
+    author_url VARCHAR(255) NULL,
+    content TEXT NOT NULL,
+    status ENUM('pending','approved','spam','trash') NOT NULL DEFAULT 'pending',
+    user_id BIGINT UNSIGNED NULL,
+    ip_address VARCHAR(64) NULL,
+    user_agent VARCHAR(255) NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_comments_post (post_id, status),
+    INDEX idx_comments_status (status, created_at),
+    CONSTRAINT fk_comments_post FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+  `CREATE TABLE IF NOT EXISTS media_meta (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    media_id BIGINT UNSIGNED NOT NULL,
+    meta_key VARCHAR(80) NOT NULL,
+    meta_value TEXT NULL,
+    UNIQUE KEY uq_media_meta (media_id, meta_key),
+    CONSTRAINT fk_media_meta FOREIGN KEY (media_id) REFERENCES media(id) ON DELETE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+  `CREATE TABLE IF NOT EXISTS subscribers (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    email VARCHAR(190) NOT NULL UNIQUE,
+    name VARCHAR(120) NULL,
+    status ENUM('pending','confirmed','unsubscribed') NOT NULL DEFAULT 'confirmed',
+    token VARCHAR(64) NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+  `CREATE TABLE IF NOT EXISTS post_views (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    post_id BIGINT UNSIGNED NOT NULL,
+    day DATE NOT NULL,
+    views INT UNSIGNED NOT NULL DEFAULT 0,
+    UNIQUE KEY uq_views_day (post_id, day),
+    INDEX idx_views_day (day),
+    CONSTRAINT fk_views_post FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+  `CREATE TABLE IF NOT EXISTS redirects (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    from_path VARCHAR(255) NOT NULL UNIQUE,
+    to_path VARCHAR(255) NOT NULL,
+    status_code SMALLINT NOT NULL DEFAULT 301,
+    hits INT UNSIGNED NOT NULL DEFAULT 0,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+  `CREATE TABLE IF NOT EXISTS activity (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT UNSIGNED NULL,
+    action VARCHAR(64) NOT NULL,
+    subject VARCHAR(255) NULL,
+    meta TEXT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_activity_created (created_at)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+  `CREATE TABLE IF NOT EXISTS sessions (
+    sid VARCHAR(128) NOT NULL PRIMARY KEY,
+    data MEDIUMTEXT NOT NULL,
+    expires BIGINT UNSIGNED NOT NULL,
+    INDEX idx_sessions_expires (expires)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+  `CREATE TABLE IF NOT EXISTS contact_messages (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(120) NOT NULL,
+    email VARCHAR(190) NOT NULL,
+    subject VARCHAR(190) NULL,
+    message TEXT NOT NULL,
+    is_read TINYINT(1) NOT NULL DEFAULT 0,
+    ip_address VARCHAR(64) NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_messages_read (is_read, created_at)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+  `CREATE TABLE IF NOT EXISTS menu_items (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    location ENUM('primary','footer','legal') NOT NULL DEFAULT 'primary',
+    label VARCHAR(120) NOT NULL,
+    url VARCHAR(255) NOT NULL,
+    parent_id BIGINT UNSIGNED NULL,
+    sort_order INT NOT NULL DEFAULT 0,
+    is_active TINYINT(1) NOT NULL DEFAULT 1,
+    target ENUM('_self','_blank') NOT NULL DEFAULT '_self'
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+];
+
+export const SCHEMA_VERSION = 1;
+
+export const DEFAULT_SETTINGS: Record<string, string> = {
+  site_title: 'Azure Gravy',
+  site_tagline: 'A publication for people who make things.',
+  site_description:
+    'Azure Gravy is an independent journal about good work, slow travel and the creative life — served warm, twice a week.',
+  site_url: '',
+  logo_text: 'Azure Gravy',
+  logo_mark: 'drop',
+  accent_color: '#0071e3',
+  default_theme: 'light',
+  posts_per_page: '9',
+  homepage_layout: 'editorial',
+  homepage_featured_count: '1',
+  show_reading_time: '1',
+  show_author_box: '1',
+  show_related_posts: '1',
+  show_toc: '1',
+  allow_comments: '1',
+  comment_moderation: '1',
+  comment_notify_email: '',
+  newsletter_enabled: '1',
+  newsletter_heading: 'The Sunday Letter',
+  newsletter_text:
+    'One thoughtful letter each week: what we read, what we made, and one idea worth keeping. No noise, ever.',
+  footer_about:
+    'Azure Gravy is a small, independent publication about work that matters and the life around it. Written by humans. Read with coffee.',
+  footer_copyright: '© {year} Azure Gravy. All rights reserved.',
+  social_twitter: 'https://twitter.com/',
+  social_instagram: 'https://instagram.com/',
+  social_linkedin: 'https://linkedin.com/',
+  social_youtube: '',
+  contact_email: 'hello@gravy.local',
+  seo_default_image: '',
+  analytics_snippet: '',
+  timezone: 'UTC',
+  date_format: 'long',
+  admin_footer_note: 'Azure Gravy CMS',
+};
+
+/** Small, deliberate set of navigation defaults (editable in Admin → Menus). */
+export const DEFAULT_MENU: Array<{ location: 'primary' | 'footer' | 'legal'; label: string; url: string; sort_order: number }> = [
+  { location: 'primary', label: 'Home', url: '/', sort_order: 0 },
+  { location: 'primary', label: 'Stories', url: '/stories', sort_order: 1 },
+  { location: 'primary', label: 'Categories', url: '/categories', sort_order: 2 },
+  { location: 'primary', label: 'About', url: '/about', sort_order: 3 },
+  { location: 'primary', label: 'Contact', url: '/contact', sort_order: 4 },
+  { location: 'footer', label: 'Stories', url: '/stories', sort_order: 0 },
+  { location: 'footer', label: 'Categories', url: '/categories', sort_order: 1 },
+  { location: 'footer', label: 'Archive', url: '/archive', sort_order: 2 },
+  { location: 'footer', label: 'About', url: '/about', sort_order: 3 },
+  { location: 'footer', label: 'Contact', url: '/contact', sort_order: 4 },
+  { location: 'legal', label: 'Privacy', url: '/privacy', sort_order: 0 },
+  { location: 'legal', label: 'Terms', url: '/terms', sort_order: 1 },
+  { location: 'legal', label: 'RSS', url: '/feed.xml', sort_order: 2 },
+];

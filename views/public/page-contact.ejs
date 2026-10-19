@@ -1,0 +1,57 @@
+<section class="page-head">
+  <div class="container">
+    <nav class="breadcrumbs" aria-label="Breadcrumb"><a href="/">Home</a> <span>/</span> <span>Contact</span></nav>
+    <span class="kicker">Say hello</span>
+    <h1 style="margin-top:10px"><%= post.title %></h1>
+    <p><%= post.excerpt || 'Story tips, corrections, partnerships or just a note about something you read — this reaches a real person.' %></p>
+  </div>
+</section>
+
+<section class="container">
+  <div class="split-page">
+    <div class="stack" style="--stack: 28px">
+      <ul class="contact-list">
+        <li>
+          <b>Email</b>
+          <a href="mailto:<%= h.setting('contact_email', 'hello@gravy.local') %>"><%= h.setting('contact_email', 'hello@gravy.local') %></a>
+        </li>
+        <li>
+          <b>Pitch a story</b>
+          <span>One paragraph, plus why it belongs here. We reply to every pitch.</span>
+        </li>
+        <li>
+          <b>Response time</b>
+          <span>Usually within two working days.</span>
+        </li>
+        <li>
+          <b>Elsewhere</b>
+          <span class="row" style="gap:8px">
+            <% if (h.setting('social_twitter')) { %><a class="icon-btn" href="<%= h.setting('social_twitter') %>" target="_blank" rel="noopener" aria-label="Twitter"><%- h.icon('twitter', '', 16) %></a><% } %>
+            <% if (h.setting('social_instagram')) { %><a class="icon-btn" href="<%= h.setting('social_instagram') %>" target="_blank" rel="noopener" aria-label="Instagram"><%- h.icon('instagram', '', 16) %></a><% } %>
+            <% if (h.setting('social_linkedin')) { %><a class="icon-btn" href="<%= h.setting('social_linkedin') %>" target="_blank" rel="noopener" aria-label="LinkedIn"><%- h.icon('linkedin', '', 16) %></a><% } %>
+          </span>
+        </li>
+      </ul>
+
+      <% if (post.content && post.content.trim()) { %>
+        <div class="prose" style="font-size:0.98rem"><%- contentHtml %></div>
+      <% } %>
+    </div>
+
+    <form class="panel-form" method="post" action="/contact">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <h2 style="font-size:1.3rem;margin-bottom:6px">Send a message</h2>
+      <p class="muted small" style="margin-bottom:20px">Fields marked with * are required.</p>
+      <div class="grid grid--2" style="gap:14px">
+        <label class="field"><span>Name *</span><input class="input" type="text" name="name" required autocomplete="name"></label>
+        <label class="field"><span>Email *</span><input class="input" type="email" name="email" required autocomplete="email"></label>
+      </div>
+      <label class="field"><span>Subject</span><input class="input" type="text" name="subject" placeholder="What is this about?"></label>
+      <label class="field"><span>Message *</span><textarea class="textarea" name="message" rows="6" required placeholder="Tell us what's on your mind…"></textarea></label>
+      <div class="row row--between" style="margin-top:18px">
+        <span class="muted small"><%- h.icon('shield', '', 13) %> We never share your details.</span>
+        <button class="btn btn--accent" type="submit">Send message <%- h.icon('send', '', 15) %></button>
+      </div>
+    </form>
+  </div>
+</section>

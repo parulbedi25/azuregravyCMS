@@ -1,0 +1,93 @@
+<div class="admin-page-head">
+  <div>
+    <h1>Comments</h1>
+    <p><%= counts.pending %> awaiting review · <%= counts.approved %> approved</p>
+  </div>
+  <div class="admin-page-head__actions">
+    <a class="btn btn--ghost btn--sm" href="/admin/settings?tab=discussion"><%- h.icon('settings', '', 14) %> Comment settings</a>
+  </div>
+</div>
+
+<div class="panel">
+  <div class="filter-bar">
+    <div class="filter-tabs">
+      <% [['pending', 'Pending'], ['approved', 'Approved'], ['spam', 'Spam'], ['trash', 'Trash'], ['all', 'All']].forEach(function (tab) { %>
+        <a href="/admin/comments?status=<%= tab[0] %>" class="<%= status === tab[0] ? 'is-active' : '' %>">
+          <%= tab[1] %><span><%= counts[tab[0]] %></span>
+        </a>
+      <% }); %>
+    </div>
+    <form method="get" action="/admin/comments" class="search-field" style="margin-left:auto">
+      <input type="hidden" name="status" value="<%= status %>">
+      <%- h.icon('search', '', 14) %>
+      <input class="input" type="search" name="q" value="<%= search %>" placeholder="Search comments…">
+    </form>
+  </div>
+
+  <% if (comments.length === 0) { %>
+    <div class="empty-state">
+      <%- h.icon('check-circle') %>
+      <h3>Nothing to moderate</h3>
+      <p><%= status === 'pending' ? 'The queue is clear. Enjoy the quiet.' : 'No comments in this view.' %></p>
+    </div>
+  <% } else { %>
+    <ul class="moderation-list">
+      <% comments.forEach(function (comment) { %>
+        <li class="moderation-item">
+          <span class="avatar avatar--initials" style="background: <%= h.colorFromSeed(comment.author_name) %>"><%= h.initials(comment.author_name) %></span>
+          <div>
+            <div class="moderation-item__head">
+              <b><%= comment.author_name %></b>
+              <span><%= comment.author_email || 'no email' %></span>
+              <span class="pill pill--<%= comment.status %>"><%= comment.status %></span>
+            </div>
+            <p><%= comment.content %></p>
+            <div class="moderation-item__meta">
+              <span><%= h.timeAgo(comment.created_at) %></span>
+              <span>on <a href="/stories/<%= comment.post_slug %>#comment-<%= comment.id %>" target="_blank" rel="noopener"><%= comment.post_title %></a></span>
+              <% if (comment.ip_address) { %><span class="mono"><%= comment.ip_address %></span><% } %>
+            </div>
+          </div>
+          <div class="moderation-item__actions">
+            <% if (comment.status !== 'approved') { %>
+              <form method="post" action="/admin/comments/<%= comment.id %>/status">
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                <input type="hidden" name="status" value="approved">
+                <input type="hidden" name="redirect" value="/admin/comments?status=<%= status %>">
+                <button class="row-action" type="submit" title="Approve"><%- h.icon('check', '', 14) %></button>
+              </form>
+            <% } %>
+            <% if (comment.status !== 'spam') { %>
+              <form method="post" action="/admin/comments/<%= comment.id %>/status">
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                <input type="hidden" name="status" value="spam">
+                <input type="hidden" name="redirect" value="/admin/comments?status=<%= status %>">
+                <button class="row-action" type="submit" title="Mark as spam"><%- h.icon('flag', '', 14) %></button>
+              </form>
+            <% } %>
+            <form method="post" action="/admin/comments/<%= comment.id %>/delete" data-confirm="Delete this comment permanently?">
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+              <input type="hidden" name="redirect" value="/admin/comments?status=<%= status %>">
+              <button class="row-action row-action--danger" type="submit" title="Delete"><%- h.icon('trash', '', 14) %></button>
+            </form>
+          </div>
+        </li>
+      <% }); %>
+    </ul>
+
+    <% if (pagination.pageCount > 1) { %>
+      <div class="pager">
+        <span>Showing <%= pagination.from %>–<%= pagination.to %> of <%= pagination.total %></span>
+        <div class="pager__links">
+          <a class="<%= pagination.hasPrev ? '' : 'is-disabled' %>" href="/admin/comments<%= qs({ status: status, page: pagination.page - 1 }) %>"><%- h.icon('chevron-left', '', 13) %></a>
+          <% pagination.pages.forEach(function (item) { %>
+            <% if (item === '…') { %><span>…</span><% } else { %>
+              <a class="<%= item === pagination.page ? 'is-current' : '' %>" href="/admin/comments<%= qs({ status: status, page: item }) %>"><%= item %></a>
+            <% } %>
+          <% }); %>
+          <a class="<%= pagination.hasNext ? '' : 'is-disabled' %>" href="/admin/comments<%= qs({ status: status, page: pagination.page + 1 }) %>"><%- h.icon('chevron-right', '', 13) %></a>
+        </div>
+      </div>
+    <% } %>
+  <% } %>
+</div>

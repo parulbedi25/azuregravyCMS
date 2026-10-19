@@ -1,0 +1,79 @@
+<div class="admin-page-head">
+  <div>
+    <h1>Categories</h1>
+    <p><%= categories.length %> sections · edit inline, then save</p>
+  </div>
+</div>
+
+<div class="admin-grid-side">
+  <div class="panel">
+    <div class="panel__head"><h2>All categories</h2><span class="text-xs text-muted">Drag-free ordering via the sort number</span></div>
+    <div class="panel__body panel__body--flush">
+      <% if (categories.length === 0) { %>
+        <div class="empty-state"><%- h.icon('layout') %><h3>No categories yet</h3><p>Add the first section on the right.</p></div>
+      <% } else { %>
+        <% categories.forEach(function (category) { %>
+          <form method="post" action="/admin/categories/<%= category.id %>" class="moderation-item" style="grid-template-columns:minmax(0,1fr) auto;align-items:center">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;min-width:0">
+              <label class="field">
+                <span>Name</span>
+                <input class="input input-sm" name="name" value="<%= category.name %>" required>
+              </label>
+              <label class="field">
+                <span>Slug</span>
+                <input class="input input-sm" name="slug" value="<%= category.slug %>">
+              </label>
+              <label class="field" style="grid-column: span 2">
+                <span>Description</span>
+                <input class="input input-sm" name="description" value="<%= category.description || '' %>" placeholder="What lives here?">
+              </label>
+              <label class="field">
+                <span>Parent</span>
+                <select class="select input-sm" name="parent_id">
+                  <option value="">None</option>
+                  <% options.filter(function (option) { return option.id !== category.id; }).forEach(function (option) { %>
+                    <option value="<%= option.id %>" <%= category.parent_id === option.id ? 'selected' : '' %>><%= option.name %></option>
+                  <% }); %>
+                </select>
+              </label>
+              <label class="field">
+                <span>Colour</span>
+                <input class="input input-sm" type="color" name="color" value="<%= category.color %>" style="padding:3px;height:34px">
+              </label>
+              <label class="field">
+                <span>Sort</span>
+                <input class="input input-sm" type="number" name="sort_order" value="<%= category.sort_order %>">
+              </label>
+              <label class="field">
+                <span>Cover path</span>
+                <input class="input input-sm" name="image" value="<%= category.image || '' %>" placeholder="/assets/…">
+              </label>
+            </div>
+            <div class="row" style="gap:4px;align-self:end">
+              <span class="pill pill--plain"><%= category.post_count || 0 %> stories</span>
+              <button class="row-action" type="submit" title="Save"><%- h.icon('check', '', 14) %></button>
+              <button class="row-action row-action--danger" type="submit" formaction="/admin/categories/<%= category.id %>/delete"
+                      title="Delete" data-confirm="Delete “<%= category.name %>”? Stories will be kept but uncategorised."><%- h.icon('trash', '', 14) %></button>
+            </div>
+          </form>
+        <% }); %>
+      <% } %>
+    </div>
+  </div>
+
+  <div class="panel" style="position:sticky;top:calc(var(--admin-topbar) + 16px)">
+    <div class="panel__head"><h2>Add a category</h2></div>
+    <form class="panel__body form-grid" method="post" action="/admin/categories">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <label class="field"><span>Name</span><input class="input" name="name" placeholder="e.g. Design" required></label>
+      <label class="field"><span>Slug <span class="text-xs text-muted">(optional)</span></span><input class="input" name="slug" placeholder="auto from name"></label>
+      <label class="field"><span>Description</span><textarea class="textarea" name="description" rows="3" placeholder="A sentence for the category header."></textarea></label>
+      <div class="form-grid form-grid--2">
+        <label class="field"><span>Colour</span><input class="input" type="color" name="color" value="#2f5bd7" style="padding:4px;height:40px"></label>
+        <label class="field"><span>Sort order</span><input class="input" type="number" name="sort_order" value="<%= categories.length + 1 %>"></label>
+      </div>
+      <button class="btn btn--accent btn--sm" type="submit"><%- h.icon('plus', '', 14) %> Create category</button>
+    </form>
+  </div>
+</div>

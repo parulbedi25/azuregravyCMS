@@ -1,0 +1,103 @@
+<header class="site-header" id="siteHeader">
+  <div class="topbar">
+    <div class="container topbar__inner">
+      <span class="topbar__date">
+        <%- h.icon('calendar', '', 13) %>
+        <%= h.formatDate(new Date(), 'long') %>
+      </span>
+      <% if (ticker) { %>
+        <span class="topbar__ticker">
+          <b>Fresh</b>
+          <a href="/stories/<%= ticker.slug %>"><%= ticker.title %></a>
+        </span>
+      <% } %>
+      <span class="topbar__socials">
+        <% if (h.setting('social_twitter')) { %><a href="<%= h.setting('social_twitter') %>" target="_blank" rel="noopener" aria-label="Twitter"><%- h.icon('twitter', '', 14) %></a><% } %>
+        <% if (h.setting('social_instagram')) { %><a href="<%= h.setting('social_instagram') %>" target="_blank" rel="noopener" aria-label="Instagram"><%- h.icon('instagram', '', 14) %></a><% } %>
+        <% if (h.setting('social_linkedin')) { %><a href="<%= h.setting('social_linkedin') %>" target="_blank" rel="noopener" aria-label="LinkedIn"><%- h.icon('linkedin', '', 14) %></a><% } %>
+        <% if (h.setting('social_youtube')) { %><a href="<%= h.setting('social_youtube') %>" target="_blank" rel="noopener" aria-label="YouTube"><%- h.icon('youtube', '', 14) %></a><% } %>
+        <a href="/feed.xml" aria-label="RSS feed"><%- h.icon('rss', '', 14) %></a>
+      </span>
+    </div>
+  </div>
+
+  <div class="container nav-bar">
+    <a class="brand" href="/" aria-label="<%= siteName %> home">
+      <span class="brand__mark"><%= h.setting('logo_text', 'G').slice(0, 1) %></span>
+      <span class="brand__name"><%= h.setting('logo_text', siteName) %></span>
+    </a>
+
+    <nav class="nav-primary" aria-label="Primary">
+      <ul>
+        <% menus.primary.forEach(function (item) { %>
+          <% const active = item.url === '/' ? currentPath === '/' : currentPath.startsWith(item.url); %>
+          <li>
+            <a href="<%= item.url %>" class="<%= active ? 'is-active' : '' %>" <%= item.target === '_blank' ? 'target="_blank" rel="noopener"' : '' %>><%= item.label %></a>
+          </li>
+        <% }); %>
+        <% if (navCategories.length) { %>
+          <li class="has-dropdown">
+            <a href="/categories">Topics <%- h.icon('chevron-down', '', 13) %></a>
+            <div class="dropdown">
+              <% navCategories.slice(0, 7).forEach(function (category) { %>
+                <a href="/category/<%= category.slug %>"><%= category.name %><span><%= category.post_count || 0 %></span></a>
+              <% }); %>
+              <a href="/categories"><b style="font-weight:560">All topics</b><span><%- h.icon('arrow-right', '', 13) %></span></a>
+            </div>
+          </li>
+        <% } %>
+      </ul>
+    </nav>
+
+    <div class="nav-actions">
+      <button class="icon-btn" type="button" data-open-search aria-label="Search stories" title="Search (press /)">
+        <%- h.icon('search', '', 18) %>
+      </button>
+      <button class="icon-btn theme-toggle" type="button" data-theme-toggle aria-label="Toggle dark mode" title="Toggle theme">
+        <span class="theme-toggle__icon">
+          <span class="ttx ttx--moon"><%- h.icon('moon', '', 18) %></span>
+          <span class="ttx ttx--sun"><%- h.icon('sun', '', 18) %></span>
+        </span>
+      </button>
+      <% if (currentUser) { %>
+        <a class="icon-btn" href="/admin" aria-label="Open studio" title="Studio"><%- h.icon('layout', '', 18) %></a>
+      <% } %>
+      <a class="btn btn--accent" href="#newsletter">Subscribe</a>
+      <button class="icon-btn nav-toggle" type="button" data-open-menu aria-label="Open menu"><%- h.icon('menu', '', 18) %></button>
+    </div>
+  </div>
+</header>
+
+<div class="mobile-nav" id="mobileNav">
+  <div class="mobile-nav__scrim" data-close-menu></div>
+  <div class="mobile-nav__panel" role="dialog" aria-modal="true" aria-label="Menu">
+    <div class="mobile-nav__head">
+      <a class="brand" href="/">
+        <span class="brand__mark"><%= h.setting('logo_text', 'G').slice(0, 1) %></span>
+        <span class="brand__name"><%= h.setting('logo_text', siteName) %></span>
+      </a>
+      <button class="icon-btn" type="button" data-close-menu aria-label="Close menu"><%- h.icon('close', '', 18) %></button>
+    </div>
+    <ul class="mobile-nav__links">
+      <% menus.primary.forEach(function (item) { %>
+        <li><a href="<%= item.url %>"><%= item.label %> <%- h.icon('arrow-up-right', '', 15) %></a></li>
+      <% }); %>
+    </ul>
+    <div>
+      <p class="eyebrow" style="margin-bottom:10px">Topics</p>
+      <div class="mobile-nav__cats">
+        <% navCategories.forEach(function (category) { %>
+          <a class="chip" href="/category/<%= category.slug %>"><%= category.name %></a>
+        <% }); %>
+      </div>
+    </div>
+    <div class="mobile-nav__foot">
+      <button class="btn btn--ghost btn--block" type="button" data-theme-toggle>Toggle appearance</button>
+      <% if (currentUser) { %>
+        <a class="btn btn--accent btn--block" href="/admin">Open Studio</a>
+      <% } else { %>
+        <a class="btn btn--accent btn--block" href="/admin/login">Sign in to Studio</a>
+      <% } %>
+    </div>
+  </div>
+</div>

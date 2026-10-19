@@ -1,0 +1,83 @@
+<div class="admin-page-head">
+  <div>
+    <div class="row" style="gap:8px;margin-bottom:4px">
+      <a class="text-xs text-muted" href="/admin/users">← All people</a>
+    </div>
+    <h1><%= user ? 'Edit ' + user.name : 'Invite a writer' %></h1>
+    <p><%= user ? 'Update details, role or reset the password.' : 'Create the account — they can sign in straight away.' %></p>
+  </div>
+</div>
+
+<div class="admin-grid-side">
+  <form class="panel" method="post" action="<%= user ? '/admin/users/' + user.id : '/admin/users' %>">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <div class="panel__head"><h2>Account details</h2></div>
+    <div class="panel__body form-grid">
+      <div class="form-grid form-grid--2">
+        <label class="field"><span>Full name</span><input class="input" name="name" value="<%= user ? user.name : '' %>" required></label>
+        <label class="field"><span>Email</span><input class="input" type="email" name="email" value="<%= user ? user.email : '' %>" required></label>
+      </div>
+      <div class="form-grid form-grid--2">
+        <label class="field">
+          <span>Role</span>
+          <select class="select" name="role">
+            <% ['author', 'editor', 'admin'].forEach(function (role) { %>
+              <option value="<%= role %>" <%= (user ? user.role : 'author') === role ? 'selected' : '' %>><%= role %></option>
+            <% }); %>
+          </select>
+        </label>
+        <label class="field">
+          <span><%= user ? 'New password' : 'Password' %></span>
+          <input class="input" type="password" name="password" <%= user ? '' : 'required' %> placeholder="<%= user ? 'Leave blank to keep current' : 'At least 8 characters' %>" autocomplete="new-password">
+        </label>
+      </div>
+      <label class="field"><span>Bio</span><textarea class="textarea" name="bio" rows="4" placeholder="Shown on the author page and under stories."><%= user && user.bio ? user.bio : '' %></textarea></label>
+      <div class="form-grid form-grid--2">
+        <label class="field"><span>Website</span><input class="input" name="website" value="<%= user && user.website ? user.website : '' %>" placeholder="https://"></label>
+        <label class="field"><span>Twitter / X</span><input class="input" name="twitter" value="<%= user && user.twitter ? user.twitter : '' %>" placeholder="handle"></label>
+      </div>
+      <div class="form-grid form-grid--2">
+        <label class="field"><span>LinkedIn</span><input class="input" name="linkedin" value="<%= user && user.linkedin ? user.linkedin : '' %>" placeholder="https://linkedin.com/in/…"></label>
+        <label class="field"><span>Avatar URL</span><input class="input" name="avatar" value="<%= user && user.avatar ? user.avatar : '' %>" placeholder="/uploads/… or https://"></label>
+      </div>
+      <div class="row row--between">
+        <a class="btn btn--ghost btn--sm" href="/admin/users">Cancel</a>
+        <button class="btn btn--accent btn--sm" type="submit"><%- h.icon('save', '', 14) %> <%= user ? 'Save changes' : 'Create account' %></button>
+      </div>
+    </div>
+  </form>
+
+  <div class="stack-16">
+    <% if (user) { %>
+      <div class="panel">
+        <div class="panel__head"><h2>At a glance</h2></div>
+        <div class="panel__body">
+          <div class="row" style="gap:12px;margin-bottom:14px">
+            <%- include('../partials/avatar', { avatar: user.avatar, name: user.name, size: 'xl' }) %>
+            <div>
+              <b style="display:block"><%= user.name %></b>
+              <span class="text-xs text-muted"><%= user.email %></span>
+            </div>
+          </div>
+          <div class="publish-meta">
+            <div><span>Role</span><b style="text-transform:capitalize"><%= user.role %></b></div>
+            <div><span>Joined</span><b><%= h.formatDate(user.created_at, 'medium') %></b></div>
+            <div><span>Last sign-in</span><b><%= user.last_login_at ? h.timeAgo(user.last_login_at) : 'never' %></b></div>
+          </div>
+          <a class="btn btn--ghost btn--sm btn--block" style="margin-top:14px" href="/author/<%= user.id %>" target="_blank" rel="noopener">
+            View public profile <%- h.icon('external', '', 13) %>
+          </a>
+        </div>
+      </div>
+    <% } else { %>
+      <div class="panel">
+        <div class="panel__head"><h2>Roles, briefly</h2></div>
+        <div class="panel__body stack-10">
+          <p class="text-sm text-muted" style="margin:0"><span class="pill pill--role">Author</span> — writes and manages their own stories.</p>
+          <p class="text-sm text-muted" style="margin:0"><span class="pill pill--role">Editor</span> — everything an author can do, plus all stories, media and moderation.</p>
+          <p class="text-sm text-muted" style="margin:0"><span class="pill pill--role">Admin</span> — full control including settings, users and tools.</p>
+        </div>
+      </div>
+    <% } %>
+  </div>
+</div>

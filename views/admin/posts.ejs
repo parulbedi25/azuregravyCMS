@@ -1,0 +1,151 @@
+<%
+  const noun = type === 'page' ? 'page' : 'story';
+  const plural = type === 'page' ? 'pages' : 'stories';
+  const basePath = type === 'page' ? '/admin/posts' : '/admin/posts';
+%>
+
+<div class="admin-page-head">
+  <div>
+    <h1><%= type === 'page' ? 'Pages' : 'Stories' %></h1>
+    <p><%= total %> <%= plural %><%= activeStatus !== 'all' ? ' · ' + activeStatus : '' %></p>
+  </div>
+  <div class="admin-page-head__actions">
+    <a class="btn btn--ghost btn--sm" href="/admin/posts?type=<%= type %>&sort=popular"><%- h.icon('trending', '', 14) %> Most read</a>
+    <a class="btn btn--accent btn--sm" href="/admin/posts/new?type=<%= type %>"><%- h.icon('plus', '', 14) %> New <%= noun %></a>
+  </div>
+</div>
+
+<div class="panel">
+  <div class="filter-bar">
+    <div class="filter-tabs">
+      <% statusTabs.forEach(function (tab) { %>
+        <a href="/admin/posts?type=<%= type %>&status=<%= tab.key %><%= filters.q ? '&q=' + encodeURIComponent(filters.q) : '' %>"
+           class="<%= activeStatus === tab.key ? 'is-active' : '' %>">
+          <%= tab.label %>
+          <% if (statusCounts[tab.key]) { %><span><%= statusCounts[tab.key] %></span><% } %>
+        </a>
+      <% }); %>
+    </div>
+
+    <form method="get" action="/admin/posts" class="flex gap-8" style="margin-left:auto;flex-wrap:wrap">
+      <input type="hidden" name="type" value="<%= type %>">
+      <input type="hidden" name="status" value="<%= activeStatus %>">
+      <label class="search-field">
+        <%- h.icon('search', '', 14) %>
+        <input class="input" type="search" name="q" value="<%= filters.q %>" placeholder="Search <%= plural %>…">
+      </label>
+      <select class="select" name="category" data-auto-submit>
+        <option value="">All categories</option>
+        <% categories.forEach(function (category) { %>
+          <option value="<%= category.slug %>" <%= filters.category === category.slug ? 'selected' : '' %>><%= category.name %></option>
+        <% }); %>
+      </select>
+      <select class="select" name="author" data-auto-submit>
+        <option value="">All authors</option>
+        <% users.forEach(function (user) { %>
+          <option value="<%= user.id %>" <%= String(filters.author) === String(user.id) ? 'selected' : '' %>><%= user.name %></option>
+        <% }); %>
+      </select>
+      <select class="select" name="sort" data-auto-submit>
+        <option value="newest" <%= filters.sort === 'newest' ? 'selected' : '' %>>Newest</option>
+        <option value="updated" <%= filters.sort === 'updated' ? 'selected' : '' %>>Recently edited</option>
+        <option value="popular" <%= filters.sort === 'popular' ? 'selected' : '' %>>Most read</option>
+        <option value="title" <%= filters.sort === 'title' ? 'selected' : '' %>>A–Z</option>
+      </select>
+      <button class="btn btn--soft btn--sm" type="submit">Filter</button>
+      <% if (filters.q || filters.category || filters.author) { %>
+        <a class="btn btn--ghost btn--sm" href="/admin/posts?type=<%= type %>&status=<%= activeStatus %>">Reset</a>
+      <% } %>
+    </form>
+  </div>
+
+  <% if (posts.length === 0) { %>
+    <div class="empty-state">
+      <%- h.icon('file-text') %>
+      <h3>No <%= plural %> here yet</h3>
+      <p><%= filters.q ? 'Nothing matched that search.' : 'Start the first one — it only takes a title.' %></p>
+      <a class="btn btn--accent btn--sm" href="/admin/posts/new?type=<%= type %>"><%- h.icon('plus', '', 14) %> New <%= noun %></a>
+    </div>
+  <% } else { %>
+    <div class="table-wrap">
+      <table class="table" data-bulk-table>
+        <thead>
+          <tr>
+            <th class="col-check"><input type="checkbox" aria-label="Select all"></th>
+            <th>Title</th>
+            <th>Status</th>
+            <th>Author</th>
+            <th>Category</th>
+            <th>Date</th>
+            <th class="nowrap">Views</th>
+            <th style="width:110px"></th>
+          </tr>
+        </thead>
+        <tbody>
+          <% posts.forEach(function (post) { %>
+            <tr>
+              <td><input type="checkbox" name="ids" value="<%= post.id %>" aria-label="Select <%= post.title %>"></td>
+              <td>
+                <div class="cell-title">
+                  <% if (post.featured_image) { %>
+                    <img src="<%= h.mediaUrl(post.featured_image) %>" alt="" loading="lazy">
+                  <% } else { %>
+                    <span style="width:46px;height:36px;border-radius:7px;background:var(--admin-bg);display:grid;place-items:center;color:var(--admin-ink-3);flex:none"><%- h.icon('image', '', 14) %></span>
+                  <% } %>
+                  <div class="cell-title__text">
+                    <b>
+                      <a href="/admin/posts/<%= post.id %>/edit"><%= post.title %></a>
+                      <% if (post.is_sticky) { %><%- h.icon('star', '', 11) %><% } %>
+                    </b>
+                    <small><%= post.excerpt ? h.truncate(post.excerpt, 62) : 'No excerpt yet' %></small>
+                  </div>
+                </div>
+              </td>
+              <td><span class="pill pill--<%= post.status %>"><%= post.status %></span></td>
+              <td class="text-xs"><%= post.author_name || '—' %></td>
+              <td class="text-xs text-muted"><%= post.category_name || '—' %></td>
+              <td class="text-xs text-muted nowrap"><%= h.formatDate(post.published_at || post.created_at, 'medium') %></td>
+              <td class="text-xs text-muted nowrap"><%= h.formatNumber(post.views) %></td>
+              <td>
+                <div class="cell-actions">
+                  <a class="row-action" href="<%= h.postUrl(post) %>" target="_blank" rel="noopener" title="View"><%- h.icon('eye', '', 14) %></a>
+                  <a class="row-action" href="/admin/posts/<%= post.id %>/edit" title="Edit"><%- h.icon('pen', '', 14) %></a>
+                  <% if (post.status === 'trash') { %>
+                    <form method="post" action="/admin/posts/<%= post.id %>/status">
+                      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                      <input type="hidden" name="status" value="draft">
+                      <input type="hidden" name="redirect" value="/admin/posts?type=<%= type %>&status=trash">
+                      <button class="row-action" type="submit" title="Restore"><%- h.icon('refresh', '', 14) %></button>
+                    </form>
+                  <% } else { %>
+                    <form method="post" action="/admin/posts/<%= post.id %>/delete">
+                      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                      <input type="hidden" name="redirect" value="/admin/posts?type=<%= type %>&status=<%= activeStatus %>">
+                      <button class="row-action row-action--danger" type="submit" title="Move to trash"
+                        data-confirm="Move “<%= post.title %>” to trash? You can restore it later."><%- h.icon('trash', '', 14) %></button>
+                    </form>
+                  <% } %>
+                </div>
+              </td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+
+    <% if (pagination.pageCount > 1) { %>
+      <div class="pager">
+        <span>Showing <%= pagination.from %>–<%= pagination.to %> of <%= pagination.total %></span>
+        <div class="pager__links">
+          <a class="<%= pagination.hasPrev ? '' : 'is-disabled' %>" href="/admin/posts<%= qs({ type: type, status: activeStatus, page: pagination.page - 1 }) %>"><%- h.icon('chevron-left', '', 13) %></a>
+          <% pagination.pages.forEach(function (item) { %>
+            <% if (item === '…') { %><span>…</span><% } else { %>
+              <a class="<%= item === pagination.page ? 'is-current' : '' %>" href="/admin/posts<%= qs({ type: type, status: activeStatus, page: item }) %>"><%= item %></a>
+            <% } %>
+          <% }); %>
+          <a class="<%= pagination.hasNext ? '' : 'is-disabled' %>" href="/admin/posts<%= qs({ type: type, status: activeStatus, page: pagination.page + 1 }) %>"><%- h.icon('chevron-right', '', 13) %></a>
+        </div>
+      </div>
+    <% } %>
+  <% } %>
+</div>

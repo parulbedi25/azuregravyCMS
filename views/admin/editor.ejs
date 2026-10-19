@@ -1,0 +1,321 @@
+<%
+  const isPage = type === 'page';
+  const base = isPage ? '/' : '/stories/';
+  const selectedCategoryIds = (post && post.categories ? post.categories.map(function (c) { return c.id; }) : []);
+  const tagValue = post && post.tags ? post.tags.map(function (t) { return t.name; }).join(', ') : '';
+  const status = post ? post.status : 'draft';
+  const featured = post && post.featured_image_id ? post.featured_image_id : '';
+  const featuredPath = post && post.featured_image ? post.featured_image : '';
+%>
+
+<form id="editorForm" method="post"
+      action="<%= post && post.id ? '/admin/posts/' + post.id : '/admin/posts' %>"
+      data-post-id="<%= post && post.id ? post.id : 'new' %>">
+  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+  <input type="hidden" name="type" value="<%= type %>">
+  <input type="hidden" name="intent" id="intentField" value="save">
+
+  <div class="admin-page-head">
+    <div>
+      <div class="row" style="gap:8px;margin-bottom:4px">
+        <a class="text-xs text-muted" href="/admin/posts?type=<%= type %>">← All <%= isPage ? 'pages' : 'stories' %></a>
+        <% if (post && post.id) { %>
+          <span class="text-xs text-muted">·</span>
+          <a class="text-xs text-muted" href="<%= h.postUrl(post) %>" target="_blank" rel="noopener">View live ↗</a>
+          <span class="text-xs text-muted">·</span>
+          <a class="text-xs text-muted" href="/admin/posts/<%= post.id %>/revisions"><%= revisions.length %> revision<%= revisions.length === 1 ? "" : "s" %></a>
+        <% } %>
+      </div>
+      <h1><%= post && post.id ? 'Edit ' + (isPage ? 'page' : 'story') : 'New ' + (isPage ? 'page' : 'story') %></h1>
+      <p><span id="saveState"><%= post && post.updated_at ? 'Last edited ' + h.timeAgo(post.updated_at) : 'Not saved yet' %></span></p>
+    </div>
+    <div class="admin-page-head__actions">
+      <button class="btn btn--ghost btn--sm" type="submit" data-save-button data-intent="save">Save changes</button>
+      <% if (can.editor || (post && post.author_id === currentUser.id)) { %>
+        <button class="btn btn--accent btn--sm" type="submit" data-intent="publish"><%- h.icon('send', '', 14) %> <%= post && post.status === 'published' ? 'Update' : 'Publish' %></button>
+      <% } %>
+    </div>
+  </div>
+
+  <div class="editor-shell">
+    <div class="editor-main">
+      <div class="panel">
+        <input class="editor-title" id="title" name="title" type="text" required
+               placeholder="<%= isPage ? 'Page title' : 'Story title…' %>" value="<%= post ? post.title : '' %>" autocomplete="off">
+        <div class="slug-row">
+          <%- h.icon('link', '', 13) %>
+          <span><%= base %></span>
+          <input class="input" id="slug" name="slug" type="text" value="<%= post ? post.slug : '' %>" placeholder="auto-generated-from-title" style="max-width: 320px">
+          <label class="checkbox text-xs" style="margin-left:6px">
+            <input type="checkbox" id="slugLocked" checked> Auto
+          </label>
+        </div>
+
+        <div class="editor-toolbar">
+          <div class="tool-group">
+            <button class="tool" type="button" data-insert="bold" title="Bold"><%- h.icon('bold', '', 15) %></button>
+            <button class="tool" type="button" data-insert="italic" title="Italic"><%- h.icon('italic', '', 15) %></button>
+            <button class="tool" type="button" data-insert="h2" title="Heading 2"><%- h.icon('heading', '', 15) %></button>
+            <button class="tool" type="button" data-insert="quote" title="Quote"><%- h.icon('quote', '', 15) %></button>
+          </div>
+          <span class="divider-v"></span>
+          <div class="tool-group">
+            <button class="tool" type="button" data-insert="ul" title="Bullet list"><%- h.icon('list-ul', '', 15) %></button>
+            <button class="tool" type="button" data-insert="ol" title="Numbered list"><%- h.icon('list-ol', '', 15) %></button>
+            <button class="tool" type="button" data-insert="link" title="Link"><%- h.icon('link', '', 15) %></button>
+            <button class="tool" type="button" data-insert="image" title="Image"><%- h.icon('image', '', 15) %></button>
+            <button class="tool" type="button" data-insert="code" title="Code block"><%- h.icon('code', '', 15) %></button>
+            <button class="tool" type="button" data-insert="hr" title="Divider"><%- h.icon('minus', '', 15) %></button>
+          </div>
+
+          <div class="editor-tabs">
+            <button type="button" data-editor-tab="write" class="is-active">Write</button>
+            <button type="button" data-editor-tab="preview">Preview</button>
+          </div>
+
+          <span class="editor-toolbar__right">
+            <span class="text-xs text-muted" style="margin-right:6px">Markdown</span>
+          </span>
+        </div>
+
+        <div class="editor-panes">
+          <div class="editor-pane is-active" id="paneWrite">
+            <textarea class="editor-textarea" id="content" name="content" spellcheck="true"
+                      placeholder="Start with a sentence.&#10;&#10;Use ## for section headings, > for quotes, and - for lists. Paste images from the media library with ![alt](/uploads/file.webp)."><%= post ? post.content : '' %></textarea>
+          </div>
+          <div class="editor-pane editor-preview" id="panePreview">
+            <div id="editorPreview"><div class="editor-preview__empty">Start writing — the preview will build itself.</div></div>
+          </div>
+        </div>
+
+        <div class="editor-foot">
+          <span id="wordCount">0 words</span>
+          <span>·</span>
+          <span id="readTime">1 min read</span>
+          <span>·</span>
+          <span id="charCount">0 characters</span>
+          <span class="spacer"></span>
+          <span>⌘S to save</span>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel__head">
+          <div><h2>Excerpt &amp; SEO</h2><p>How this <%= isPage ? 'page' : 'story' %> appears in search and social.</p></div>
+        </div>
+        <div class="panel__body">
+          <div class="form-grid">
+            <label class="field">
+              <span>Excerpt</span>
+              <textarea class="textarea" name="excerpt" rows="3" placeholder="A sentence or two that makes someone want to read on. Leave blank to auto-generate from the first paragraph."><%= post && post.excerpt ? post.excerpt : '' %></textarea>
+            </label>
+
+            <div class="form-grid form-grid--2">
+              <label class="field">
+                <span class="label-row"><span>SEO title</span><span class="counter" id="seoTitleCount"></span></span>
+                <input class="input" type="text" name="seo_title" value="<%= post && post.seo_title ? post.seo_title : '' %>"
+                       placeholder="Defaults to the story title" data-counter="seoTitleCount" data-ideal="30" data-max="60">
+              </label>
+              <label class="field">
+                <span>Social image</span>
+                <div class="row">
+                  <input class="input" type="hidden" id="og_image_id" name="og_image_id" value="<%= post && post.og_image_id ? post.og_image_id : '' %>">
+                  <button class="btn btn--soft btn--sm" type="button" data-pick-media="og_image_id"><%- h.icon('image', '', 14) %> Choose image</button>
+                  <img id="og_image_id-preview" alt="" style="width:36px;height:28px;object-fit:cover;border-radius:5px;<%= post && post.og_image_id ? '' : 'display:none' %>" src="">
+                </div>
+              </label>
+            </div>
+
+            <label class="field">
+              <span class="label-row"><span>SEO description</span><span class="counter" id="seoDescCount"></span></span>
+              <textarea class="textarea" name="seo_description" rows="2" placeholder="The one-liner search engines show under the title."
+                        data-counter="seoDescCount" data-ideal="70" data-max="160"><%= post && post.seo_description ? post.seo_description : '' %></textarea>
+            </label>
+
+            <div class="seo-preview">
+              <span><%= settings.site_url || 'https://your-domain.com' %><%= base %><span id="seoSlug"><%= post ? post.slug : 'your-story' %></span></span>
+              <b><%= post && post.seo_title ? post.seo_title : (post ? post.title : 'Your story title') %></b>
+              <p><%= post && post.seo_description ? post.seo_description : 'A short description of the story, shown under the title in search results.' %></p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <aside class="editor-side">
+      <div class="side-card">
+        <div class="side-card__head"><h3>Publishing</h3><span class="pill pill--<%= status %>"><%= status %></span></div>
+        <div class="side-card__body">
+          <label class="field">
+            <span class="label">Status</span>
+            <select class="select" name="status">
+              <option value="draft" <%= status === 'draft' ? 'selected' : '' %>>Draft</option>
+              <option value="published" <%= status === 'published' ? 'selected' : '' %>>Published</option>
+              <option value="scheduled" <%= status === 'scheduled' ? 'selected' : '' %>>Scheduled</option>
+              <option value="private" <%= status === 'private' ? 'selected' : '' %>>Private</option>
+              <% if (status === 'trash') { %><option value="trash" selected>Trash</option><% } %>
+            </select>
+          </label>
+          <label class="field">
+            <span class="label">Date &amp; time (UTC)</span>
+            <input class="input input-sm" type="datetime-local" name="published_at" value="<%= post ? h.toLocalInput(post.published_at) : '' %>">
+            <span class="hint">Set a future date with “Scheduled” to publish automatically.</span>
+          </label>
+          <% if (can.editor) { %>
+            <label class="field">
+              <span class="label">Author</span>
+              <select class="select" name="author_id">
+                <% users.forEach(function (user) { %>
+                  <option value="<%= user.id %>" <%= post && post.author_id === user.id ? 'selected' : (!post && user.id === currentUser.id ? 'selected' : '') %>><%= user.name %></option>
+                <% }); %>
+              </select>
+            </label>
+          <% } %>
+          <% if (isPage) { %>
+            <label class="field">
+              <span class="label">Template</span>
+              <select class="select" name="template">
+                <option value="default" <%= post && post.template === 'default' ? 'selected' : '' %>>Default page</option>
+                <option value="contact" <%= post && post.template === 'contact' ? 'selected' : '' %>>Contact page</option>
+              </select>
+            </label>
+          <% } %>
+          <label class="switch">
+            <input type="checkbox" name="is_sticky" <%= post && post.is_sticky ? 'checked' : '' %>>
+            <span class="switch__track"></span>
+            <span class="switch__text"><b>Featured</b><span>Pin to the top of the home page.</span></span>
+          </label>
+          <label class="switch">
+            <input type="checkbox" name="allow_comments" <%= !post || post.allow_comments ? 'checked' : '' %>>
+            <span class="switch__track"></span>
+            <span class="switch__text"><b>Comments</b><span>Allow readers to reply.</span></span>
+          </label>
+
+          <div class="publish-actions" style="margin-top:4px">
+            <button class="btn btn--accent btn--block btn--sm" type="submit" data-intent="publish">
+              <%- h.icon('send', '', 14) %> <%= post && post.status === 'published' ? 'Update story' : 'Publish' %>
+            </button>
+            <button class="btn btn--ghost btn--block btn--sm" type="submit" data-intent="save">Save draft</button>
+          </div>
+
+          <% if (post && post.id) { %>
+            <div class="publish-meta" style="margin-top:6px;padding-top:10px;border-top:1px solid var(--admin-line)">
+              <div><span>Created</span><b><%= h.formatDate(post.created_at, 'medium') %></b></div>
+              <div><span>Updated</span><b><%= h.timeAgo(post.updated_at) %></b></div>
+              <div><span>Views</span><b><%= h.formatNumber(post.views) %></b></div>
+              <div><span>Comments</span><b><%= post.comment_count || 0 %></b></div>
+            </div>
+            <form method="post" action="/admin/posts/<%= post.id %>/delete" style="margin-top:6px"
+                  data-confirm="Move this <%= isPage ? 'page' : 'story' %> to trash?">
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+              <input type="hidden" name="redirect" value="/admin/posts?type=<%= type %>">
+              <button class="btn btn--ghost btn--sm btn--block" type="submit" style="color:#c0392b"><%- h.icon('trash', '', 13) %> Move to trash</button>
+            </form>
+          <% } %>
+        </div>
+      </div>
+
+      <div class="side-card side-card--collapsible side-card--open">
+        <div class="side-card__head"><h3>Categories</h3><span class="side-card__toggle"><%- h.icon('chevron-down', '', 15) %></span></div>
+        <div class="side-card__body">
+          <div class="checklist">
+            <% categories.forEach(function (category) { %>
+              <label>
+                <input type="checkbox" name="categories" value="<%= category.id %>" <%= selectedCategoryIds.includes(category.id) ? 'checked' : '' %>>
+                <span><%= category.name %></span>
+                <span class="text-xs text-muted" style="margin-left:auto"><%= category.post_count || 0 %></span>
+              </label>
+            <% }); %>
+          </div>
+          <a class="text-xs" href="/admin/categories" style="color:var(--admin-accent)">Manage categories →</a>
+        </div>
+      </div>
+
+      <div class="side-card side-card--collapsible side-card--open">
+        <div class="side-card__head"><h3>Tags</h3><span class="side-card__toggle"><%- h.icon('chevron-down', '', 15) %></span></div>
+        <div class="side-card__body">
+          <input type="hidden" name="tags" id="tagsValue" value="<%= tagValue %>">
+          <div class="tag-input" id="tagInput">
+            <span id="tagChips" style="display:contents"></span>
+            <input type="text" id="tagEntry" placeholder="Add a tag…" aria-label="Add a tag">
+          </div>
+          <span class="hint">Press Enter or comma to add. Up to 20 tags.</span>
+          <div class="tag-cloud" style="gap:5px">
+            <% tags.slice(0, 8).forEach(function (tag) { %>
+              <button type="button" class="chip" style="font-size:.68rem;text-transform:none;letter-spacing:0" data-add-tag="<%= tag.name %>">#<%= tag.name %></button>
+            <% }); %>
+          </div>
+        </div>
+      </div>
+
+      <div class="side-card">
+        <div class="side-card__head"><h3>Featured image</h3></div>
+        <div class="side-card__body">
+          <input type="hidden" id="featured_image_id" name="featured_image_id" value="<%= featured %>">
+          <div class="image-picker <%= featured ? 'has-image' : '' %>">
+            <% if (featuredPath) { %>
+              <img id="featured_image_id-preview" src="<%= featuredPath %>" alt="">
+            <% } else { %>
+              <img id="featured_image_id-preview" src="" alt="" style="display:none">
+              <span class="image-picker__empty">
+                <%- h.icon('image-plus', '', 22) %>
+                <span>No image selected</span>
+              </span>
+            <% } %>
+            <span class="image-picker__actions">
+              <button type="button" data-pick-media="featured_image_id" title="Choose image"><%- h.icon('image', '', 13) %></button>
+              <button type="button" data-remove-media="featured_image_id" title="Remove image"><%- h.icon('close', '', 13) %></button>
+            </span>
+          </div>
+          <div class="media-grid" style="grid-template-columns:repeat(4,1fr);gap:5px;margin-top:8px">
+            <% media.slice(0, 8).forEach(function (item) { %>
+              <button type="button" data-pick-media="featured_image_id" style="border:1px solid var(--admin-line);border-radius:6px;overflow:hidden;padding:0;aspect-ratio:1;background:var(--admin-bg)">
+                <img src="<%= item.path %>" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover">
+              </button>
+            <% }); %>
+          </div>
+          <span class="hint">For a quick pick, click a recent image above or browse the full library.</span>
+        </div>
+      </div>
+
+      <% if (revisions.length) { %>
+        <div class="side-card side-card--collapsible">
+          <div class="side-card__head"><h3>Revision history</h3><span class="side-card__toggle"><%- h.icon('chevron-down', '', 15) %></span></div>
+          <div class="side-card__body">
+            <ul class="revision-list">
+              <% revisions.slice(0, 6).forEach(function (revision) { %>
+                <li>
+                  <span class="flex-1 truncate"><%= revision.title %></span>
+                  <time><%= h.timeAgo(revision.created_at) %></time>
+                  <form method="post" action="/admin/posts/<%= post.id %>/revisions/<%= revision.id %>/restore" data-confirm="Restore this revision?">
+                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                    <button class="row-action" type="submit" title="Restore"><%- h.icon('undo', '', 13) %></button>
+                  </form>
+                </li>
+              <% }); %>
+            </ul>
+            <a class="text-xs" href="/admin/posts/<%= post.id %>/revisions" style="color:var(--admin-accent)">All revisions →</a>
+          </div>
+        </div>
+      <% } %>
+    </aside>
+  </div>
+</form>
+
+<script>
+  document.addEventListener('click', function (event) {
+    var addTag = event.target.closest('[data-add-tag]');
+    if (!addTag) return;
+    var hidden = document.getElementById('tagsValue');
+    var chips = document.getElementById('tagChips');
+    var entry = document.getElementById('tagEntry');
+    var tags = (hidden.value || '').split(',').map(function (t) { return t.trim(); }).filter(Boolean);
+    if (!tags.some(function (t) { return t.toLowerCase() === addTag.dataset.addTag.toLowerCase(); })) {
+      tags.push(addTag.dataset.addTag);
+      hidden.value = tags.join(', ');
+      chips.innerHTML = tags.map(function (tag, index) {
+        return '<span class="tag-input__chip">' + tag.replace(/</g, '&lt;') + '<button type="button" data-remove-tag="' + index + '" aria-label="Remove tag">✕</button></span>';
+      }).join('');
+    }
+  });
+</script>
