@@ -3,7 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title><%= pageTitle %> · <%= typeof siteName !== "undefined" ? siteName : "Azure Gravy" %></title>
+  <% const _site = typeof siteName !== "undefined" ? siteName : "Azure Gravy"; %>
+  <title><%= pageTitle %><% if (String(pageTitle).indexOf(_site) === -1) { %> · <%= _site %><% } %></title>
   <meta name="description" content="<%= metaDescription %>">
   <link rel="canonical" href="<%= settings.site_url || '' %><%= currentPath %>">
   <meta name="theme-color" content="<%= theme === 'dark' ? '#000000' : '#ffffff' %>">
