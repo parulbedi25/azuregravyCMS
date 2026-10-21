@@ -165,6 +165,19 @@ export async function createApp() {
           force the flag instead of leaving it to request sniffing.
         */
         secure: config.sessionSameSite === 'none' ? true : 'auto',
+        /*
+          CHIPS. `SameSite=None; Secure` is necessary but not sufficient for a
+          cross-site iframe: Safari's ITP blocks unpartitioned third-party cookies
+          outright, and Chrome/Firefox are partitioning them too. `Partitioned`
+          scopes the cookie to the embedding top-level site, which is precisely
+          the embedded-Studio case `none` already declares.
+
+          Tied to `none` rather than a separate knob because it is only valid
+          alongside `Secure` + `SameSite=None`, and it degrades gracefully —
+          browsers that do not implement CHIPS ignore the attribute per RFC 6265
+          and keep the unpartitioned cookie.
+        */
+        partitioned: config.sessionSameSite === 'none',
         maxAge: 1000 * 60 * 60 * 24 * 7,
       },
     }),

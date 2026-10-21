@@ -404,6 +404,15 @@ with `419 Session expired`. Browsers only accept `SameSite=None` alongside `Secu
 forces the `Secure` flag and treats incoming requests as HTTPS; use it only behind TLS. Leave it unset
 for a normal top-level site, where `lax` is the stronger default.
 
+This mode also sets the CHIPS **`Partitioned`** attribute, which the browsers phasing out third-party
+cookies (Safari's ITP already does) require before they will store a cross-site cookie at all. Two
+consequences worth knowing:
+
+- A partitioned cookie is scoped to the *embedding* site, so opening the same URL as a top-level tab
+  gets its own separate session rather than sharing the iframe's.
+- Do not reach for `none` to solve a cross-site **POST** flow (a payment redirect back, say) — there
+  the partitioning would silently split the session. `none` here means "embedded in an iframe".
+
 With no `DB_*` values the app is **not** broken — it serves the installer at `/admin/setup` and waits.
 `data/install.json` (written by the installer, `0600`, git-ignored) holds the same five values; delete
 it to run the installer again.
