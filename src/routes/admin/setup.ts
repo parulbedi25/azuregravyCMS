@@ -114,8 +114,31 @@ function dbFormFrom(_state: InstallState, stored: SessionDb | undefined): DbForm
   const snapshot = dbConfigSnapshot();
   return {
     driver: stored?.driver ?? (snapshot.driver === 'embedded' ? 'embedded' : 'mysql'),
-    host: stored?.host ?? snapshot.host ?? (config.isProd ? 'localhost' : '127.0.0.1'),
+    /*
+      `snapshot.host` is `''` — not `undefined` — when nothing is configured, and
+      `??` only falls through on null/undefined. So the intended default below was
+      unreachable: Host rendered empty (grey placeholder) while Port rendered its
+      real `3306` (dark text), leaving the two halves of the same row looking
+      unlike each other. `||` treats the empty string as absent too.
+
+      `stored` is honoured first so a host the user already typed and got a
+      connection error on is not silently replaced by this default. Note that a
+      *cleared* host is not preserved across requests: it fails `MysqlForm`
+      validation, which returns before `req.session.installDb` is written, so the
+      next GET falls through to the default again. Within the 422 response itself
+      the field still renders empty, because that path echoes `submittedDb`.
+    */
+    host: stored ? stored.host : (snapshot.host || (config.isProd ? 'localhost' : '127.0.0.1')),
     port: String(stored?.port ?? snapshot.port ?? 3306),
+    /*
+      These two keep `??` on purpose, so the trailing defaults stay unreachable and
+      both fields render empty, showing their example placeholders instead. That is
+      the intended split on this screen: host and port have universal well-known
+      values worth prefilling, whereas the database name and user are account-
+      specific — on cPanel they are prefixed (`myaccount_gravy`), so prefilling
+      `azuregravy` here would actively mislead. Do not "make these consistent" with
+      host above by switching to `||`.
+    */
     database: stored?.database ?? snapshot.database ?? 'azuregravy',
     user: stored?.user ?? snapshot.user ?? '',
     // Passwords are never kept in the session; the applied config still has it.
