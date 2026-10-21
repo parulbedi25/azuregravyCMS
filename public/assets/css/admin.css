@@ -911,3 +911,41 @@ label.field > span { color: var(--admin-ink-2); }
   .stat-card__foot { font-size: 0.71rem; line-height: 1.35; }
   .dash-grid { gap: 12px; }
 }
+
+/* ---------------------------------------------------- installer (setup wizard) */
+.steps {
+  display: flex; align-items: center; gap: 18px;
+  list-style: none; margin: 0 0 22px; padding: 0;
+  font-size: 0.78rem; color: var(--admin-ink-3);
+}
+.steps li { display: flex; align-items: center; gap: 8px; position: relative; }
+.steps li span {
+  display: grid; place-items: center;
+  width: 22px; height: 22px; border-radius: 50%;
+  border: 1px solid var(--admin-line);
+  font-size: 0.7rem; font-weight: 600;
+  background: var(--admin-bg);
+}
+.steps li + li::before {
+  content: ''; position: absolute; left: -14px; top: 50%;
+  width: 10px; height: 1px; background: var(--admin-line);
+}
+.steps li.is-current { color: var(--admin-ink-1); font-weight: 540; }
+.steps li.is-current span { background: var(--admin-accent); border-color: var(--admin-accent); color: #fff; }
+.steps li.is-done span { border-color: var(--admin-accent); color: var(--admin-accent); }
+
+.hint--error { color: #c0392b; }
+.auth-card .alert code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.92em; }
+.db-code {
+  display: inline-block; margin-left: 8px; padding: 1px 7px;
+  border-radius: var(--radius-pill, 32px);
+  border: 1px solid currentColor; opacity: 0.72;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.68rem;
+}
+.db-hint {
+  margin: 10px 0 0; padding: 10px 12px;
+  border-radius: 8px; background: rgba(0, 0, 0, 0.045);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.72rem; line-height: 1.6; white-space: pre-wrap; word-break: break-word;
+}
+#db-embedded-fields[hidden], #db-server-fields[hidden] { display: none; }

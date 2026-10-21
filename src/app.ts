@@ -4,20 +4,63 @@ import expressLayouts from 'express-ejs-layouts';
 import { config, PUBLIC_DIR, VIEWS_DIR } from './config.js';
 import { attachUser } from './lib/auth.js';
 import { clientIp, csrfProtection, flashMiddleware } from './lib/http.js';
-import { MariaSessionStore } from './lib/session-store.js';
+import { HybridSessionStore } from './lib/session-store.js';
 import { loadSettings } from './lib/settings.js';
 import { buildHelpers } from './lib/view.js';
 import { accentStylesheet } from './lib/theme.js';
 import { rememberRequestOrigin } from './lib/url.js';
 import { getMenuItems, getNavCategories, getTicker } from './services/navigation.js';
-import { publishDuePosts, getDb } from './db/index.js';
+import { publishDuePosts, getDb, DbSetupError } from './db/index.js';
+import { getInstallState, type InstallState } from './db/bootstrap.js';
+import { DEFAULT_SETTINGS } from './db/schema.js';
 import publicRoutes from './routes/public.js';
 import adminRoutes from './routes/admin/index.js';
 
 let lastPublishSweep = 0;
 
+const EMPTY_INSTALL_STATE: InstallState = {
+  configured: false,
+  connected: false,
+  installed: false,
+  needsSetup: true,
+  tables: 0,
+  admins: 0,
+  posts: 0,
+  pages: 0,
+  error: null,
+  checkedAt: 0,
+};
+
+/** Paths that must keep working before the database exists. */
+const OPEN_PATHS = ['/admin/setup', '/healthz'];
+const isOpenPath = (path: string) =>
+  OPEN_PATHS.includes(path) || path.startsWith('/assets/') || path === '/favicon.ico';
+
+/**
+ * Render the "we cannot reach the database" page.
+ *
+ * Used both by the gate and by the error handler, so a wrong password in
+ * `data/install.json` produces a helpful screen with a way back into the
+ * installer — never a stack trace and never a dead process.
+ */
+function renderDbError(req: Request, res: Response, state: InstallState | null, status = 503): void {
+  if (res.headersSent) return;
+  res.status(status).render('public/db-error', {
+    layout: 'layouts/plain',
+    title: 'Database unreachable',
+    status,
+    message: state?.error?.message ?? 'The database could not be reached.',
+    hint: state?.error?.hint ?? '',
+    code: state?.error?.code ?? '',
+    target: config.db.configured ? `${config.db.user}@${config.db.host}:${config.db.port}/${config.db.database}` : '',
+    path: req.originalUrl,
+    siteName: 'Azure Gravy',
+    settings: DEFAULT_SETTINGS as Record<string, string>,
+    h: buildHelpers(DEFAULT_SETTINGS as Record<string, string>),
+  });
+}
+
 export async function createApp() {
-  const db = await getDb();
   const app = express();
 
   app.set('trust proxy', 1);
@@ -42,6 +85,9 @@ export async function createApp() {
     next();
   });
 
+  // Liveness probe that never touches the database — handy on cPanel.
+  app.get('/healthz', (_req, res) => res.type('text/plain').send('ok'));
+
   // Browsers ask for /favicon.ico even when an SVG icon is declared.
   app.get('/favicon.ico', (_req, res) => res.redirect(301, '/assets/img/favicon.svg'));
 
@@ -58,7 +104,8 @@ export async function createApp() {
   app.use(express.urlencoded({ extended: true, limit: '2mb' }));
   app.use(express.json({ limit: '2mb' }));
 
-  const store = new MariaSessionStore();
+  // Memory-backed until the installer connects a database, then MariaDB-backed.
+  const store = new HybridSessionStore();
   setInterval(() => void store.clearExpired().catch(() => undefined), 1000 * 60 * 30).unref();
 
   app.use(
@@ -82,27 +129,45 @@ export async function createApp() {
 
   app.use(flashMiddleware);
 
-  // Shared template locals (available to every renderer, including error pages)
+  // Shared template locals (available to every renderer, including error pages).
+  // Nothing here may throw when the database is missing: the installer has to be
+  // reachable on a machine with no MySQL at all.
   app.use(async (req: Request, res: Response, next: NextFunction) => {
     try {
       // Canonical/OG/RSS URLs follow the real host when SITE_URL is not configured.
       rememberRequestOrigin(req.protocol, req.get('host'));
-      // Publish due stories at most once a minute rather than on every request.
-      if (Date.now() - lastPublishSweep > 60_000) {
-        lastPublishSweep = Date.now();
-        await publishDuePosts(db);
+
+      const state = await getInstallState();
+      res.locals.install = state;
+
+      let settings: Record<string, string>;
+      if (state.connected) {
+        // Publish due stories at most once a minute rather than on every request.
+        if (Date.now() - lastPublishSweep > 60_000) {
+          lastPublishSweep = Date.now();
+          await publishDuePosts(await getDb());
+        }
+        const [loaded, menus, categories, ticker] = await Promise.all([
+          loadSettings(), getMenuItems(), getNavCategories(), getTicker(),
+        ]);
+        settings = loaded as Record<string, string>;
+        res.locals.menus = {
+          primary: menus.filter((item) => item.location === 'primary'),
+          footer: menus.filter((item) => item.location === 'footer'),
+          legal: menus.filter((item) => item.location === 'legal'),
+        };
+        res.locals.navCategories = categories;
+        res.locals.ticker = ticker;
+      } else {
+        // Pre-install: render from the built-in defaults so the installer and the
+        // error pages look like the real site.
+        settings = DEFAULT_SETTINGS as Record<string, string>;
+        res.locals.menus = { primary: [], footer: [], legal: [] };
+        res.locals.navCategories = [];
+        res.locals.ticker = null;
       }
-      const [settings, menus, categories, ticker] = await Promise.all([
-        loadSettings(), getMenuItems(), getNavCategories(), getTicker(),
-      ]);
+
       res.locals.settings = settings;
-      res.locals.menus = {
-        primary: menus.filter((item) => item.location === 'primary'),
-        footer: menus.filter((item) => item.location === 'footer'),
-        legal: menus.filter((item) => item.location === 'legal'),
-      };
-      res.locals.navCategories = categories;
-      res.locals.ticker = ticker;
       res.locals.h = buildHelpers(settings);
       res.locals.currentPath = req.path;
       res.locals.query = req.query;
@@ -134,6 +199,23 @@ export async function createApp() {
   });
 
   app.use(csrfProtection);
+
+  /**
+   * Installation gate.
+   *
+   * Until a database is connected *and* a super admin exists, every URL leads to
+   * the installer; a configured-but-unreachable database gets the friendly
+   * "database unreachable" page with a link back into the installer.
+   */
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    const state = res.locals.install as InstallState | undefined;
+    if (!state || isOpenPath(req.path)) return next();
+
+    if (state.configured && !state.connected) return renderDbError(req, res, state);
+    if (!state.installed) return res.redirect('/admin/setup');
+    return next();
+  });
+
   app.use(attachUser);
 
   app.use('/admin', adminRoutes);
@@ -159,10 +241,21 @@ export async function createApp() {
   });
 
   app.use((error: Error & { status?: number }, req: Request, res: Response, _next: NextFunction) => {
+    if (res.headersSent) return;
+
+    // A database problem is a configuration problem, not a 500: explain it and
+    // offer the installer. Never exit the process over it.
+    if (error instanceof DbSetupError) {
+      const dbError = error as DbSetupError;
+      console.warn(`[db] ${req.method} ${req.originalUrl} — ${dbError.message}`);
+      const state = (res.locals.install as InstallState | undefined) ?? null;
+      const withError = { ...(state ?? EMPTY_INSTALL_STATE), error: { message: dbError.message, hint: dbError.hint, code: '' } };
+      return renderDbError(req, res, withError);
+    }
+
     console.error('[error]', req.method, req.originalUrl, error);
     const status = error.status ?? 500;
     const message = config.isProd ? 'Something went wrong on our end. Please try again in a moment.' : error.message;
-    if (res.headersSent) return;
     if (req.path.startsWith('/admin') && res.locals.currentUser) {
       res.status(status).render('admin/error', {
         layout: 'layouts/admin',

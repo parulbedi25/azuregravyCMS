@@ -2,65 +2,201 @@
   <div class="auth-form-side">
     <div class="auth-card">
       <a class="brand" href="/">
-        <span class="brand__mark"><%= (form.site_title || siteName || 'G').slice(0, 1) %></span>
-        <span class="brand__name"><%= form.site_title || siteName %></span>
+        <span class="brand__mark"><%= (adminForm.site_title || siteName || 'G').slice(0, 1) %></span>
+        <span class="brand__name"><%= adminForm.site_title || siteName %></span>
       </a>
 
-      <div>
-        <span class="kicker" style="display:block;margin-bottom:10px">First run</span>
-        <h1>Let's set up<br>your site.</h1>
-        <p>The database is connected and the tables are ready. Create the administrator account and you're publishing.</p>
-      </div>
+      <ol class="steps">
+        <li class="<%= step === 'db' ? 'is-current' : 'is-done' %>"><span>1</span> Database</li>
+        <li class="<%= step === 'admin' ? 'is-current' : '' %>"><span>2</span> Administrator</li>
+      </ol>
 
-      <% if (errors.form) { %>
-        <div class="alert alert--error" role="alert"><%= errors.form %></div>
-      <% } %>
-
-      <form method="post" action="/admin/setup">
-        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-
-        <label class="field"><span>Publication name</span>
-          <input class="input" type="text" name="site_title" value="<%= form.site_title %>" maxlength="120"
-                 placeholder="Azure Gravy" autocomplete="organization">
-          <span class="hint">Shown in the header, footer, RSS feed and browser tab. You can change it later.</span>
-        </label>
-
-        <label class="field"><span>Your name</span>
-          <input class="input" type="text" name="name" value="<%= form.name %>" maxlength="120"
-                 required autocomplete="name" placeholder="Ada Lovelace">
-          <% if (errors.name) { %><span class="hint" style="color:#c0392b"><%= errors.name %></span><% } %>
-        </label>
-
-        <label class="field"><span>E-mail</span>
-          <input class="input" type="email" name="email" value="<%= form.email %>" maxlength="190"
-                 required autocomplete="username" placeholder="you@publication.com">
-          <% if (errors.email) { %><span class="hint" style="color:#c0392b"><%= errors.email %></span><% } %>
-        </label>
-
-        <div class="form-grid form-grid--2">
-          <label class="field"><span>Password</span>
-            <input class="input" type="password" name="password" required minlength="8"
-                   autocomplete="new-password" placeholder="At least 8 characters">
-            <% if (errors.password) { %><span class="hint" style="color:#c0392b"><%= errors.password %></span><% } %>
-          </label>
-          <label class="field"><span>Confirm password</span>
-            <input class="input" type="password" name="password_confirm" required minlength="8"
-                   autocomplete="new-password" placeholder="Repeat it">
-            <% if (errors.password_confirm) { %><span class="hint" style="color:#c0392b"><%= errors.password_confirm %></span><% } %>
-          </label>
+      <% if (step === 'db') { %>
+        <div>
+          <span class="kicker" style="display:block;margin-bottom:10px">First run</span>
+          <h1>Connect your<br>database.</h1>
+          <p>Nothing has been written yet. Enter the MariaDB or MySQL details from your host —
+             we test the connection here, then create the tables for you.</p>
         </div>
 
-        <button class="btn btn--accent btn--block" type="submit">
-          Create my account <%- h.icon('arrow-right', '', 15) %>
-        </button>
-      </form>
+        <% if (envConfigured) { %>
+          <div class="alert alert--info">
+            These values came from your environment (<code><%= dbSource %></code>): <code><%= dbTarget %></code>.
+            <% if (!install.connected) { %>They did not work — correct them below.<% } else { %>They work, so you can skip ahead.<% } %>
+          </div>
+        <% } %>
 
-      <div class="auth-hint">
-        <b>What happens next</b><br>
-        Your account is created as a super admin and signed in automatically. Starter pages
-        (About, Contact, Privacy, Terms), a menu and one welcome story are added so the site is
-        not empty — edit or delete them in the Studio.
-      </div>
+        <% if (errors.form) { %>
+          <div class="alert alert--error" role="alert"><%= errors.form %></div>
+        <% } %>
+
+        <% if (errors.db) { %>
+          <div class="alert alert--error" role="alert">
+            <b><%= errors.db %></b>
+            <% if (errors.db_code) { %><span class="db-code"><%= errors.db_code %></span><% } %>
+            <% if (errors.db_hint) { %><pre class="db-hint"><%= errors.db_hint %></pre><% } %>
+          </div>
+        <% } %>
+
+        <form method="post" action="/admin/setup" id="db-form">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <input type="hidden" name="step" value="db">
+
+          <label class="field"><span>Where is the database?</span>
+            <select class="select" name="driver" id="db-driver">
+              <option value="mysql" <%= dbForm.driver === 'mysql' ? 'selected' : '' %>>MariaDB / MySQL server (cPanel, Namecheap, RDS…)</option>
+              <option value="embedded" <%= dbForm.driver === 'embedded' ? 'selected' : '' %>>Built-in MariaDB on this machine (no server needed)</option>
+            </select>
+            <span class="hint">Your hosting account's MySQL® Databases page has the name, user and host.</span>
+          </label>
+
+          <div id="db-server-fields">
+            <div class="form-grid form-grid--2">
+              <label class="field"><span>Host</span>
+                <input class="input" type="text" name="host" value="<%= dbForm.host %>" maxlength="190"
+                       placeholder="localhost" autocomplete="off" spellcheck="false">
+                <% if (errors.host) { %><span class="hint hint--error"><%= errors.host %></span><% } %>
+              </label>
+              <label class="field"><span>Port</span>
+                <input class="input" type="text" name="port" value="<%= dbForm.port %>" maxlength="5"
+                       placeholder="3306" inputmode="numeric" autocomplete="off" spellcheck="false">
+                <% if (errors.port) { %><span class="hint hint--error"><%= errors.port %></span><% } %>
+              </label>
+            </div>
+
+            <label class="field"><span>Database name</span>
+              <input class="input" type="text" name="database" value="<%= dbForm.database %>" maxlength="64"
+                     placeholder="myaccount_gravy" autocomplete="off" spellcheck="false">
+              <span class="hint">On cPanel the name is prefixed with your account, e.g. <code>myaccount_gravy</code>.</span>
+              <% if (errors.database) { %><span class="hint hint--error"><%= errors.database %></span><% } %>
+            </label>
+
+            <div class="form-grid form-grid--2">
+              <label class="field"><span>Database user</span>
+                <input class="input" type="text" name="user" value="<%= dbForm.user %>" maxlength="190"
+                       placeholder="myaccount_gravy" autocomplete="off" spellcheck="false">
+                <% if (errors.user) { %><span class="hint hint--error"><%= errors.user %></span><% } %>
+              </label>
+              <label class="field"><span>Password</span>
+                <input class="input" type="password" name="password" value="<%= dbForm.password %>" maxlength="200"
+                       autocomplete="off" placeholder="Database password">
+              </label>
+            </div>
+
+            <label class="switch">
+              <input type="checkbox" name="create_database" value="on" <%= dbForm.create_database ? 'checked' : '' %>>
+              <span class="switch__track"></span>
+              <span class="switch__text">
+                <b>Create the database if it is missing</b>
+                <span>Only works when the user has that privilege — shared hosts usually require you to create it in cPanel.</span>
+              </span>
+            </label>
+
+            <label class="switch">
+              <input type="checkbox" name="ssl" value="on" <%= dbForm.ssl ? 'checked' : '' %>>
+              <span class="switch__track"></span>
+              <span class="switch__text">
+                <b>Connect over TLS</b>
+                <span>Needed by some managed hosts. Leave off for cPanel's <code>localhost</code>.</span>
+              </span>
+            </label>
+          </div>
+
+          <div id="db-embedded-fields" hidden>
+            <label class="field"><span>Database name</span>
+              <input class="input" type="text" name="database" value="<%= dbForm.database || 'azuregravy' %>" maxlength="64"
+                     placeholder="azuregravy" autocomplete="off" spellcheck="false" disabled>
+              <span class="hint">Real MariaDB compiled to WebAssembly, stored under <code>./data</code> on this machine.
+                Great for trying the CMS out — use a MariaDB/MySQL server for a live site.</span>
+            </label>
+          </div>
+
+          <button class="btn btn--accent btn--block" type="submit">
+            Test connection &amp; continue <%- h.icon('arrow-right', '', 15) %>
+          </button>
+        </form>
+
+        <div class="auth-hint">
+          <b>What happens next</b><br>
+          The connection is tested, every table and default setting is created, and you are taken to
+          step 2 — your administrator account. If a detail is wrong you stay on this page with an
+          explanation; nothing is written and the server keeps running.
+        </div>
+
+      <% } else { %>
+        <div>
+          <span class="kicker" style="display:block;margin-bottom:10px">Step 2 of 2</span>
+          <h1>Create your<br>administrator.</h1>
+          <p>The database is connected and the tables are ready. This account owns the Studio.</p>
+        </div>
+
+        <% if (connectionTest && connectionTest.ok) { %>
+          <div class="alert alert--success">
+            <b>Connected to <%= connectionTest.server || 'the database' %></b> in <%= connectionTest.ms %> ms
+            · <code><%= dbTarget %></code>
+            <% if (connectionTest.createdDatabase) { %> · database created for you<% } %>
+          </div>
+        <% } else { %>
+          <div class="alert alert--success">
+            <b>Database connected</b> · <code><%= dbTarget %></code> · <%= install.tables %> tables ready
+          </div>
+        <% } %>
+
+        <% if (errors.form) { %>
+          <div class="alert alert--error" role="alert"><%= errors.form %></div>
+        <% } %>
+
+        <form method="post" action="/admin/setup">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <input type="hidden" name="step" value="admin">
+
+          <label class="field"><span>Publication name</span>
+            <input class="input" type="text" name="site_title" value="<%= adminForm.site_title %>" maxlength="120"
+                   placeholder="Azure Gravy" autocomplete="organization">
+            <span class="hint">Shown in the header, footer, RSS feed and browser tab. You can change it later.</span>
+          </label>
+
+          <label class="field"><span>Your name</span>
+            <input class="input" type="text" name="name" value="<%= adminForm.name %>" maxlength="120"
+                   required autocomplete="name" placeholder="Ada Lovelace">
+            <% if (errors.name) { %><span class="hint hint--error"><%= errors.name %></span><% } %>
+          </label>
+
+          <label class="field"><span>E-mail</span>
+            <input class="input" type="email" name="email" value="<%= adminForm.email %>" maxlength="190"
+                   required autocomplete="username" placeholder="you@publication.com">
+            <% if (errors.email) { %><span class="hint hint--error"><%= errors.email %></span><% } %>
+          </label>
+
+          <div class="form-grid form-grid--2">
+            <label class="field"><span>Password</span>
+              <input class="input" type="password" name="password" required minlength="8"
+                     autocomplete="new-password" placeholder="At least 8 characters">
+              <% if (errors.password) { %><span class="hint hint--error"><%= errors.password %></span><% } %>
+            </label>
+            <label class="field"><span>Confirm password</span>
+              <input class="input" type="password" name="password_confirm" required minlength="8"
+                     autocomplete="new-password" placeholder="Repeat it">
+              <% if (errors.password_confirm) { %><span class="hint hint--error"><%= errors.password_confirm %></span><% } %>
+            </label>
+          </div>
+
+          <button class="btn btn--accent btn--block" type="submit">
+            Create my account <%- h.icon('arrow-right', '', 15) %>
+          </button>
+        </form>
+
+        <p class="text-xs text-muted">
+          <a href="/admin/setup?step=db" style="color:var(--admin-accent)">← Change the database settings</a>
+        </p>
+
+        <div class="auth-hint">
+          <b>What happens next</b><br>
+          Your account is created as a super admin and signed in automatically. Starter pages
+          (About, Contact, Privacy, Terms), a menu and one welcome story are added so the site is
+          not empty — edit or delete them in the Studio.
+        </div>
+      <% } %>
 
       <p class="text-xs text-muted">
         <a href="/" style="color:var(--admin-accent)">← Back to the publication</a>
@@ -70,18 +206,56 @@
 
   <div class="auth-art">
     <a class="brand" href="/">
-      <span class="brand__mark" style="background:#fff;color:#0e1015"><%= (form.site_title || siteName || 'G').slice(0, 1) %></span>
-      <span class="brand__name" style="color:#fff;font-family:var(--font-serif);font-size:1.7rem"><%= form.site_title || siteName %></span>
+      <span class="brand__mark" style="background:#fff;color:#0e1015"><%= (adminForm.site_title || siteName || 'G').slice(0, 1) %></span>
+      <span class="brand__name" style="color:#fff;font-family:var(--font-serif);font-size:1.7rem"><%= adminForm.site_title || siteName %></span>
     </a>
     <div>
-      <p class="auth-art__quote">“The database is connected. The rest is writing.”</p>
-      <p class="auth-art__sub">Tables, settings and starter content were created automatically on the first boot. This form creates the account that can administer them.</p>
+      <p class="auth-art__quote">“Two forms later, you are publishing.”</p>
+      <p class="auth-art__sub">
+        <% if (step === 'db') { %>
+          The server started without a database on purpose: you choose where your content lives,
+          the installer tests it and builds the schema. No SQL to import, no config file to edit.
+        <% } else { %>
+          Tables, settings and starter content were created the moment the connection succeeded.
+          This form creates the account that can administer them.
+        <% } %>
+      </p>
     </div>
     <div class="auth-art__badges">
-      <span>Database connected</span>
-      <span>Tables ready</span>
-      <span>Super admin</span>
-      <span>Starter content</span>
+      <% if (step === 'db') { %>
+        <span>Starts with no database</span>
+        <span>Connection tested here</span>
+        <span>Tables created for you</span>
+        <span>cPanel friendly</span>
+      <% } else { %>
+        <span>Database connected</span>
+        <span>Tables ready</span>
+        <span>Super admin</span>
+        <span>Starter content</span>
+      <% } %>
     </div>
   </div>
 </div>
+
+<script>
+  // Progressive enhancement: the built-in engine needs no server fields.
+  (function () {
+    var driver = document.getElementById('db-driver');
+    if (!driver) return;
+    var server = document.getElementById('db-server-fields');
+    var embedded = document.getElementById('db-embedded-fields');
+    function apply() {
+      var isEmbedded = driver.value === 'embedded';
+      server.hidden = isEmbedded;
+      embedded.hidden = !isEmbedded;
+      Array.prototype.forEach.call(server.querySelectorAll('input, select'), function (input) {
+        input.disabled = isEmbedded;
+      });
+      Array.prototype.forEach.call(embedded.querySelectorAll('input'), function (input) {
+        input.disabled = !isEmbedded;
+      });
+    }
+    driver.addEventListener('change', apply);
+    apply();
+  })();
+</script>
