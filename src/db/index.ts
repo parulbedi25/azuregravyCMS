@@ -38,33 +38,49 @@ export const mysqlErrorCode = (error: unknown): string => {
   return typeof code === 'string' ? code : '';
 };
 
+/**
+ * Plain-English remedy for each MySQL failure.
+ *
+ * The same text is shown by the installer (where the values are form fields) and by
+ * the "Database unreachable" page (where they live in .env or data/install.json), so
+ * it names the *values* rather than only the environment variables.
+ */
 export function connectionHint(error: unknown): string {
   switch (mysqlErrorCode(error)) {
     case 'ER_ACCESS_DENIED_ERROR':
       return [
-        'The database rejected these credentials.',
-        'Check DB_USER / DB_PASSWORD in .env. On cPanel the user name is prefixed,',
-        'e.g. `myaccount_gravy`, and the user must be added to the database in',
-        'cPanel → MySQL® Databases → Add User To Database (ALL PRIVILEGES).',
+        'The user and password do not match, or the user has no rights on this database.',
+        'On cPanel the user name is prefixed, e.g. `myaccount_gravy`, and the user must be',
+        'added to the database in cPanel → MySQL® Databases → Add User To Database',
+        'with ALL PRIVILEGES. Elsewhere, check DB_USER / DB_PASSWORD.',
+      ].join('\n');
+    case 'ER_DBACCESS_DENIED_ERROR':
+      return [
+        'The user signed in but may not use this database.',
+        'In cPanel → MySQL® Databases → Add User To Database, grant ALL PRIVILEGES on it.',
       ].join('\n');
     case 'ER_BAD_DB_ERROR':
       return [
         'That database does not exist.',
         'Create it in cPanel → MySQL® Databases and use the *full* name (`myaccount_gravy`).',
-        'If the database user is allowed to create databases, the app will try that automatically.',
+        'If the database user is allowed to create databases, tick "create the database if it',
+        'is missing" and the app will do it for you.',
       ].join('\n');
     case 'ENOTFOUND':
     case 'EAI_AGAIN':
-      return 'DB_HOST could not be resolved. On cPanel this is almost always `localhost`.';
+      return 'The host could not be resolved. On cPanel this is almost always `localhost`.';
     case 'ECONNREFUSED':
-      return 'Nothing is listening on that host/port. On cPanel use DB_HOST=localhost and leave DB_PORT empty.';
+      return 'Nothing is listening on that host/port. On cPanel use host `localhost` and port 3306.';
     case 'ETIMEDOUT':
     case 'PROTOCOL_SEQUENCE_TIMEOUT':
       return 'The server did not answer in time. Shared hosts sometimes block remote MySQL — use `localhost`, or ask the host to allow your IP.';
     case 'ER_NOT_SUPPORTED_AUTH_MODE':
       return 'The server uses an old authentication plugin. Ask the host to set the user to mysql_native_password.';
+    case 'PROTOCOL_CONNECTION_LOST':
+    case 'ECONNRESET':
+      return 'The server closed the connection. Check that the host and port are right, and that the server accepts connections from this machine.';
     default:
-      return 'Check DB_HOST, DB_PORT, DB_USER, DB_PASSWORD and DB_NAME in .env.';
+      return 'Check the host, port, database name, user and password.';
   }
 }
 
