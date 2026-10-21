@@ -176,15 +176,24 @@ The wizard then reports that the site is already installed and sends you to the 
 
 ---
 
-## 7. Writable uploads folder
+## 7. Writable folders
 
-Media uploads are written to `public/uploads/`. If the boot log says it is not writable:
+Two directories must be writable by the application user:
 
 ```bash
-chmod -R 775 public/uploads
+chmod -R 775 public/uploads data
 ```
 
+- `public/uploads/` — the media library. The boot log warns if it is read-only.
+- `data/` — holds `install.json`, the file the installer writes in step 6 (mode `0600`, so the
+  password is not world-readable). If `data/` is not writable the installer cannot remember the
+  database; put the same values in the cPanel environment panel instead, which always wins.
+
 (Some hosts need `755` with the file group set to your account — ask support if neither works.)
+
+> **Running several workers?** Until a database is connected, installer sessions live in that
+> process's memory, so run the installer with a single application instance — or skip it entirely by
+> setting `DB_*` in step 4.
 
 ---
 

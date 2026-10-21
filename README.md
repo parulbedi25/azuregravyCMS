@@ -465,9 +465,13 @@ icons and JavaScript here are original to this project.
 - Set `NODE_ENV=production`, a strong `SESSION_SECRET`, and either `SITE_URL` or a detected host.
 - Run `npm start` behind the host's own web server (Passenger/nginx) or a reverse proxy that
   terminates TLS. The app trusts one proxy hop, so client IPs are correct.
-- Ensure `public/uploads/` is writable by the app user — the boot log warns if it is not.
+- Ensure `public/uploads/` **and** `data/` are writable by the app user — `data/install.json` is how
+  the installer remembers the database, and the boot log warns about uploads if they are read-only.
 - Use a database user with privileges on that single database only (cPanel does this by default).
-- Back up two things: the database and `public/uploads/`.
+- Back up three things: the database, `public/uploads/`, and `data/install.json` (or keep the same
+  values in your host's environment panel, which always takes precedence).
+- Run the installer on a **single** application process: until a database exists, sessions live in
+  that process's memory. Set `DB_*` in the environment instead if your host starts several workers.
 - In production, responses carry `Content-Security-Policy: frame-ancestors 'self'`; development
   omits framing headers so sandbox preview panes can embed the app.
 
