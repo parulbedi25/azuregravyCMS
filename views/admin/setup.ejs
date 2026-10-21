@@ -130,6 +130,10 @@
           <p>The database is connected and the tables are ready. This account owns the Studio.</p>
         </div>
 
+        <% if (persistWarning) { %>
+          <div class="alert alert--warning" role="alert"><%= persistWarning %></div>
+        <% } %>
+
         <% if (connectionTest && connectionTest.ok) { %>
           <div class="alert alert--success">
             <b>Connected to <%= connectionTest.server || 'the database' %></b> in <%= connectionTest.ms %> ms

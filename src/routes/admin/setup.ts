@@ -58,6 +58,8 @@ interface SetupLocals {
   state: InstallState;
   test: ConnectionTest | null;
   status?: number;
+  /** Set when the connection worked but `data/install.json` could not be written. */
+  persistWarning?: string | null;
 }
 
 const MysqlForm = z
@@ -139,6 +141,7 @@ function render(res: Response, locals: SetupLocals): void {
     dbTarget: describeDbTarget(),
     envConfigured: config.db.source !== 'none',
     dbSource: config.db.source,
+    persistWarning: locals.persistWarning ?? null,
   });
 }
 
@@ -284,8 +287,24 @@ router.post(
       }
 
       // Connection works: remember it, drop any stale pool, create the schema.
+      //
+      // Remembering is best-effort. On a host where `data/` is read-only the
+      // installation must still succeed — the details simply have to be repeated in
+      // the environment, so say that plainly instead of blaming the database.
+      let persistWarning: string | null = null;
       try {
         await saveDbConfig(candidate);
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : String(error);
+        persistWarning = [
+          `Connected, but the details could not be saved to data/install.json (${reason}).`,
+          'The installation continues in memory. Add the same values to your environment',
+          '(cPanel → Setup Node.js App → Environment variables, or .env) so the next',
+          'restart keeps them — otherwise the installer will ask again.',
+        ].join(' ');
+      }
+
+      try {
         await setDbConfig(candidate);
         resetBootstrap();
         clearInstallState();
@@ -321,6 +340,7 @@ router.post(
           errors: {},
           state: fresh,
           test,
+          persistWarning,
         });
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
