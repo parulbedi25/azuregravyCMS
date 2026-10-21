@@ -3,6 +3,7 @@ import { asyncRoute, clientIp, setFlash, verifyCsrf } from '../../lib/http.js';
 import { safeNext, verifyPassword } from '../../lib/auth.js';
 import { getUserByEmail, updateLastLogin } from '../../services/users.js';
 import { logActivity } from '../../services/activity.js';
+import { siteInstalled } from '../../db/bootstrap.js';
 
 const router = Router();
 
@@ -59,17 +60,22 @@ function prune(): void {
 
 /* ------------------------------------------------------------------ */
 
-router.get('/login', (req, res) => {
-  if (res.locals.currentUser) return res.redirect(safeNext(req.query.next));
-  res.render('admin/login', {
-    layout: 'layouts/auth',
-    title: 'Sign in',
-    bodyClass: 'admin-body',
-    pageTitle: 'Studio sign in',
-    next: safeNext(req.query.next),
-    email: '',
-  });
-});
+router.get(
+  '/login',
+  asyncRoute(async (req, res) => {
+    if (res.locals.currentUser) return res.redirect(safeNext(req.query.next));
+    // A brand-new install has no accounts yet: send the visitor to the wizard.
+    if (!(await siteInstalled())) return res.redirect('/admin/setup');
+    res.render('admin/login', {
+      layout: 'layouts/auth',
+      title: 'Sign in',
+      bodyClass: 'admin-body',
+      pageTitle: 'Studio sign in',
+      next: safeNext(req.query.next),
+      email: '',
+    });
+  }),
+);
 
 router.post(
   '/login',

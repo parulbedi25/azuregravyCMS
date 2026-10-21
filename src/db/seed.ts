@@ -82,10 +82,13 @@ async function seedMedia(db: DbClient): Promise<Map<string, number>> {
   return map;
 }
 
-export async function runSeed(options: { reset?: boolean; force?: boolean } = {}): Promise<void> {
+export async function runSeed(
+  options: { reset?: boolean; force?: boolean } = {},
+  client?: DbClient,
+): Promise<void> {
   const reset = options.reset ?? false;
   const force = options.force ?? false;
-  const db = await getDb();
+  const db = client ?? (await getDb());
   await migrate(db);
 
   const existing = await db.query<{ total: number }>('SELECT COUNT(*) AS total FROM users');
@@ -370,8 +373,9 @@ export async function runSeed(options: { reset?: boolean; force?: boolean } = {}
   console.log('\n✔ Seed complete');
   console.log(`  posts: ${counts[0]?.posts}  ·  comments: ${counts[0]?.comments}`);
   console.log(`  database: ${config.db.driver === 'embedded' ? config.db.dataDir : `${config.db.host}:${config.db.port}/${config.db.database}`}`);
-  console.log(`\n  Studio login: ${config.admin.email} / ${config.admin.password}`);
-  console.log('  (Demo editors and authors use the password gravy123)\n');
+  const demoAdmin = SEED_USERS.find((user) => user.role === 'admin') ?? SEED_USERS[0];
+  console.log(`\n  Studio login: ${demoAdmin?.email} / ${demoAdmin?.password}`);
+  console.log('  (Every demo account uses the same password)\n');
 }
 
 const invokedDirectly = process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1]);

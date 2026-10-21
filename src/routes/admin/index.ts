@@ -3,6 +3,7 @@ import { requireAuth } from '../../lib/auth.js';
 import { setFlash } from '../../lib/http.js';
 import { getDb } from '../../db/index.js';
 import authRoutes from './auth.js';
+import setupRoutes from './setup.js';
 import dashboardRoutes from './dashboard.js';
 import postRoutes from './posts.js';
 import taxonomyRoutes from './taxonomy.js';
@@ -25,6 +26,8 @@ router.use((req, res, next) => {
   next();
 });
 
+// First-run installer — only reachable while the site has no administrator.
+router.use(setupRoutes);
 router.use(authRoutes);
 
 router.use(async (req, res, next) => {

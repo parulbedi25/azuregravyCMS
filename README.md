@@ -8,11 +8,18 @@ Everything is hand-built: the markup, the design system, the admin UI and the da
 framework, no admin theme, no client-side JS library. Fonts and demo images ship with the repository,
 so the whole thing runs offline.
 
+```bash
+npm install && npm start
+```
+
 ```
 Public site   http://localhost:3000
 Studio        http://localhost:3000/admin
-Sign in       admin@azuregravy.local / gravy123
+First run     create your administrator at /admin/setup
 ```
+
+MariaDB/MySQL is the only thing you have to provide — the tables, settings, starter pages and super
+admin account are created automatically the first time the server connects.
 
 ![Azure Gravy home page](docs/screenshots/home-fold.png)
 
@@ -31,6 +38,7 @@ Sign in       admin@azuregravy.local / gravy123
 - [Project layout](#project-layout)
 - [Design system](#design-system)
 - [Deployment notes](#deployment-notes)
+- [Deploying on cPanel / Namecheap](docs/DEPLOY-CPANEL.md)
 - [Screenshots](#screenshots)
 - [Licence](#licence)
 
@@ -38,38 +46,76 @@ Sign in       admin@azuregravy.local / gravy123
 
 ## Quick start
 
-**Requirements:** Node.js 20 or newer. That's it — the default database is a real MariaDB engine
-compiled to WebAssembly and embedded in the Node process, so there is no database server to install.
+**Requirements:** Node.js 20 or newer, and a MariaDB / MySQL database.
 
 ```bash
-git clone https://github.com/parulbedi25/azuregravyCMS.git
-cd azuregravyCMS
-
 npm install
-cp .env.example .env      # optional — sensible defaults are built in
-npm run dev               # http://localhost:3000
+npm start
 ```
 
-First boot creates the schema, runs pending migrations and seeds a complete demo publication:
-18 stories (16 published, 2 drafts), 4 pages, 8 categories, 22 tags, 42 images, 6 writers,
-threaded comments, newsletter subscribers, contact messages, menus and redirects.
+That is the whole install. `npm start` runs `app.js`, which loads the TypeScript server directly —
+no build step, no compiled folder to keep in sync.
+
+On first boot the app:
+
+1. **connects** to the MariaDB/MySQL server in `.env` (and creates the database if the user is allowed to),
+2. **creates every table**, index, foreign key and the default settings — only what is missing,
+3. sends you to **`/admin/setup`** to create the super admin account, then adds starter pages
+   (About, Contact, Privacy, Terms), a menu and one welcome story so the site is not empty.
+
+Nothing to import, no SQL file to run, no install wizard to download.
+
+```
+Public site   http://localhost:3000
+Studio        http://localhost:3000/admin/setup     (first run)
+              http://localhost:3000/admin           (after that)
+```
+
+### Configure the database
+
+Copy the template and fill in the values from your host:
 
 ```bash
-npm run build             # compile TypeScript to dist/
-npm start                 # serve the compiled build (production-style)
-npm run build && npm start
+cp .env.example .env
 ```
 
-### Seeded accounts
+```dotenv
+DB_HOST=localhost
+DB_PORT=3306
+DB_NAME=myaccount_gravy     # full cPanel name, prefixed with your account
+DB_USER=myaccount_gravy
+DB_PASSWORD=the-password-you-set
+```
 
-| Role   | Email                    | Password   |
-| ------ | ------------------------ | ---------- |
-| Admin  | `admin@azuregravy.local` | `gravy123` |
-| Editor | `rowan@azuregravy.local` | `gravy123` |
-| Author | `avery@azuregravy.local` | `gravy123` |
+Creating the database itself is a two-minute job in any host's control panel — see
+**[Deploying on cPanel / Namecheap](docs/DEPLOY-CPANEL.md)** for the exact clicks.
 
-All six demo users share the password `gravy123`. Before seeding a real installation, change
-`ADMIN_EMAIL` / `ADMIN_PASSWORD` in `.env` and set `SESSION_SECRET` to a long random string.
+### Optional: create the admin without opening a browser
+
+```dotenv
+ADMIN_NAME=Site Administrator
+ADMIN_EMAIL=you@yourdomain.com
+ADMIN_PASSWORD=a-long-password
+```
+
+The account is created on the next `npm start` (or `npm run db:setup`), and the wizard is skipped.
+
+### Optional: load the demo publication
+
+```bash
+SEED_DEMO=1 npm start      # 18 stories, 4 pages, 8 categories, 42 images, 6 writers
+```
+
+Demo accounts all use the password `gravy123`; the admin is `admin@azuregravy.local`.
+
+### Local development
+
+```bash
+npm run dev        # tsx watch, reloads on change
+```
+
+If you do not want to install a database server locally, `DB_DRIVER=embedded` runs a real MariaDB
+compiled to WebAssembly inside Node (optional dependency: `npm install lite4mariadb`).
 
 ---
 
@@ -213,7 +259,7 @@ accept them.
 | Runtime | Node.js 20+, ES modules, TypeScript (strict) |
 | Server | Express 4 |
 | Views | EJS with `express-ejs-layouts` — no client-side rendering |
-| Database | MariaDB — embedded (WebAssembly, zero setup) or a real server over the wire |
+| Database | MariaDB / MySQL over the wire (mysql2); optional embedded MariaDB (WebAssembly) for local dev |
 | Sessions | `express-session` with a custom MariaDB store |
 | Markdown | `marked` + `sanitize-html` |
 | Uploads | `multer` + `image-size` |
@@ -226,37 +272,57 @@ The CSS and JavaScript are served exactly as written; `npm run build` only compi
 
 ## Database
 
-Two drivers, chosen with `DB_DRIVER`:
+MariaDB or MySQL over the wire (`mysql2`) is the default and the supported production path —
+cPanel, Plesk, a VPS, RDS, PlanetScale: anything that speaks the MySQL protocol.
 
-| Driver | What it does |
+| Driver | When to use it |
 | --- | --- |
-| `embedded` *(default)* | Runs MariaDB compiled to WebAssembly inside Node against `DB_DATA_DIR`. Zero setup, ideal for local dev and single-node demos. |
-| `mysql` | Connects to an external MariaDB/MySQL server — use this for production or multiple instances. |
+| `mysql` *(default)* | Production and anything real. Connects to a MariaDB/MySQL server. |
+| `embedded` | Local development and tests with no database server: real MariaDB compiled to WebAssembly. Single process only. |
 
-```bash
-# external MariaDB
-DB_DRIVER=mysql DB_HOST=127.0.0.1 DB_PORT=3306 \
-DB_USER=azuregravy DB_PASSWORD=secret DB_NAME=azuregravy npm start
+```dotenv
+DB_DRIVER=mysql
+DB_HOST=localhost
+DB_PORT=3306
+DB_NAME=myaccount_gravy
+DB_USER=myaccount_gravy
+DB_PASSWORD=secret
+DB_SSL=false
 ```
 
-Both drivers sit behind one small interface (`query`, `execute`, `insert`, `transaction`), so the same
-code and SQL run on either. Schema creation and versioned migrations happen automatically at startup.
-`./data/` and `public/uploads/` are ignored by git.
+Or a single URL instead of five values:
 
-> **Single process only for the embedded driver.** Two app instances pointed at the same data
-> directory will fight over the files. For anything with more than one instance, use `DB_DRIVER=mysql`.
+```dotenv
+DATABASE_URL=mysql://myaccount_gravy:secret@localhost:3306/myaccount_gravy
+```
 
-### Creating the database for the `mysql` driver
+### What the first boot does
+
+Startup is idempotent, so it is safe to restart (or deploy) as often as you like:
+
+| Step | Detail |
+| --- | --- |
+| Connect | Retries transient failures; if the database is missing it tries `CREATE DATABASE` once. |
+| Migrate | `CREATE TABLE IF NOT EXISTS` for all 19 tables, then records the schema version. |
+| Settings | Inserts any missing setting keys; never overwrites values you have changed. |
+| Super admin | Created from `ADMIN_EMAIL` / `ADMIN_PASSWORD`, or through `/admin/setup`. |
+| Starter content | Menus, About / Contact / Privacy / Terms pages, three categories, one welcome story. |
+| Demo content | Only when `SEED_DEMO=1`, and only on a completely empty database. |
+
+If the connection fails, the process stops with a specific explanation (wrong password, unknown
+database, host unreachable, no privileges) instead of a stack trace, and writes nothing.
+
+### Creating the database yourself (VPS / local)
 
 ```sql
 CREATE DATABASE azuregravy CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-CREATE USER 'azuregravy'@'%' IDENTIFIED BY 'azuregravy';
-GRANT ALL PRIVILEGES ON azuregravy.* TO 'azuregravy'@'%';
+CREATE USER 'azuregravy'@'localhost' IDENTIFIED BY 'a-strong-password';
+GRANT ALL PRIVILEGES ON azuregravy.* TO 'azuregravy'@'localhost';
 FLUSH PRIVILEGES;
 ```
 
-Then set `DB_DRIVER=mysql` in `.env` and run `npm run db:seed` (or let the app create the schema and
-seed on first boot).
+On shared hosting (cPanel, Namecheap, Hostinger) the database and user are created in the panel and
+are prefixed with your account name — see the [cPanel guide](docs/DEPLOY-CPANEL.md).
 
 ---
 
@@ -264,31 +330,41 @@ seed on first boot).
 
 | Command | What it does |
 | --- | --- |
+| `npm start` | `node app.js` — what cPanel/Passenger runs. Loads the TypeScript server through tsx, so no build is needed. |
 | `npm run dev` | `tsx watch src/server.ts` — hot reload on <http://localhost:3000> |
-| `npm run build` | `tsc -p tsconfig.json` → `dist/` |
-| `npm start` | `node dist/server.js` — serve the compiled build |
-| `npm run db:seed` | Seed an empty database with the demo publication |
+| `npm run db:setup` | Connect, create tables, starter content and the admin from `.env`, then exit |
+| `npm run db:seed` | Load the demo publication into an empty database |
 | `npm run db:reset` | Wipe and re-seed — **destroys all content** |
+| `npm run build` | `tsc` → `dist/` (optional; for `npm run start:prod`) |
+| `npm run start:prod` | `node dist/server.js` — serve a compiled build |
 | `npm run typecheck` | `tsc --noEmit` |
 
 ---
 
 ## Configuration
 
-Copy `.env.example` to `.env`. Everything has a working default.
+`.env` is read from the project root. Environment variables always win, so on a host with a
+"Environment variables" panel you can skip the file entirely.
 
 | Variable | Default | Notes |
 | --- | --- | --- |
-| `PORT` | `3000` | HTTP port, bound to `0.0.0.0` |
+| `PORT` | `3000` | HTTP port. If Passenger supplies a socket path, it is used as-is. |
+| `HOST` | `0.0.0.0` | Bind address for the TCP listener |
 | `NODE_ENV` | `development` | `production` enables long asset caching and same-origin framing |
-| `SITE_URL` | `http://localhost:3000` | Canonical links, RSS and sitemap |
+| `SITE_URL` | *(detected)* | Canonical links, RSS and sitemap. Blank = follow the request host |
 | `SESSION_SECRET` | dev fallback | **Set a long random string in production** |
-| `DB_DRIVER` | `embedded` | `embedded` or `mysql` |
+| `DB_DRIVER` | `mysql` | `mysql` or `embedded` |
+| `DB_HOST` / `DB_PORT` | `127.0.0.1` / `3306` | Database server |
+| `DB_NAME` | `azuregravy` | Database name (full cPanel name) |
+| `DB_USER` / `DB_PASSWORD` | `root` / *(empty)* | Database credentials |
+| `DB_SSL` | `false` | `true` for hosts that require TLS |
+| `DATABASE_URL` | *(empty)* | `mysql://user:pass@host:port/db` — replaces the five values above |
+| `AUTO_SETUP` | `true` | Create tables and starter content on boot |
+| `SEED_DEMO` | `false` | Load the demo publication on an empty database |
+| `ADMIN_NAME` | `Site Administrator` | Used when creating the super admin from env |
+| `ADMIN_EMAIL` / `ADMIN_PASSWORD` | *(empty)* | Blank = use the `/admin/setup` wizard |
+| `UPLOAD_MAX_MB` | `12` | Upload size limit |
 | `DB_DATA_DIR` | `./data/mariadb` | Embedded driver only |
-| `DB_NAME` | `azuregravy` | Database name |
-| `DB_HOST` / `DB_PORT` | `127.0.0.1` / `3306` | `mysql` driver only |
-| `DB_USER` / `DB_PASSWORD` | `azuregravy` / `azuregravy` | `mysql` driver only |
-| `ADMIN_EMAIL` / `ADMIN_PASSWORD` | `admin@azuregravy.local` / `gravy123` | Used by the seeder |
 
 Uploads land in `public/uploads/` and are served by the app.
 
@@ -302,14 +378,16 @@ src/
   server.ts              boot, migrate, seed-if-empty, listen
   config.ts              env-backed configuration
   db/
-    index.ts             DbClient interface, embedded + mysql drivers, transactions, migrations
+    index.ts             DbClient interface, mysql + embedded drivers, transactions, migrations
+    bootstrap.ts         first-run provisioning: tables, starter content, super admin
+    setup-cli.ts         `npm run db:setup`
     schema.ts            schema DDL, migration list, default settings
     seed.ts, seed-data.ts demo publication
   lib/                   markdown, auth, settings, sessions, uploads, http helpers, icons, views
   services/              posts, comments, media, users, stats, activity, navigation
   routes/
     public.ts            home, story, page, archive, category, tag, author, search, feed, sitemap
-    admin/*.ts           dashboard, auth, posts, taxonomy, media, comments, people, settings
+    admin/*.ts           dashboard, setup wizard, auth, posts, taxonomy, media, comments, people, settings
 views/
   layouts/               public, admin, auth, plain (standalone error pages)
   partials/              header, footer, mega menu, newsletter popup, post card, pagination, comments
@@ -347,13 +425,17 @@ icons and JavaScript here are original to this project.
 
 ## Deployment notes
 
-- Set `NODE_ENV=production`, a strong `SESSION_SECRET` and the real `SITE_URL`.
-- Run `npm run build && npm start` behind a reverse proxy (nginx, Caddy) that terminates TLS.
-- Use `DB_DRIVER=mysql` for any setup with more than one app instance or a managed database.
+- **cPanel / Namecheap:** follow the step-by-step guide in
+  [`docs/DEPLOY-CPANEL.md`](docs/DEPLOY-CPANEL.md) — Node.js app, `app.js` as the startup file,
+  NPM install, restart.
+- Set `NODE_ENV=production`, a strong `SESSION_SECRET`, and either `SITE_URL` or a detected host.
+- Run `npm start` behind the host's own web server (Passenger/nginx) or a reverse proxy that
+  terminates TLS. The app trusts one proxy hop, so client IPs are correct.
+- Ensure `public/uploads/` is writable by the app user — the boot log warns if it is not.
+- Use a database user with privileges on that single database only (cPanel does this by default).
 - Back up two things: the database and `public/uploads/`.
-- The app trusts one proxy hop (`trust proxy`) so client IPs are correct behind nginx/Caddy.
-- In production, responses are sent with `Content-Security-Policy: frame-ancestors 'self'`;
-  development deliberately omits framing headers so sandbox preview panes can embed the app.
+- In production, responses carry `Content-Security-Policy: frame-ancestors 'self'`; development
+  omits framing headers so sandbox preview panes can embed the app.
 
 ---
 

@@ -1,16 +1,19 @@
 {
   "name": "azuregravycms",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "description": "Azure Gravy — a complete editorial blogging CMS built with Node.js, TypeScript, Express and MariaDB.",
   "type": "module",
+  "main": "app.js",
   "engines": {
     "node": ">=20"
   },
   "scripts": {
+    "start": "node app.js",
     "dev": "tsx watch src/server.ts",
     "build": "tsc -p tsconfig.json",
-    "start": "node dist/server.js",
+    "start:prod": "node dist/server.js",
+    "db:setup": "tsx src/db/setup-cli.ts",
     "db:seed": "tsx src/db/seed.ts",
     "db:reset": "tsx src/db/seed.ts --reset",
     "typecheck": "tsc --noEmit"
@@ -24,7 +27,9 @@
     "blog",
     "typescript",
     "mariadb",
-    "express"
+    "mysql",
+    "express",
+    "cpanel"
   ],
   "license": "MIT",
   "dependencies": {
@@ -34,12 +39,15 @@
     "express-ejs-layouts": "^2.5.1",
     "express-session": "^1.19.0",
     "image-size": "^2.0.2",
-    "lite4mariadb": "^0.1.2",
     "marked": "^18.1.1",
     "multer": "^2.4.0",
     "mysql2": "^3.24.6",
     "sanitize-html": "^2.18.1",
+    "tsx": "^4.23.15",
     "zod": "^4.6.7"
+  },
+  "optionalDependencies": {
+    "lite4mariadb": "^0.1.2"
   },
   "devDependencies": {
     "@types/ejs": "^3.1.5",
@@ -49,7 +57,6 @@
     "@types/multer": "^1.4.13",
     "@types/node": "^22.18.0",
     "@types/sanitize-html": "^2.16.2",
-    "tsx": "^4.23.15",
     "typescript": "^5.7.3"
   }
 }
