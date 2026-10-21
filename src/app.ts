@@ -108,6 +108,41 @@ export async function createApp() {
   const store = new HybridSessionStore();
   setInterval(() => void store.clearExpired().catch(() => undefined), 1000 * 60 * 30).unref();
 
+  /*
+    `SameSite=None` is only honoured by browsers over HTTPS, so opting into it is
+    itself an assertion that TLS terminates upstream. But express-session decides
+    whether to emit a Secure cookie from `req.secure`, which in turn depends on
+    the proxy forwarding `X-Forwarded-Proto`. A proxy that omits that header — or
+    forwards it as `http` — makes express-session silently DROP the cookie
+    (`index.js`: "only send secure cookies via https"), which would reintroduce
+    the exact sessionless-419 this mode exists to fix.
+
+    So when the operator has asserted HTTPS via SESSION_SAMESITE=none, hold the
+    proxy to it rather than depending on a header we cannot verify from here.
+    Scoped strictly to that opt-in: the default `lax` path is untouched.
+
+    Side benefit: `rememberRequestOrigin(req.protocol, ...)` below then builds
+    canonical/OG/RSS URLs as https://, which is correct for such a deployment.
+  */
+  if (config.sessionSameSite === 'none') {
+    let warned = false;
+    app.use((req, _res, next) => {
+      const proto = req.headers['x-forwarded-proto'];
+      if (proto !== 'https') {
+        if (!warned) {
+          warned = true;
+          console.warn(
+            `  SESSION_SAMESITE=none: treating requests as HTTPS (x-forwarded-proto was ${
+              proto === undefined ? 'absent' : `"${proto}"`
+            }). Unset SESSION_SAMESITE if this site is really served over plain HTTP.`,
+          );
+        }
+        req.headers['x-forwarded-proto'] = 'https';
+      }
+      next();
+    });
+  }
+
   app.use(
     session({
       store,
@@ -118,10 +153,18 @@ export async function createApp() {
       name: 'gravy.sid',
       cookie: {
         httpOnly: true,
-        sameSite: 'lax',
-        // `auto` = secure whenever the request itself is HTTPS (works behind
-        // cPanel/Passenger's proxy), plain HTTP keeps working in development.
-        secure: 'auto',
+        sameSite: config.sessionSameSite,
+        /*
+          `auto` = secure whenever the request itself is HTTPS (works behind
+          cPanel/Passenger's proxy), plain HTTP keeps working in development.
+
+          `SameSite=None` is the one combination that cannot use `auto`: browsers
+          discard a `None` cookie that lacks `Secure`, and behind a terminating
+          proxy the app may see plain HTTP even though the browser is on HTTPS.
+          So when the operator has opted into `none` (cross-site iframe hosting),
+          force the flag instead of leaving it to request sniffing.
+        */
+        secure: config.sessionSameSite === 'none' ? true : 'auto',
         maxAge: 1000 * 60 * 60 * 24 * 7,
       },
     }),

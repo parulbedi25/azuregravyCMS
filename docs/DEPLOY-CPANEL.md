@@ -88,6 +88,7 @@ details can be typed into the installer in step 6 instead:
 | `NODE_ENV` | `production` | yes |
 | `SESSION_SECRET` | 64+ random characters — generate with `node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"` | yes |
 | `SITE_URL` | `https://yourdomain.com` | optional — detected from the request when blank |
+| `SESSION_SAMESITE` | *(leave unset)* | optional — a top-level cPanel site wants the `lax` default. Only set `none` if you embed the Studio in an iframe on another domain |
 | `DB_HOST` | `localhost` | optional — the installer asks |
 | `DB_PORT` | `3306` | optional |
 | `DB_NAME` | `myaccount_gravy` *(full name from step 1)* | optional |
@@ -246,6 +247,7 @@ only when missing, and settings you have changed are never overwritten. Restart 
 | Blank page, assets 404 | `public/` was not uploaded, or the application root is one level too deep. |
 | Uploads fail | `public/uploads` is not writable (step 7). |
 | Logged out on every restart | `SESSION_SECRET` changes between restarts, or the `sessions` table is missing (restart once after the DB is reachable). Sessions live in memory only until the installer connects a database. |
+| `419 Session expired` on every form submit | The session cookie is not coming back, so the CSRF token in the page can never match. On a normal top-level cPanel site this means `SESSION_SECRET` changed or cookies are blocked. If you embed the Studio in an iframe on a **different** domain, the browser withholds a `SameSite=Lax` cookie from every cross-site request — set `SESSION_SAMESITE=none` (HTTPS only) and restart. |
 | Want to run the installer again | Delete `data/install.json` (and clear `DB_*` from the environment) and restart. |
 | 502 / app keeps restarting | Node version below 20, or `app.js` is not the startup file. |
 
