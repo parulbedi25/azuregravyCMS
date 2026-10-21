@@ -448,20 +448,37 @@ body.admin-body {
 /* -------------------------------------------------------------- forms */
 .form-grid { display: grid; gap: 18px; }
 .form-grid--2 { grid-template-columns: 1fr 1fr; }
-@media (max-width: 720px) { .form-grid--2 { grid-template-columns: 1fr; } }
+/*
+  appearance.ejs ("Front page") has marked up .form-grid--3 since the Studio was
+  built, but the class was never defined — so it silently fell back to
+  .form-grid's single column and stacked Layout / Stories per page / Featured
+  slots vertically. `minmax(0, 1fr)` follows .admin-grid-3 and base.css's
+  .grid--3, and stops a long <option> label from blowing out its track.
+*/
+.form-grid--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 720px) {
+  .form-grid--2 { grid-template-columns: 1fr; }
+  .form-grid--3 { grid-template-columns: 1fr; }
+}
 /*
   base.css's `.field + .field { margin-top: 18px }` also fires between grid items.
-  In a two-column grid that is a visible defect: the second field is pushed 18px
-  below its row partner, so its label, input and placeholder text drop out of
-  alignment with the left column. `gap` already spaces grid items, so zero it.
-  This holds both for the desktop two-column row and for the single-column mobile
-  stack (<=720px), where `gap` continues to separate the rows.
+  In a multi-column grid that is a visible defect: every field after the first is
+  pushed 18px below its row partner, so labels, inputs and placeholder text drop
+  out of alignment across the row. `gap` already spaces grid items, so zero it.
+  This holds for the desktop columns and for the single-column mobile stack
+  (<=720px) alike, where `gap` continues to separate the rows.
+
+  Applies to both multi-column modifiers now that .form-grid--3 is actually
+  defined above -- until then --3 rendered as one column and was correctly left
+  out. Defining it as three-up re-arms the defect, so the two changes must ship
+  together.
 
   Deliberately NOT applied to plain single-column `.form-grid` (used as
   `.panel__body` across the Studio): every item there shares one column, so the
   extra margin only widens the vertical gap uniformly and nothing is misaligned.
 */
-.form-grid--2 > .field + .field { margin-top: 0; }
+.form-grid--2 > .field + .field,
+.form-grid--3 > .field + .field { margin-top: 0; }
 .form-section + .form-section { margin-top: 6px; padding-top: 20px; border-top: 1px solid var(--admin-line); }
 .form-section h3 { font-size: 0.9rem; margin-bottom: 4px; }
 .form-section > p { font-size: 0.8rem; color: var(--admin-ink-3); margin-bottom: 14px; }
