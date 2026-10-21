@@ -397,16 +397,26 @@ are prefixed with your account name — see the [cPanel guide](docs/DEPLOY-CPANE
 | `UPLOAD_MAX_MB` | `12` | Upload size limit |
 | `DB_DATA_DIR` | `./data/mariadb` | Embedded driver only |
 
-**`SESSION_SAMESITE=none`** covers exactly one situation: the Studio is embedded in an `<iframe>` served
-from a *different* domain. A cross-site iframe makes every request cross-site, and browsers withhold a
-`lax` cookie from those — so the session never survives to the next request and every form submit fails
-with `419 Session expired`. Browsers only accept `SameSite=None` alongside `Secure`, so this mode also
-forces the `Secure` flag and treats incoming requests as HTTPS; use it only behind TLS. Leave it unset
-for a normal top-level site, where `lax` is the stronger default.
+**`SESSION_SAMESITE=none`** is for one situation: the Studio is embedded in an `<iframe>` served from a
+*different* domain. A cross-site iframe makes every request cross-site, and browsers withhold a `lax`
+cookie from those — so the session never survives to the next request and every form submit fails with
+`419 Session expired`. Browsers only accept `SameSite=None` alongside `Secure`, so this mode also forces
+the `Secure` flag and treats incoming requests as HTTPS; use it only behind TLS. Leave it unset for a
+normal top-level site, where `lax` is the stronger default.
 
-This mode also sets the CHIPS **`Partitioned`** attribute, which the browsers phasing out third-party
-cookies (Safari's ITP already does) require before they will store a cross-site cookie at all. Two
-consequences worth knowing:
+This mode also sets the CHIPS **`Partitioned`** attribute, which browsers that block third-party cookies
+require before they will store a cross-site cookie at all.
+
+**Treat `none` as best-effort, not a guarantee.** Whether a cross-site iframe keeps *any* cookie is
+decided by the browser and the embedding host, not by this app. Measured against one real preview host,
+the cookie was refused on every request even with `SameSite=None; Secure; Partitioned` — the most
+permissive combination that exists — so there are hosts where no attribute setting helps. If `none` does
+not clear the 419, stop tuning attributes and open the app as a top-level tab, where the cookie is
+first-party. Worth understanding why this matters beyond forms: sessions carry the login, the flash
+messages and the installer's step 1 → step 2 handoff, so a cookieless iframe breaks the whole Studio
+rather than just its submits.
+
+Two further consequences of `Partitioned`:
 
 - A partitioned cookie is scoped to the *embedding* site, so opening the same URL as a top-level tab
   gets its own separate session rather than sharing the iframe's.
