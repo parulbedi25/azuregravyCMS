@@ -8,6 +8,7 @@ import { MariaSessionStore } from './lib/session-store.js';
 import { loadSettings } from './lib/settings.js';
 import { buildHelpers } from './lib/view.js';
 import { accentStylesheet } from './lib/theme.js';
+import { rememberRequestOrigin } from './lib/url.js';
 import { getMenuItems, getNavCategories, getTicker } from './services/navigation.js';
 import { publishDuePosts, getDb } from './db/index.js';
 import publicRoutes from './routes/public.js';
@@ -71,7 +72,9 @@ export async function createApp() {
       cookie: {
         httpOnly: true,
         sameSite: 'lax',
-        secure: false,
+        // `auto` = secure whenever the request itself is HTTPS (works behind
+        // cPanel/Passenger's proxy), plain HTTP keeps working in development.
+        secure: 'auto',
         maxAge: 1000 * 60 * 60 * 24 * 7,
       },
     }),
@@ -82,6 +85,8 @@ export async function createApp() {
   // Shared template locals (available to every renderer, including error pages)
   app.use(async (req: Request, res: Response, next: NextFunction) => {
     try {
+      // Canonical/OG/RSS URLs follow the real host when SITE_URL is not configured.
+      rememberRequestOrigin(req.protocol, req.get('host'));
       // Publish due stories at most once a minute rather than on every request.
       if (Date.now() - lastPublishSweep > 60_000) {
         lastPublishSweep = Date.now();

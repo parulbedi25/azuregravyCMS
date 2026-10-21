@@ -22,6 +22,53 @@ export interface DbClient {
 }
 
 /* ------------------------------------------------------------------ */
+/* errors                                                              */
+/* ------------------------------------------------------------------ */
+
+/** A connection/setup failure with a human explanation and an actionable hint. */
+export class DbSetupError extends Error {
+  constructor(message: string, readonly hint?: string, readonly cause?: unknown) {
+    super(message);
+    this.name = 'DbSetupError';
+  }
+}
+
+const mysqlErrorCode = (error: unknown): string => {
+  const code = (error as { code?: string })?.code;
+  return typeof code === 'string' ? code : '';
+};
+
+function connectionHint(error: unknown): string {
+  switch (mysqlErrorCode(error)) {
+    case 'ER_ACCESS_DENIED_ERROR':
+      return [
+        'The database rejected these credentials.',
+        'Check DB_USER / DB_PASSWORD in .env. On cPanel the user name is prefixed,',
+        'e.g. `myaccount_gravy`, and the user must be added to the database in',
+        'cPanel → MySQL® Databases → Add User To Database (ALL PRIVILEGES).',
+      ].join('\n');
+    case 'ER_BAD_DB_ERROR':
+      return [
+        'That database does not exist.',
+        'Create it in cPanel → MySQL® Databases and use the *full* name (`myaccount_gravy`).',
+        'If the database user is allowed to create databases, the app will try that automatically.',
+      ].join('\n');
+    case 'ENOTFOUND':
+    case 'EAI_AGAIN':
+      return 'DB_HOST could not be resolved. On cPanel this is almost always `localhost`.';
+    case 'ECONNREFUSED':
+      return 'Nothing is listening on that host/port. On cPanel use DB_HOST=localhost and leave DB_PORT empty.';
+    case 'ETIMEDOUT':
+    case 'PROTOCOL_SEQUENCE_TIMEOUT':
+      return 'The server did not answer in time. Shared hosts sometimes block remote MySQL — use `localhost`, or ask the host to allow your IP.';
+    case 'ER_NOT_SUPPORTED_AUTH_MODE':
+      return 'The server uses an old authentication plugin. Ask the host to set the user to mysql_native_password.';
+    default:
+      return 'Check DB_HOST, DB_PORT, DB_USER, DB_PASSWORD and DB_NAME in .env.';
+  }
+}
+
+/* ------------------------------------------------------------------ */
 /* helpers                                                             */
 /* ------------------------------------------------------------------ */
 
@@ -72,7 +119,7 @@ export function formatDate(d: Date): string {
 }
 
 /* ------------------------------------------------------------------ */
-/* embedded MariaDB (WASM)                                             */
+/* embedded MariaDB (WASM) — offline demos and tests                   */
 /* ------------------------------------------------------------------ */
 
 interface EmbeddedEngine {
@@ -128,7 +175,7 @@ class EmbeddedDb implements DbClient {
 /* mysql2 / remote MariaDB                                             */
 /* ------------------------------------------------------------------ */
 
-class RemoteDb implements DbClient {
+export class RemoteDb implements DbClient {
   readonly driver = 'mysql' as const;
   constructor(private readonly pool: mysql.Pool) {}
 
@@ -197,17 +244,102 @@ class RemoteDb implements DbClient {
   }
 }
 
+/** Exposed so tests can drive the exact production code path with a stub pool. */
+export function remoteFromPool(pool: mysql.Pool): DbClient {
+  return new RemoteDb(pool);
+}
+
 /* ------------------------------------------------------------------ */
-/* lifecycle                                                           */
+/* connection                                                          */
 /* ------------------------------------------------------------------ */
 
-let db: DbClient | null = null;
-let initPromise: Promise<DbClient> | null = null;
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+function poolOptions(includeDatabase = true): mysql.PoolOptions {
+  return {
+    host: config.db.host,
+    port: config.db.port,
+    user: config.db.user,
+    password: config.db.password,
+    ...(includeDatabase ? { database: config.db.database } : {}),
+    waitForConnections: true,
+    connectionLimit: 5,
+    maxIdle: 5,
+    idleTimeout: 60_000,
+    charset: 'utf8mb4_unicode_ci',
+    dateStrings: true,
+    timezone: 'Z',
+    multipleStatements: false,
+    connectTimeout: config.db.connectTimeout,
+    ...(config.db.ssl ? { ssl: { rejectUnauthorized: false } } : {}),
+  };
+}
+
+/**
+ * Connect, creating the database first when the account is allowed to.
+ * Shared hosts usually are not — in that case the error explains what to do in cPanel.
+ */
+async function createRemote(): Promise<DbClient> {
+  const pool = mysql.createPool(poolOptions(true));
+
+  let lastError: unknown = null;
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    try {
+      await pool.query('SELECT 1');
+      return new RemoteDb(pool);
+    } catch (error) {
+      lastError = error;
+      const code = mysqlErrorCode(error);
+
+      // 1049 — the database itself is missing. Try to create it once.
+      if (code === 'ER_BAD_DB_ERROR' && attempt === 1) {
+        try {
+          const bootstrapPool = mysql.createPool(poolOptions(false));
+          await bootstrapPool.query(
+            `CREATE DATABASE IF NOT EXISTS \`${config.db.database.replace(/`/g, '')}\`
+             CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`,
+          );
+          await bootstrapPool.end();
+          continue;
+        } catch (createError) {
+          await pool.end().catch(() => undefined);
+          throw new DbSetupError(
+            `Connected to ${config.db.host}, but the database \`${config.db.database}\` does not exist and this user cannot create it.`,
+            connectionHint(error),
+            createError,
+          );
+        }
+      }
+
+      const retryable = ['ECONNREFUSED', 'ETIMEDOUT', 'EAI_AGAIN', 'PROTOCOL_CONNECTION_LOST', 'ER_CON_COUNT_ERROR'].includes(code);
+      if (retryable && attempt < 3) {
+        await sleep(1500 * attempt);
+        continue;
+      }
+      break;
+    }
+  }
+
+  await pool.end().catch(() => undefined);
+  throw new DbSetupError(
+    `Could not connect to the database at ${config.db.host}:${config.db.port} (${mysqlErrorCode(lastError) || 'unknown error'}).`,
+    connectionHint(lastError),
+    lastError,
+  );
+}
 
 async function createEmbedded(): Promise<DbClient> {
-  const { Lite4MariaDB } = (await import('lite4mariadb')) as unknown as {
-    Lite4MariaDB: { create(opts?: { dataDir?: string }): Promise<unknown> };
-  };
+  let Lite4MariaDB: { create(opts?: { dataDir?: string }): Promise<unknown> };
+  try {
+    ({ Lite4MariaDB } = (await import('lite4mariadb')) as unknown as {
+      Lite4MariaDB: { create(opts?: { dataDir?: string }): Promise<unknown> };
+    });
+  } catch {
+    throw new DbSetupError(
+      'DB_DRIVER=embedded was requested but the optional `lite4mariadb` package is not installed.',
+      'Run `npm install lite4mariadb`, or switch DB_DRIVER=mysql to use a real MariaDB/MySQL server.',
+    );
+  }
   await fs.mkdir(config.db.dataDir, { recursive: true });
   const engine = (await Lite4MariaDB.create({ dataDir: config.db.dataDir })) as EmbeddedEngine;
   await engine.exec(`CREATE DATABASE IF NOT EXISTS \`${config.db.database}\``);
@@ -215,24 +347,8 @@ async function createEmbedded(): Promise<DbClient> {
   return new EmbeddedDb(engine);
 }
 
-async function createRemote(): Promise<DbClient> {
-  const pool = mysql.createPool({
-    host: config.db.host,
-    port: config.db.port,
-    user: config.db.user,
-    password: config.db.password,
-    database: config.db.database,
-    waitForConnections: true,
-    connectionLimit: 10,
-    charset: 'utf8mb4_unicode_ci',
-    dateStrings: true,
-    timezone: 'Z',
-    multipleStatements: false,
-  });
-  // Fail fast with a helpful message.
-  await pool.query('SELECT 1');
-  return new RemoteDb(pool);
-}
+let db: DbClient | null = null;
+let initPromise: Promise<DbClient> | null = null;
 
 export async function getDb(): Promise<DbClient> {
   if (db) return db;
@@ -241,7 +357,10 @@ export async function getDb(): Promise<DbClient> {
       const client = config.db.driver === 'mysql' ? await createRemote() : await createEmbedded();
       db = client;
       return client;
-    })();
+    })().catch((error) => {
+      initPromise = null;
+      throw error;
+    });
   }
   return initPromise;
 }
@@ -251,7 +370,15 @@ export function dbSync(): DbClient {
   return db;
 }
 
-export async function migrate(client?: DbClient): Promise<void> {
+/* ------------------------------------------------------------------ */
+/* schema + migrations                                                 */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Creates every table (idempotent), records the schema version and fills in any
+ * missing setting keys. Safe to run on every boot and on a brand-new database.
+ */
+export async function migrate(client?: DbClient): Promise<{ tables: number }> {
   const database = client ?? (await getDb());
   for (const statement of SCHEMA_STATEMENTS) {
     await database.execute(statement);
@@ -267,6 +394,11 @@ export async function migrate(client?: DbClient): Promise<void> {
       [key, value],
     );
   }
+  const rows = await database.query<{ total: number }>(
+    `SELECT COUNT(*) AS total FROM information_schema.tables
+      WHERE table_schema = DATABASE() AND table_type = 'BASE TABLE'`,
+  );
+  return { tables: Number(rows[0]?.total ?? SCHEMA_STATEMENTS.length) };
 }
 
 /** Publish posts whose scheduled time has arrived. Returns the number published. */

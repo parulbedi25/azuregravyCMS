@@ -1,4 +1,4 @@
-import { config } from '../config.js';
+import { absoluteUrl as absolute } from './url.js';
 import type { Post } from '../types.js';
 
 /** Turn a MariaDB `DATETIME` string (or ISO string) into an ISO-8601 timestamp. */
@@ -9,11 +9,7 @@ export function isoDate(value: string | null | undefined): string | undefined {
   return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
 }
 
-export function absoluteUrl(pathOrUrl: string | null | undefined): string | undefined {
-  if (!pathOrUrl) return undefined;
-  if (/^https?:\/\//i.test(pathOrUrl)) return pathOrUrl;
-  return `${config.siteUrl}${pathOrUrl.startsWith('/') ? '' : '/'}${pathOrUrl}`;
-}
+export const absoluteUrl = absolute;
 
 /** Serialise structured data safely for embedding inside a `<script>` tag. */
 export function jsonLd(data: Record<string, unknown>): string {
@@ -29,7 +25,7 @@ export function articleJsonLd(
   post: Post,
   options: { siteName: string; url: string; logo?: string | null },
 ): string {
-  const url = absoluteUrl(options.url) ?? `${config.siteUrl}/stories/${post.slug}`;
+  const url = absoluteUrl(options.url) ?? absoluteUrl(`/stories/${post.slug}`)!;
   const description = post.seo_description || post.excerpt || undefined;
   const image = absoluteUrl(post.featured_image);
   const authorName = post.author_name || options.siteName;
@@ -56,10 +52,10 @@ export function articleJsonLd(
     isAccessibleForFree: post.status === 'private' ? false : true,
   };
 
-  const trail: Array<{ name: string; item: string }> = [{ name: 'Home', item: `${config.siteUrl}/` }];
-  trail.push({ name: 'Stories', item: `${config.siteUrl}/stories` });
+  const trail: Array<{ name: string; item: string }> = [{ name: 'Home', item: absoluteUrl('/')! }];
+  trail.push({ name: 'Stories', item: absoluteUrl('/stories')! });
   if (section && post.category_slug) {
-    trail.push({ name: section, item: `${config.siteUrl}/category/${post.category_slug}` });
+    trail.push({ name: section, item: absoluteUrl(`/category/${post.category_slug}`)! });
   }
   trail.push({ name: post.title, item: url });
 

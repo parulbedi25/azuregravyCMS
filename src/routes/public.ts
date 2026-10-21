@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { config } from '../config.js';
+import { siteBase } from '../lib/url.js';
 import { getDb } from '../db/index.js';
 import { asyncRoute, clientIp, pageParam, paginate, setFlash, verifyCsrf } from '../lib/http.js';
 import { renderMarkdown } from '../lib/markdown.js';
@@ -213,7 +213,7 @@ router.get(
       pageTitle: post.seo_title || post.title,
       metaDescription: post.seo_description || post.excerpt || '',
       ogType: 'article',
-      ogImage: post.featured_image ? (post.featured_image.startsWith('http') ? post.featured_image : `${config.siteUrl}${post.featured_image}`) : res.locals.ogImage,
+      ogImage: post.featured_image ? (post.featured_image.startsWith('http') ? post.featured_image : `${siteBase()}${post.featured_image}`) : res.locals.ogImage,
       bodyClass: 'page-post',
       post,
       contentHtml: html,
@@ -229,7 +229,7 @@ router.get(
       commentOk: req.query.comment === '1',
       extraHead: articleJsonLd(post, {
         siteName: res.locals.siteName,
-        url: `${config.siteUrl}/stories/${post.slug}`,
+        url: `${siteBase()}/stories/${post.slug}`,
         logo: res.locals.settings.logo_image || undefined,
       }),
     });
@@ -447,7 +447,7 @@ router.get(
   asyncRoute(async (_req, res) => {
     const settings = res.locals.settings as Record<string, string>;
     const { posts } = await listPosts({ type: 'post', perPage: 20, sort: 'newest' });
-    const base = (settings.site_url || config.siteUrl).replace(/\/$/, '');
+    const base = (settings.site_url || siteBase()).replace(/\/$/, '');
     const escape = (value: string) =>
       value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     const items = posts
@@ -483,7 +483,7 @@ router.get(
   '/sitemap.xml',
   asyncRoute(async (_req, res) => {
     const settings = res.locals.settings as Record<string, string>;
-    const base = (settings.site_url || config.siteUrl).replace(/\/$/, '');
+    const base = (settings.site_url || siteBase()).replace(/\/$/, '');
     const db = await getDb();
     const posts = await db.query<{ slug: string; updated_at: string; type: string }>(
       `SELECT slug, updated_at, type FROM posts WHERE status = 'published'`,
@@ -517,7 +517,7 @@ ${body}
 
 router.get('/robots.txt', (req, res) => {
   const settings = req.app.locals.settings ?? {};
-  const base = (settings.site_url || config.siteUrl).replace(/\/$/, '');
+  const base = (settings.site_url || siteBase()).replace(/\/$/, '');
   res.type('text/plain').send(`User-agent: *\nAllow: /\nDisallow: /admin\nDisallow: /uploads/tmp\n\nSitemap: ${base}/sitemap.xml\n`);
 });
 
@@ -557,7 +557,7 @@ router.get(
       title: post.title,
       pageTitle: post.seo_title || post.title,
       metaDescription: post.seo_description || post.excerpt || '',
-      ogImage: post.featured_image ? `${config.siteUrl}${post.featured_image}` : res.locals.ogImage,
+      ogImage: post.featured_image ? `${siteBase()}${post.featured_image}` : res.locals.ogImage,
       post,
       contentHtml: html,
       toc,
