@@ -1,6 +1,6 @@
 import { config } from '../config.js';
 import { hashPassword } from '../lib/auth.js';
-import { getDb, migrate, type DbClient } from './index.js';
+import { DbSetupError, getDb, migrate, mysqlErrorCode, type DbClient } from './index.js';
 import { DEFAULT_MENU } from './schema.js';
 
 /**
@@ -30,6 +30,8 @@ export interface BootstrapReport {
   installed: boolean;
 }
 
+let installedCache = false;
+
 const one = async (db: DbClient, sql: string, params: unknown[] = []): Promise<number> => {
   const rows = await db.query<{ total: number }>(sql, params);
   return Number(rows[0]?.total ?? 0);
@@ -52,8 +54,6 @@ export async function getSetupState(client?: DbClient): Promise<SetupState> {
  * A single indexed lookup, and once an admin has been seen it stays true for the
  * lifetime of the process — so this costs nothing after the first hit.
  */
-let installedCache = false;
-
 export async function siteInstalled(client?: DbClient): Promise<boolean> {
   if (installedCache) return true;
   const db = client ?? (await getDb());
@@ -65,6 +65,147 @@ export async function siteInstalled(client?: DbClient): Promise<boolean> {
 /** Called after the wizard creates the first admin so the cache flips immediately. */
 export function markInstalled(): void {
   installedCache = true;
+}
+
+/* ------------------------------------------------------------------ */
+/* installation state — safe to ask on every request                   */
+/* ------------------------------------------------------------------ */
+
+export interface DbErrorInfo {
+  message: string;
+  hint?: string;
+  code?: string;
+}
+
+export interface InstallState {
+  /** We know where the database is (environment variables or `data/install.json`). */
+  configured: boolean;
+  /** A connection is open and the schema is in place. */
+  connected: boolean;
+  /** A super admin exists — the publication is usable. */
+  installed: boolean;
+  /** True when the browser installer should handle the request. */
+  needsSetup: boolean;
+  tables: number;
+  admins: number;
+  posts: number;
+  pages: number;
+  error: DbErrorInfo | null;
+  checkedAt: number;
+}
+
+const EMPTY_STATE: InstallState = {
+  configured: false,
+  connected: false,
+  installed: false,
+  needsSetup: true,
+  tables: 0,
+  admins: 0,
+  posts: 0,
+  pages: 0,
+  error: null,
+  checkedAt: 0,
+};
+
+const STATE_TTL = 10_000;
+
+let installState: InstallState | null = null;
+let installCheck: Promise<InstallState> | null = null;
+
+/** Drop the cached answer — the installer calls this after changing the database. */
+export function clearInstallState(): void {
+  installState = null;
+  installCheck = null;
+}
+
+/**
+ * "Can this installation serve requests?" without ever throwing.
+ *
+ * The HTTP gate calls it on every request, so it is cached, single-flighted and
+ * turns connection failures into data (`error`) rather than exceptions: an
+ * unreachable database must produce a helpful page, not a dead process.
+ */
+export async function getInstallState(force = false): Promise<InstallState> {
+  if (!force && installState && Date.now() - installState.checkedAt < STATE_TTL) return installState;
+  if (!force && installState?.installed) return installState;
+  if (!installCheck) {
+    installCheck = computeInstallState().finally(() => {
+      installCheck = null;
+    });
+  }
+  return installCheck;
+}
+
+async function computeInstallState(): Promise<InstallState> {
+  if (!config.db.configured) {
+    installState = { ...EMPTY_STATE, checkedAt: Date.now() };
+    return installState;
+  }
+
+  try {
+    const db = await getDb();
+    const report = await ensureBootstrapped(db);
+    const state = await getSetupState(db);
+    installState = {
+      configured: true,
+      connected: true,
+      installed: state.ready,
+      needsSetup: !state.ready,
+      tables: report.tables || state.tables,
+      admins: state.admins,
+      posts: state.posts,
+      pages: state.pages,
+      error: null,
+      checkedAt: Date.now(),
+    };
+  } catch (error) {
+    installState = {
+      ...EMPTY_STATE,
+      configured: true,
+      connected: false,
+      needsSetup: true,
+      error: {
+        message: error instanceof Error ? error.message : String(error),
+        hint: error instanceof DbSetupError ? error.hint : undefined,
+        code: mysqlErrorCode(error) || undefined,
+      },
+      checkedAt: Date.now(),
+    };
+  }
+  return installState;
+}
+
+/* ------------------------------------------------------------------ */
+/* lazy bootstrap — runs once per process, on first use                */
+/* ------------------------------------------------------------------ */
+
+let bootstrapReport: BootstrapReport | null = null;
+let bootstrapPromise: Promise<BootstrapReport> | null = null;
+
+/** Forget the "already bootstrapped" flag (after the installer changes database). */
+export function resetBootstrap(): void {
+  bootstrapReport = null;
+  bootstrapPromise = null;
+  installedCache = false;
+}
+
+/**
+ * Tables, settings and starter content — created the first time the app actually
+ * talks to the database, never at boot. Idempotent, so a restart is harmless.
+ */
+export async function ensureBootstrapped(client?: DbClient): Promise<BootstrapReport> {
+  if (bootstrapReport) return bootstrapReport;
+  if (!bootstrapPromise) {
+    bootstrapPromise = (async () => {
+      const report = await runBootstrap(client);
+      bootstrapReport = report;
+      return report;
+    })().catch((error) => {
+      bootstrapPromise = null;
+      throw error;
+    });
+  }
+  return bootstrapPromise;
 }
 
 /* ------------------------------------------------------------------ */

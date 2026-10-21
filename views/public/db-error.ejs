@@ -1,0 +1,49 @@
+<section class="container status-page">
+  <span class="status-page__code"><%= status %></span>
+  <span class="kicker">Database</span>
+  <h1><%= title %></h1>
+  <p><%= message %></p>
+
+  <% if (hint) { %>
+    <pre class="db-error__hint"><%= hint %></pre>
+  <% } %>
+
+  <% if (target) { %>
+    <p class="text-xs text-muted" style="max-width:52ch;margin-inline:auto">
+      Connection attempted: <code><%= target %></code><% if (code) { %> · <code><%= code %></code><% } %>
+    </p>
+  <% } %>
+
+  <div class="row" style="gap:10px;margin-top:8px;justify-content:center">
+    <a class="btn btn--accent" href="/admin/setup?step=db">Fix the database settings</a>
+    <a class="btn btn--ghost" href="<%= path %>">Try again</a>
+  </div>
+
+  <p class="text-xs text-muted" style="max-width:60ch;margin-inline:auto">
+    Nothing was written and the server is still running — correct the details above and
+    the site comes straight back. On cPanel the database user is prefixed
+    (<code>myaccount_gravy</code>) and must be added to the database with ALL PRIVILEGES.
+  </p>
+</section>
+
+<style>
+  .db-error__hint {
+    margin: 4px auto 0;
+    padding: 14px 16px;
+    max-width: 62ch;
+    text-align: left;
+    font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+    font-size: 0.78rem;
+    line-height: 1.6;
+    color: var(--ink-2);
+    background: var(--surface-2, #fafafa);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .db-error__hint code, .status-page code {
+    font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+    font-size: 0.9em;
+  }
+</style>

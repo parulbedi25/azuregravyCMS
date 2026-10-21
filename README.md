@@ -13,13 +13,15 @@ npm install && npm start
 ```
 
 ```
+Installer     http://localhost:3000/admin/setup     (first run — database + administrator)
 Public site   http://localhost:3000
 Studio        http://localhost:3000/admin
-First run     create your administrator at /admin/setup
 ```
 
-MariaDB/MySQL is the only thing you have to provide — the tables, settings, starter pages and super
-admin account are created automatically the first time the server connects.
+The server starts **without a database**. Open it in a browser and the installer asks for your
+MariaDB/MySQL details, tests the connection right there in the page, creates every table, and then
+creates your administrator account. No `.env` editing, no SQL import, no crash when the credentials
+are wrong — a wrong password is a form error you can correct and resubmit.
 
 ![Azure Gravy home page](docs/screenshots/home-fold.png)
 
@@ -46,7 +48,8 @@ admin account are created automatically the first time the server connects.
 
 ## Quick start
 
-**Requirements:** Node.js 20 or newer, and a MariaDB / MySQL database.
+**Requirements:** Node.js 20 or newer. A MariaDB / MySQL database — but you do not need it to *start*
+the app, only to finish the installer.
 
 ```bash
 npm install
@@ -54,26 +57,31 @@ npm start
 ```
 
 That is the whole install. `npm start` runs `app.js`, which loads the TypeScript server directly —
-no build step, no compiled folder to keep in sync.
+no build step, no compiled folder to keep in sync. **Nothing touches MySQL at this point**, so the
+server comes up even on a host where the database does not exist yet.
 
-On first boot the app:
+Open `http://localhost:3000` and the two-step installer takes over:
 
-1. **connects** to the MariaDB/MySQL server in `.env` (and creates the database if the user is allowed to),
-2. **creates every table**, index, foreign key and the default settings — only what is missing,
-3. sends you to **`/admin/setup`** to create the super admin account, then adds starter pages
-   (About, Contact, Privacy, Terms), a menu and one welcome story so the site is not empty.
+| Step | What you enter | What happens |
+| --- | --- | --- |
+| **1 · Database** | host, port, database name, user, password — or "built-in MariaDB" for a zero-setup trial | The connection is **tested in the page**. If it fails you get a plain-English reason (`ER_ACCESS_DENIED_ERROR`, `ECONNREFUSED`, unknown database…) with the cPanel fix, and nothing is written. If it succeeds the database is created when needed and all 19 tables plus the default settings are built. |
+| **2 · Administrator** | publication name, your name, e-mail, password | The super admin is created and you are signed straight into the Studio. Starter pages (About, Contact, Privacy, Terms), menus, three categories and one welcome story are added so the site is not empty. |
 
-Nothing to import, no SQL file to run, no install wizard to download.
+The database details are remembered in `data/install.json` (permissions `0600`), so later boots
+connect on their own. Until an administrator exists, every URL leads back to the installer.
 
 ```
+Installer     http://localhost:3000/admin/setup
 Public site   http://localhost:3000
-Studio        http://localhost:3000/admin/setup     (first run)
-              http://localhost:3000/admin           (after that)
+Studio        http://localhost:3000/admin
+Health        http://localhost:3000/healthz        (never touches the database)
 ```
 
-### Configure the database
+### Optional: configure the database with environment variables instead
 
-Copy the template and fill in the values from your host:
+If you would rather not use the installer — cPanel, Docker, CI — set the variables and the app
+connects on the first request, creating the tables and (with `ADMIN_*`) the administrator for you.
+Environment values always win over `data/install.json`.
 
 ```bash
 cp .env.example .env
@@ -90,6 +98,10 @@ DB_PASSWORD=the-password-you-set
 Creating the database itself is a two-minute job in any host's control panel — see
 **[Deploying on cPanel / Namecheap](docs/DEPLOY-CPANEL.md)** for the exact clicks.
 
+If the saved or supplied credentials stop working (a rotated password, a restored dump), the site
+serves a **"Database unreachable"** page with the reason and a **Fix the database settings** button
+that reopens the installer — the process keeps running, so you can repair it from the browser.
+
 ### Optional: create the admin without opening a browser
 
 ```dotenv
@@ -98,7 +110,7 @@ ADMIN_EMAIL=you@yourdomain.com
 ADMIN_PASSWORD=a-long-password
 ```
 
-The account is created on the next `npm start` (or `npm run db:setup`), and the wizard is skipped.
+The account is created on the first request (or by `npm run db:setup`), and the installer is skipped.
 
 ### Optional: load the demo publication
 
@@ -114,8 +126,10 @@ Demo accounts all use the password `gravy123`; the admin is `admin@azuregravy.lo
 npm run dev        # tsx watch, reloads on change
 ```
 
-If you do not want to install a database server locally, `DB_DRIVER=embedded` runs a real MariaDB
-compiled to WebAssembly inside Node (optional dependency: `npm install lite4mariadb`).
+If you do not want to install a database server locally, pick **"Built-in MariaDB on this machine"**
+in the installer (or set `DB_DRIVER=embedded`): a real MariaDB compiled to WebAssembly runs inside
+Node and keeps its files under `./data` (optional dependency: `lite4mariadb`, installed by
+`npm install`).
 
 ---
 
@@ -280,6 +294,12 @@ cPanel, Plesk, a VPS, RDS, PlanetScale: anything that speaks the MySQL protocol.
 | `mysql` *(default)* | Production and anything real. Connects to a MariaDB/MySQL server. |
 | `embedded` | Local development and tests with no database server: real MariaDB compiled to WebAssembly. Single process only. |
 
+The details can come from three places, in this order of precedence:
+
+1. **Environment variables** (`.env`, cPanel's environment panel, Docker, CI),
+2. **`data/install.json`**, written by the browser installer the first time it connects,
+3. **nothing at all** — the app still starts and serves the installer.
+
 ```dotenv
 DB_DRIVER=mysql
 DB_HOST=localhost
@@ -296,21 +316,29 @@ Or a single URL instead of five values:
 DATABASE_URL=mysql://myaccount_gravy:secret@localhost:3306/myaccount_gravy
 ```
 
-### What the first boot does
+### When the database work happens
 
-Startup is idempotent, so it is safe to restart (or deploy) as often as you like:
+`npm start` opens the HTTP listener and nothing else. The database is touched on the **first request
+that needs it** — or by the installer's connection test — and every step is idempotent, so restarting
+or redeploying is always safe:
 
-| Step | Detail |
-| --- | --- |
-| Connect | Retries transient failures; if the database is missing it tries `CREATE DATABASE` once. |
-| Migrate | `CREATE TABLE IF NOT EXISTS` for all 19 tables, then records the schema version. |
-| Settings | Inserts any missing setting keys; never overwrites values you have changed. |
-| Super admin | Created from `ADMIN_EMAIL` / `ADMIN_PASSWORD`, or through `/admin/setup`. |
-| Starter content | Menus, About / Contact / Privacy / Terms pages, three categories, one welcome story. |
-| Demo content | Only when `SEED_DEMO=1`, and only on a completely empty database. |
+| Step | When | Detail |
+| --- | --- | --- |
+| Configure | Installer step 1, or environment | Details are tested before they are saved; `data/install.json` is written `0600`. |
+| Connect | First request / installer | Retries transient failures; if the database is missing it tries `CREATE DATABASE` once. |
+| Migrate | Once per process | `CREATE TABLE IF NOT EXISTS` for all 19 tables, then records the schema version. |
+| Settings | Once per process | Inserts any missing setting keys; never overwrites values you have changed. |
+| Super admin | Installer step 2, or `ADMIN_EMAIL` / `ADMIN_PASSWORD` | The installer closes itself as soon as an administrator exists. |
+| Starter content | With the super admin | Menus, About / Contact / Privacy / Terms pages, three categories, one welcome story. |
+| Demo content | Only when `SEED_DEMO=1` | And only on a completely empty database. |
 
-If the connection fails, the process stops with a specific explanation (wrong password, unknown
-database, host unreachable, no privileges) instead of a stack trace, and writes nothing.
+A failed connection never stops the process. Depending on where it fails you get:
+
+- **Installer step 1** — the reason inline in the form (`The database rejected these credentials…`,
+  `Nothing is listening on that host/port…`) with the cPanel fix, your values preserved, nothing written.
+- **A saved configuration that stopped working** — a `503 Database unreachable` page naming the target
+  and the error code, with a button back into the installer. `/healthz` stays `200` for uptime checks.
+- **No configuration at all** — every URL redirects to `/admin/setup`.
 
 ### Creating the database yourself (VPS / local)
 
@@ -353,18 +381,22 @@ are prefixed with your account name — see the [cPanel guide](docs/DEPLOY-CPANE
 | `NODE_ENV` | `development` | `production` enables long asset caching and same-origin framing |
 | `SITE_URL` | *(detected)* | Canonical links, RSS and sitemap. Blank = follow the request host |
 | `SESSION_SECRET` | dev fallback | **Set a long random string in production** |
-| `DB_DRIVER` | `mysql` | `mysql` or `embedded` |
-| `DB_HOST` / `DB_PORT` | `127.0.0.1` / `3306` | Database server |
-| `DB_NAME` | `azuregravy` | Database name (full cPanel name) |
-| `DB_USER` / `DB_PASSWORD` | `root` / *(empty)* | Database credentials |
+| `DB_DRIVER` | *(unset)* | `mysql` or `embedded`. Unset = the installer asks |
+| `DB_HOST` / `DB_PORT` | *(unset)* / `3306` | Database server. On cPanel: `localhost` |
+| `DB_NAME` | *(unset)* | Database name (full cPanel name) |
+| `DB_USER` / `DB_PASSWORD` | *(unset)* | Database credentials |
 | `DB_SSL` | `false` | `true` for hosts that require TLS |
+| `DB_CONNECT_TIMEOUT` | `12000` | Milliseconds before a connection attempt is abandoned |
 | `DATABASE_URL` | *(empty)* | `mysql://user:pass@host:port/db` — replaces the five values above |
-| `AUTO_SETUP` | `true` | Create tables and starter content on boot |
 | `SEED_DEMO` | `false` | Load the demo publication on an empty database |
 | `ADMIN_NAME` | `Site Administrator` | Used when creating the super admin from env |
-| `ADMIN_EMAIL` / `ADMIN_PASSWORD` | *(empty)* | Blank = use the `/admin/setup` wizard |
+| `ADMIN_EMAIL` / `ADMIN_PASSWORD` | *(empty)* | Blank = the installer creates the administrator |
 | `UPLOAD_MAX_MB` | `12` | Upload size limit |
 | `DB_DATA_DIR` | `./data/mariadb` | Embedded driver only |
+
+With no `DB_*` values the app is **not** broken — it serves the installer at `/admin/setup` and waits.
+`data/install.json` (written by the installer, `0600`, git-ignored) holds the same five values; delete
+it to run the installer again.
 
 Uploads land in `public/uploads/` and are served by the app.
 
@@ -374,12 +406,14 @@ Uploads land in `public/uploads/` and are served by the app.
 
 ```
 src/
-  app.ts                 Express app: parsers → session → flash → locals → static → CSRF → routes
-  server.ts              boot, migrate, seed-if-empty, listen
-  config.ts              env-backed configuration
+  app.ts                 Express app: parsers → session → flash → locals → install gate → CSRF → routes
+  server.ts              boot and listen — deliberately never touches the database
+  config.ts              env + install.json configuration, database target resolution
   db/
-    index.ts             DbClient interface, mysql + embedded drivers, transactions, migrations
-    bootstrap.ts         first-run provisioning: tables, starter content, super admin
+    index.ts             DbClient interface, mysql + embedded drivers, transactions, migrations,
+                         connection probe used by the installer
+    install.ts           `data/install.json` — the installer's memory
+    bootstrap.ts         install state, lazy provisioning: tables, starter content, super admin
     setup-cli.ts         `npm run db:setup`
     schema.ts            schema DDL, migration list, default settings
     seed.ts, seed-data.ts demo publication
@@ -431,9 +465,13 @@ icons and JavaScript here are original to this project.
 - Set `NODE_ENV=production`, a strong `SESSION_SECRET`, and either `SITE_URL` or a detected host.
 - Run `npm start` behind the host's own web server (Passenger/nginx) or a reverse proxy that
   terminates TLS. The app trusts one proxy hop, so client IPs are correct.
-- Ensure `public/uploads/` is writable by the app user — the boot log warns if it is not.
+- Ensure `public/uploads/` **and** `data/` are writable by the app user — `data/install.json` is how
+  the installer remembers the database, and the boot log warns about uploads if they are read-only.
 - Use a database user with privileges on that single database only (cPanel does this by default).
-- Back up two things: the database and `public/uploads/`.
+- Back up three things: the database, `public/uploads/`, and `data/install.json` (or keep the same
+  values in your host's environment panel, which always takes precedence).
+- Run the installer on a **single** application process: until a database exists, sessions live in
+  that process's memory. Set `DB_*` in the environment instead if your host starts several workers.
 - In production, responses carry `Content-Security-Policy: frame-ancestors 'self'`; development
   omits framing headers so sandbox preview panes can embed the app.
 

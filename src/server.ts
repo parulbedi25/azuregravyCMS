@@ -1,8 +1,7 @@
 import fs from 'node:fs/promises';
 import { createApp } from './app.js';
 import { config, describeDbTarget, UPLOADS_DIR } from './config.js';
-import { closeDb, DbSetupError, getDb } from './db/index.js';
-import { getSetupState, runBootstrap } from './db/bootstrap.js';
+import { closeDb } from './db/index.js';
 
 const line = (label: string, value: string) => console.log(`  ${label.padEnd(12)}: ${value}`);
 
@@ -16,29 +15,20 @@ async function checkUploads(): Promise<string | null> {
   }
 }
 
-function printSetupFailure(error: unknown): void {
-  const setupError = error instanceof DbSetupError ? error : null;
-  console.error('\n  ✖ Could not start Azure Gravy CMS\n');
-  console.error(`  ${setupError?.message ?? (error instanceof Error ? error.message : String(error))}`);
-  if (setupError?.hint) {
-    console.error('');
-    for (const hintLine of setupError.hint.split('\n')) console.error(`  ${hintLine}`);
-  }
-  if (!config.isProd && setupError?.cause) {
-    console.error(`\n  cause: ${(setupError.cause as Error)?.message ?? setupError.cause}`);
-  }
-  console.error('\n  Connection attempted:');
-  console.error(`    driver   ${config.db.driver}`);
-  console.error(`    target   ${describeDbTarget()}`);
-  console.error(`    env      ${config.isProd ? '.env' : `${process.cwd()}/.env`}`);
-  console.error('\n  Nothing was written to the database.');
-  console.error('  Fix the values in .env and run `npm start` again.\n');
-}
-
+/**
+ * Start serving.
+ *
+ * Deliberately database-free: the process must come up on a host where MySQL is
+ * unreachable, misconfigured or not created yet. Credentials are collected by the
+ * browser installer at `/admin/setup` (or read from the environment), the schema is
+ * built on the first successful connection, and a bad password is a form error in
+ * that wizard — never a crash here.
+ */
 async function bootstrap() {
   console.log('\n  Azure Gravy CMS');
   line('environment', config.env);
-  line('database', describeDbTarget());
+  line('database', config.db.configured ? describeDbTarget() : 'not configured yet');
+  if (config.db.configured) line('settings from', config.db.source === 'env+installer' ? '.env + data/install.json' : config.db.source === 'env' ? 'environment / .env' : 'data/install.json');
 
   if (config.isProd && config.sessionSecret === 'azure-gravy-development-secret-change-me') {
     console.warn('  ⚠ SESSION_SECRET is the development fallback — set a long random value in .env.');
@@ -47,26 +37,11 @@ async function bootstrap() {
     console.log('  · SITE_URL not set — canonical links will follow the request host.');
   }
 
-  // 1. Connect. Throws DbSetupError with an actionable hint when it cannot.
-  const db = await getDb();
-
-  // 2. Create tables, settings and starter content; create the super admin if
-  //    ADMIN_EMAIL / ADMIN_PASSWORD are provided.
-  const report = await runBootstrap(db);
-  line('tables', `${report.tables} ready`);
-  if (report.demoSeeded) console.log('  · demo publication seeded (SEED_DEMO=1)');
-  if (report.createdContent) console.log('  · starter pages, menu and welcome story created');
-  if (report.createdAdmin) console.log(`  · super admin created: ${report.createdAdmin}`);
-
-  const state = await getSetupState(db);
   const uploadsWarning = await checkUploads();
   if (uploadsWarning) console.warn(`  ⚠ ${uploadsWarning}`);
 
-  // 3. Serve.
   const app = await createApp();
-  const server = config.socketPath
-    ? app.listen(config.socketPath)
-    : app.listen(config.port, config.host);
+  const server = config.socketPath ? app.listen(config.socketPath) : app.listen(config.port, config.host);
 
   server.on('error', (error: NodeJS.ErrnoException) => {
     if (error.code === 'EADDRINUSE') {
@@ -78,19 +53,22 @@ async function bootstrap() {
 
   server.on('listening', () => {
     const where = config.socketPath ? `socket ${config.socketPath}` : `http://localhost:${config.port}`;
+    // Passenger hides the port, so name the path rather than a URL in that case.
+    const base = config.socketPath ? 'your domain' : `http://localhost:${config.port}`;
     console.log(`\n  ✔ Listening on ${where}`);
-    console.log('    Site    /');
-    console.log('    Studio  /admin');
-    if (!state.ready) {
-      console.log('\n  First run — open /admin/setup to create your administrator account.');
-      console.log(`  Then sign in at /admin.\n`);
-    } else {
-      console.log(
-        `    ${state.admins} admin account${state.admins === 1 ? '' : 's'} · ` +
-          `${state.posts} stor${state.posts === 1 ? 'y' : 'ies'} · ${state.pages} page${state.pages === 1 ? '' : 's'}`,
-      );
-      console.log('    Ready. Press Ctrl+C to stop.\n');
+    console.log('    Site      /');
+    console.log('    Studio    /admin');
+    console.log('    Installer /admin/setup');
+
+    if (!config.db.configured) {
+      console.log('\n  No database has been configured — nothing was attempted.');
+      console.log(`  Open ${base}/admin/setup to connect your MariaDB/MySQL database`);
+      console.log('  and create your administrator account. The server stays up either way.\n');
+      return;
     }
+
+    console.log('\n  The database is connected on first use (tables and settings are created');
+    console.log('  automatically). If the details are wrong, /admin/setup fixes them in the browser.\n');
   });
 
   server.keepAliveTimeout = 65_000;
@@ -109,10 +87,8 @@ async function bootstrap() {
 }
 
 bootstrap().catch((error) => {
-  if (error instanceof DbSetupError) {
-    printSetupFailure(error);
-  } else {
-    console.error('\n  ✖ Failed to start:', error);
-  }
+  // Only a genuine programming/startup fault reaches here — database problems are
+  // handled inside the request lifecycle and never take the process down.
+  console.error('\n  ✖ Failed to start:', error);
   void closeDb().finally(() => process.exit(1));
 });

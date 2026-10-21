@@ -1,6 +1,6 @@
 import fs from 'node:fs/promises';
 import mysql from 'mysql2/promise';
-import { config } from '../config.js';
+import { applyDbConfig, config, type DbConfigInput } from '../config.js';
 import { SCHEMA_STATEMENTS, SCHEMA_VERSION, DEFAULT_SETTINGS } from './schema.js';
 
 export type SqlParam = string | number | boolean | null | Date | undefined;
@@ -33,38 +33,54 @@ export class DbSetupError extends Error {
   }
 }
 
-const mysqlErrorCode = (error: unknown): string => {
+export const mysqlErrorCode = (error: unknown): string => {
   const code = (error as { code?: string })?.code;
   return typeof code === 'string' ? code : '';
 };
 
-function connectionHint(error: unknown): string {
+/**
+ * Plain-English remedy for each MySQL failure.
+ *
+ * The same text is shown by the installer (where the values are form fields) and by
+ * the "Database unreachable" page (where they live in .env or data/install.json), so
+ * it names the *values* rather than only the environment variables.
+ */
+export function connectionHint(error: unknown): string {
   switch (mysqlErrorCode(error)) {
     case 'ER_ACCESS_DENIED_ERROR':
       return [
-        'The database rejected these credentials.',
-        'Check DB_USER / DB_PASSWORD in .env. On cPanel the user name is prefixed,',
-        'e.g. `myaccount_gravy`, and the user must be added to the database in',
-        'cPanel → MySQL® Databases → Add User To Database (ALL PRIVILEGES).',
+        'The user and password do not match, or the user has no rights on this database.',
+        'On cPanel the user name is prefixed, e.g. `myaccount_gravy`, and the user must be',
+        'added to the database in cPanel → MySQL® Databases → Add User To Database',
+        'with ALL PRIVILEGES. Elsewhere, check DB_USER / DB_PASSWORD.',
+      ].join('\n');
+    case 'ER_DBACCESS_DENIED_ERROR':
+      return [
+        'The user signed in but may not use this database.',
+        'In cPanel → MySQL® Databases → Add User To Database, grant ALL PRIVILEGES on it.',
       ].join('\n');
     case 'ER_BAD_DB_ERROR':
       return [
         'That database does not exist.',
         'Create it in cPanel → MySQL® Databases and use the *full* name (`myaccount_gravy`).',
-        'If the database user is allowed to create databases, the app will try that automatically.',
+        'If the database user is allowed to create databases, tick "create the database if it',
+        'is missing" and the app will do it for you.',
       ].join('\n');
     case 'ENOTFOUND':
     case 'EAI_AGAIN':
-      return 'DB_HOST could not be resolved. On cPanel this is almost always `localhost`.';
+      return 'The host could not be resolved. On cPanel this is almost always `localhost`.';
     case 'ECONNREFUSED':
-      return 'Nothing is listening on that host/port. On cPanel use DB_HOST=localhost and leave DB_PORT empty.';
+      return 'Nothing is listening on that host/port. On cPanel use host `localhost` and port 3306.';
     case 'ETIMEDOUT':
     case 'PROTOCOL_SEQUENCE_TIMEOUT':
       return 'The server did not answer in time. Shared hosts sometimes block remote MySQL — use `localhost`, or ask the host to allow your IP.';
     case 'ER_NOT_SUPPORTED_AUTH_MODE':
       return 'The server uses an old authentication plugin. Ask the host to set the user to mysql_native_password.';
+    case 'PROTOCOL_CONNECTION_LOST':
+    case 'ECONNRESET':
+      return 'The server closed the connection. Check that the host and port are right, and that the server accepts connections from this machine.';
     default:
-      return 'Check DB_HOST, DB_PORT, DB_USER, DB_PASSWORD and DB_NAME in .env.';
+      return 'Check the host, port, database name, user and password.';
   }
 }
 
@@ -255,13 +271,47 @@ export function remoteFromPool(pool: mysql.Pool): DbClient {
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-function poolOptions(includeDatabase = true): mysql.PoolOptions {
+const asNumber = (value: unknown, fallback: number) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+interface ConnectionTarget {
+  driver: 'embedded' | 'mysql';
+  host: string;
+  port: number;
+  user: string;
+  password: string;
+  database: string;
+  ssl: boolean;
+  connectTimeout: number;
+  dataDir: string;
+  createDatabase: boolean;
+}
+
+/** Fill in the gaps so the rest of the file can work with plain strings/numbers. */
+export function normaliseTarget(input: DbConfigInput = config.db): ConnectionTarget {
   return {
-    host: config.db.host,
-    port: config.db.port,
-    user: config.db.user,
-    password: config.db.password,
-    ...(includeDatabase ? { database: config.db.database } : {}),
+    driver: input.driver === 'embedded' ? 'embedded' : 'mysql',
+    host: (input.host ?? '').trim() || 'localhost',
+    port: asNumber(input.port, 3306),
+    user: (input.user ?? '').trim(),
+    password: input.password ?? '',
+    database: (input.database ?? '').trim(),
+    ssl: Boolean(input.ssl),
+    connectTimeout: asNumber(input.connectTimeout, 12_000),
+    dataDir: input.dataDir || config.db.dataDir,
+    createDatabase: input.createDatabase !== false,
+  };
+}
+
+function poolOptions(target: ConnectionTarget, includeDatabase = true): mysql.PoolOptions {
+  return {
+    host: target.host,
+    port: target.port,
+    user: target.user,
+    password: target.password,
+    ...(includeDatabase && target.database ? { database: target.database } : {}),
     waitForConnections: true,
     connectionLimit: 5,
     maxIdle: 5,
@@ -270,17 +320,19 @@ function poolOptions(includeDatabase = true): mysql.PoolOptions {
     dateStrings: true,
     timezone: 'Z',
     multipleStatements: false,
-    connectTimeout: config.db.connectTimeout,
-    ...(config.db.ssl ? { ssl: { rejectUnauthorized: false } } : {}),
+    connectTimeout: target.connectTimeout,
+    ...(target.ssl ? { ssl: { rejectUnauthorized: false } } : {}),
   };
 }
+
+const safeName = (name: string) => name.replace(/`/g, '');
 
 /**
  * Connect, creating the database first when the account is allowed to.
  * Shared hosts usually are not — in that case the error explains what to do in cPanel.
  */
-async function createRemote(): Promise<DbClient> {
-  const pool = mysql.createPool(poolOptions(true));
+async function createRemote(target: ConnectionTarget): Promise<DbClient> {
+  const pool = mysql.createPool(poolOptions(target, true));
 
   let lastError: unknown = null;
   for (let attempt = 1; attempt <= 3; attempt += 1) {
@@ -292,11 +344,11 @@ async function createRemote(): Promise<DbClient> {
       const code = mysqlErrorCode(error);
 
       // 1049 — the database itself is missing. Try to create it once.
-      if (code === 'ER_BAD_DB_ERROR' && attempt === 1) {
+      if (code === 'ER_BAD_DB_ERROR' && attempt === 1 && target.createDatabase) {
         try {
-          const bootstrapPool = mysql.createPool(poolOptions(false));
+          const bootstrapPool = mysql.createPool(poolOptions(target, false));
           await bootstrapPool.query(
-            `CREATE DATABASE IF NOT EXISTS \`${config.db.database.replace(/`/g, '')}\`
+            `CREATE DATABASE IF NOT EXISTS \`${safeName(target.database)}\`
              CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`,
           );
           await bootstrapPool.end();
@@ -304,7 +356,7 @@ async function createRemote(): Promise<DbClient> {
         } catch (createError) {
           await pool.end().catch(() => undefined);
           throw new DbSetupError(
-            `Connected to ${config.db.host}, but the database \`${config.db.database}\` does not exist and this user cannot create it.`,
+            `Connected to ${target.host}, but the database \`${target.database}\` does not exist and this user cannot create it.`,
             connectionHint(error),
             createError,
           );
@@ -322,13 +374,13 @@ async function createRemote(): Promise<DbClient> {
 
   await pool.end().catch(() => undefined);
   throw new DbSetupError(
-    `Could not connect to the database at ${config.db.host}:${config.db.port} (${mysqlErrorCode(lastError) || 'unknown error'}).`,
+    `Could not connect to the database at ${target.host}:${target.port} (${mysqlErrorCode(lastError) || 'unknown error'}).`,
     connectionHint(lastError),
     lastError,
   );
 }
 
-async function createEmbedded(): Promise<DbClient> {
+async function createEmbedded(target: ConnectionTarget): Promise<DbClient> {
   let Lite4MariaDB: { create(opts?: { dataDir?: string }): Promise<unknown> };
   try {
     ({ Lite4MariaDB } = (await import('lite4mariadb')) as unknown as {
@@ -336,25 +388,60 @@ async function createEmbedded(): Promise<DbClient> {
     });
   } catch {
     throw new DbSetupError(
-      'DB_DRIVER=embedded was requested but the optional `lite4mariadb` package is not installed.',
-      'Run `npm install lite4mariadb`, or switch DB_DRIVER=mysql to use a real MariaDB/MySQL server.',
+      'The built-in MariaDB engine was requested but the optional `lite4mariadb` package is not installed.',
+      'Run `npm install` (it is an optional dependency), or choose "MariaDB / MySQL server" in the installer.',
     );
   }
-  await fs.mkdir(config.db.dataDir, { recursive: true });
-  const engine = (await Lite4MariaDB.create({ dataDir: config.db.dataDir })) as EmbeddedEngine;
-  await engine.exec(`CREATE DATABASE IF NOT EXISTS \`${config.db.database}\``);
-  await engine.exec(`USE \`${config.db.database}\``);
+  await fs.mkdir(target.dataDir, { recursive: true });
+  const engine = (await Lite4MariaDB.create({ dataDir: target.dataDir })) as EmbeddedEngine;
+  await engine.exec(`CREATE DATABASE IF NOT EXISTS \`${safeName(target.database || 'azuregravy')}\``);
+  await engine.exec(`USE \`${safeName(target.database || 'azuregravy')}\``);
   return new EmbeddedDb(engine);
+}
+
+async function connect(target: ConnectionTarget): Promise<DbClient> {
+  return target.driver === 'mysql' ? createRemote(target) : createEmbedded(target);
 }
 
 let db: DbClient | null = null;
 let initPromise: Promise<DbClient> | null = null;
 
+/** True once a client is connected in this process. */
+export function dbIsReady(): boolean {
+  return db !== null;
+}
+
+/** True when we know *where* the database is (environment or installer). */
+export function dbIsConfigured(): boolean {
+  return config.db.configured;
+}
+
+const NOT_CONFIGURED_HINT = [
+  'No database details have been given yet, so nothing was attempted.',
+  'Open the installer in your browser and enter them — it tests the connection,',
+  'creates the tables and creates your administrator account:',
+  '',
+  '    http://localhost:3000/admin/setup',
+  '',
+  'Alternatively set DB_HOST, DB_USER, DB_PASSWORD and DB_NAME in .env',
+  '(or as environment variables in cPanel) and restart the app.',
+].join('\n');
+
+/**
+ * The connection is opened on first use, never at boot.
+ *
+ * Callers that run before the installer has finished get a `DbSetupError` with a
+ * friendly hint; the HTTP layer turns that into the installer redirect or the
+ * "database is not reachable" page instead of a stack trace or a dead process.
+ */
 export async function getDb(): Promise<DbClient> {
   if (db) return db;
+  if (!config.db.configured) {
+    throw new DbSetupError('The database has not been configured yet.', NOT_CONFIGURED_HINT);
+  }
   if (!initPromise) {
     initPromise = (async () => {
-      const client = config.db.driver === 'mysql' ? await createRemote() : await createEmbedded();
+      const client = await connect(normaliseTarget(config.db));
       db = client;
       return client;
     })().catch((error) => {
@@ -368,6 +455,168 @@ export async function getDb(): Promise<DbClient> {
 export function dbSync(): DbClient {
   if (!db) throw new Error('Database has not been initialised yet');
   return db;
+}
+
+/**
+ * Point the running app at a different database (the installer calls this after a
+ * successful connection test). Drops any existing pool so the next `getDb()`
+ * reconnects with the new details.
+ */
+export async function setDbConfig(input: DbConfigInput): Promise<void> {
+  await closeDb();
+  applyDbConfig(input);
+}
+
+/* ------------------------------------------------------------------ */
+/* connection probe used by the installer                              */
+/* ------------------------------------------------------------------ */
+
+export interface ConnectionTest {
+  ok: boolean;
+  driver: 'embedded' | 'mysql';
+  /** Milliseconds the probe took — shown in the installer as reassurance. */
+  ms: number;
+  code?: string;
+  message?: string;
+  hint?: string;
+  server?: string;
+  database?: string;
+  tables?: number;
+  createdDatabase?: boolean;
+}
+
+/**
+ * Try a set of credentials *without* touching the app's live connection and
+ * *without* throwing. The installer shows `message` / `hint` inline, so a wrong
+ * password is a form error rather than a crashed process.
+ */
+export async function testConnection(input: DbConfigInput): Promise<ConnectionTest> {
+  const target = normaliseTarget(input);
+  const started = Date.now();
+
+  if (target.driver === 'embedded') {
+    try {
+      const client = await createEmbedded(target);
+      const version = await client.query<{ v: string }>('SELECT VERSION() AS v');
+      const database = await client.query<{ d: string | null }>('SELECT DATABASE() AS d');
+      const tables = await client.query<{ total: number }>(
+        `SELECT COUNT(*) AS total FROM information_schema.tables
+          WHERE table_schema = DATABASE() AND table_type = 'BASE TABLE'`,
+      );
+      await client.close();
+      return {
+        ok: true,
+        driver: 'embedded',
+        ms: Date.now() - started,
+        server: String(version[0]?.v ?? 'MariaDB'),
+        database: database[0]?.d ?? target.database,
+        tables: Number(tables[0]?.total ?? 0),
+      };
+    } catch (error) {
+      return {
+        ok: false,
+        driver: 'embedded',
+        ms: Date.now() - started,
+        code: mysqlErrorCode(error),
+        message: error instanceof Error ? error.message : String(error),
+        hint:
+          error instanceof DbSetupError && error.hint
+            ? error.hint
+            : 'The built-in engine could not open its data directory. Check that ./data is writable.',
+      };
+    }
+  }
+
+  // One connection, one attempt, short timeout: the installer should answer fast.
+  const options: mysql.ConnectionOptions = {
+    host: target.host,
+    port: target.port,
+    user: target.user,
+    password: target.password,
+    connectTimeout: Math.min(target.connectTimeout, 8_000),
+    charset: 'utf8mb4_unicode_ci',
+    dateStrings: true,
+    timezone: 'Z',
+    multipleStatements: false,
+    ...(target.ssl ? { ssl: { rejectUnauthorized: false } } : {}),
+  };
+
+  let createdDatabase = false;
+
+  const probe = async (withDatabase: boolean): Promise<mysql.Connection> => {
+    const connection = await mysql.createConnection(
+      withDatabase && target.database ? { ...options, database: target.database } : options,
+    );
+    return connection;
+  };
+
+  try {
+    let connection: mysql.Connection;
+    try {
+      connection = await probe(true);
+    } catch (error) {
+      if (mysqlErrorCode(error) !== 'ER_BAD_DB_ERROR' || !target.createDatabase) throw error;
+      // The credentials worked, the database itself is missing — try to create it.
+      connection = await probe(false);
+      try {
+        await connection.query(
+          `CREATE DATABASE IF NOT EXISTS \`${safeName(target.database)}\`
+           CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`,
+        );
+        createdDatabase = true;
+      } catch (createError) {
+        await connection.end().catch(() => undefined);
+        return {
+          ok: false,
+          driver: 'mysql',
+          ms: Date.now() - started,
+          code: 'ER_DBACCESS_DENIED_ERROR',
+          message: `Signed in to ${target.host}, but the database \`${target.database}\` does not exist and this user may not create it.`,
+          hint: [
+            'Create the database in cPanel → MySQL® Databases, then add your user to it',
+            'with ALL PRIVILEGES. Use the full prefixed name (for example `myaccount_gravy`).',
+          ].join('\n'),
+        };
+      }
+    }
+
+    try {
+      if (createdDatabase || !target.database) {
+        await connection.query(`USE \`${safeName(target.database)}\``);
+      }
+      const [infoRows] = await connection.query<(mysql.RowDataPacket & { version: string; database: string | null })[]>(
+        'SELECT VERSION() AS version, DATABASE() AS database',
+      );
+      const [countRows] = await connection.query<(mysql.RowDataPacket & { total: number })[]>(
+        `SELECT COUNT(*) AS total FROM information_schema.tables
+          WHERE table_schema = DATABASE() AND table_type = 'BASE TABLE'`,
+      );
+      const info = infoRows[0];
+      return {
+        ok: true,
+        driver: 'mysql',
+        ms: Date.now() - started,
+        server: String(info?.version ?? ''),
+        database: info?.database ?? target.database,
+        tables: Number(countRows[0]?.total ?? 0),
+        createdDatabase,
+      };
+    } finally {
+      await connection.end().catch(() => undefined);
+    }
+  } catch (error) {
+    return {
+      ok: false,
+      driver: 'mysql',
+      ms: Date.now() - started,
+      code: mysqlErrorCode(error) || 'UNKNOWN',
+      message:
+        mysqlErrorCode(error) === 'ER_ACCESS_DENIED_ERROR'
+          ? `The database rejected these credentials (${target.user}@${target.host}).`
+          : `Could not connect to ${target.user ? `${target.user}@` : ''}${target.host}:${target.port} (${mysqlErrorCode(error) || 'unknown error'}).`,
+      hint: connectionHint(error),
+    };
+  }
 }
 
 /* ------------------------------------------------------------------ */
@@ -413,9 +662,10 @@ export async function publishDuePosts(client: DbClient): Promise<number> {
 }
 
 export async function closeDb(): Promise<void> {
+  initPromise = null;
   if (db) {
-    await db.close();
+    const closing = db;
     db = null;
-    initPromise = null;
+    await closing.close().catch(() => undefined);
   }
 }

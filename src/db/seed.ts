@@ -1,8 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { imageSize } from 'image-size';
-import { config, PUBLIC_DIR } from '../config.js';
-import { closeDb, formatDate, formatDateTime, getDb, migrate } from './index.js';
+import { config, describeDbTarget, PUBLIC_DIR } from '../config.js';
+import { closeDb, DbSetupError, formatDate, formatDateTime, getDb, migrate } from './index.js';
 import { DEFAULT_MENU } from './schema.js';
 import {
   SEED_CATEGORIES, SEED_COMMENTS, SEED_MESSAGES, SEED_PAGES, SEED_POSTS, SEED_SUBSCRIBERS, SEED_TAGS, SEED_USERS,
@@ -372,7 +372,7 @@ export async function runSeed(
   );
   console.log('\n✔ Seed complete');
   console.log(`  posts: ${counts[0]?.posts}  ·  comments: ${counts[0]?.comments}`);
-  console.log(`  database: ${config.db.driver === 'embedded' ? config.db.dataDir : `${config.db.host}:${config.db.port}/${config.db.database}`}`);
+  console.log(`  database: ${describeDbTarget()}`);
   const demoAdmin = SEED_USERS.find((user) => user.role === 'admin') ?? SEED_USERS[0];
   console.log(`\n  Studio login: ${demoAdmin?.email} / ${demoAdmin?.password}`);
   console.log('  (Every demo account uses the same password)\n');
@@ -384,7 +384,16 @@ if (invokedDirectly) {
   const args = new Set(process.argv.slice(2));
   runSeed({ reset: args.has('--reset'), force: args.has('--force') })
     .catch((error) => {
-      console.error('Seed failed:', error);
+      if (error instanceof DbSetupError) {
+        console.error(`\n  ✖ ${error.message}`);
+        if (error.hint) {
+          console.error('');
+          for (const hintLine of error.hint.split('\n')) console.error(`  ${hintLine}`);
+        }
+        console.error('');
+      } else {
+        console.error('Seed failed:', error);
+      }
       process.exitCode = 1;
     })
     .finally(async () => {

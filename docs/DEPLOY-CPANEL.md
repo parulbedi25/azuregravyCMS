@@ -7,6 +7,10 @@ Tested against the standard **cPanel → Setup Node.js App** flow (Phusion Passe
 
 Total time: about ten minutes, most of it waiting for `npm install`.
 
+**You never edit a config file and never import SQL.** The app starts without a database; the
+installer in your browser collects the credentials, tests them, builds the tables and creates your
+administrator account. Steps 1–3 and 5 are the only server work.
+
 ---
 
 ## 1. Create the database
@@ -76,24 +80,29 @@ Click **Create**.
 
 ## 4. Environment variables
 
-Still on the application screen, open **Environment variables** and add:
+Still on the application screen, open **Environment variables**. Only two are required — the database
+details can be typed into the installer in step 6 instead:
 
-| Name | Value |
-| --- | --- |
-| `NODE_ENV` | `production` |
-| `DB_HOST` | `localhost` |
-| `DB_PORT` | `3306` |
-| `DB_NAME` | `myaccount_gravy` *(full name from step 1)* |
-| `DB_USER` | `myaccount_gravy` *(full name from step 1)* |
-| `DB_PASSWORD` | the password you set |
-| `SESSION_SECRET` | 64+ random characters — generate with `node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"` |
-| `SITE_URL` | `https://yourdomain.com` *(optional — detected automatically when blank)* |
+| Name | Value | Required |
+| --- | --- | --- |
+| `NODE_ENV` | `production` | yes |
+| `SESSION_SECRET` | 64+ random characters — generate with `node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"` | yes |
+| `SITE_URL` | `https://yourdomain.com` | optional — detected from the request when blank |
+| `DB_HOST` | `localhost` | optional — the installer asks |
+| `DB_PORT` | `3306` | optional |
+| `DB_NAME` | `myaccount_gravy` *(full name from step 1)* | optional |
+| `DB_USER` | `myaccount_gravy` *(full name from step 1)* | optional |
+| `DB_PASSWORD` | the password you set | optional |
 
 Leave `PORT` **unset**: Passenger provides it. If your host does expose one, the app accepts either a
 port number or a socket path.
 
+**Which should you use?** Set `DB_*` here when you want the deployment fully hands-off (Git-based
+deploys, staging clones, containers). Otherwise skip them and type the same values into the
+installer — they are stored in `data/install.json` with mode `0600`. Environment variables always win
+over that file, so you can also start with the installer and move the values here later.
+
 Prefer a file? Copy `.env.example` to `.env` in the application root and fill in the same values.
-Environment variables take precedence over the file.
 
 ---
 
@@ -112,16 +121,47 @@ npm install --omit=dev
 
 ## 6. Restart and finish setup in the browser
 
-Click **Restart**. Then open:
+Click **Restart**, then open your domain. Every URL leads to the installer until it is finished:
 
 ```
 https://yourdomain.com/admin/setup
 ```
 
-Fill in the publication name, your name, e-mail and a password. That creates the super admin, the
-starter pages (About, Contact, Privacy, Terms), the menus and one welcome story — and signs you in.
+**Step 1 — Database.** Enter the values from step 1 of this guide:
+
+| Field | cPanel value |
+| --- | --- |
+| Where is the database? | *MariaDB / MySQL server* |
+| Host | `localhost` |
+| Port | `3306` |
+| Database name | `myaccount_gravy` (the **full** prefixed name) |
+| Database user | `myaccount_gravy` (the **full** prefixed name) |
+| Password | the one you set in cPanel |
+| Create the database if it is missing | leave on — harmless, and it works if your user has the privilege |
+| Connect over TLS | off for cPanel's `localhost` |
+
+Press **Test connection & continue**. The connection is attempted right there:
+
+- **Wrong password** → *"The database rejected these credentials (myaccount_gravy@localhost)"* plus
+  the reminder to add the user to the database with ALL PRIVILEGES. Your values stay in the form.
+- **Wrong name** → *"Connected to …, but the database `gravy` does not exist"* — use the prefixed name.
+- **Wrong host/port** → *"Nothing is listening on that host/port"* — cPanel is always `localhost:3306`.
+
+Nothing is written on failure and the app keeps running, so you can correct and resubmit as often as
+you need. On success the 19 tables and default settings are created and you move to step 2.
+
+**Step 2 — Administrator.** Publication name, your name, e-mail, password. That creates the super
+admin, the starter pages (About, Contact, Privacy, Terms), the menus and one welcome story — and signs
+you in. The installer then closes itself: `/admin/setup` redirects to the normal sign-in page.
 
 **Then delete or edit the welcome story**, and replace the About/Privacy/Terms text.
+
+### If the database settings ever break
+
+A rotated password or a restored dump leaves the saved details stale. The site then answers with a
+**503 "Database unreachable"** page that names the target and the MySQL error code, with a **Fix the
+database settings** button back into step 1 — Passenger does not need to be restarted, and
+`/healthz` keeps returning `200` for uptime monitors.
 
 ### Prefer to create the admin from the terminal?
 
@@ -136,35 +176,58 @@ The wizard then reports that the site is already installed and sends you to the 
 
 ---
 
-## 7. Writable uploads folder
+## 7. Writable folders
 
-Media uploads are written to `public/uploads/`. If the boot log says it is not writable:
+Two directories must be writable by the application user:
 
 ```bash
-chmod -R 775 public/uploads
+chmod -R 775 public/uploads data
 ```
 
+- `public/uploads/` — the media library. The boot log warns if it is read-only.
+- `data/` — holds `install.json`, the file the installer writes in step 6 (mode `0600`, so the
+  password is not world-readable). If `data/` is not writable the installer cannot remember the
+  database; put the same values in the cPanel environment panel instead, which always wins.
+
 (Some hosts need `755` with the file group set to your account — ask support if neither works.)
+
+> **Running several workers?** Until a database is connected, installer sessions live in that
+> process's memory, so run the installer with a single application instance — or skip it entirely by
+> setting `DB_*` in step 4.
 
 ---
 
 ## What the first boot actually does
 
+Before the installer has run:
+
+```
+  Azure Gravy CMS
+  environment : production
+  database    : not configured yet
+
+  ✔ Listening on socket /tmp/passenger.../node.socket
+    Site      /
+    Studio    /admin
+    Installer /admin/setup
+
+  No database has been configured — nothing was attempted.
+```
+
+After it (or with `DB_*` environment variables set):
+
 ```
   Azure Gravy CMS
   environment : production
   database    : myaccount_gravy@localhost:3306/myaccount_gravy
-  tables      : 19 ready
+  settings from: data/install.json
 
   ✔ Listening on socket /tmp/passenger.../node.socket
-    Site    /
-    Studio  /admin
-
-  First run — open /admin/setup to create your administrator account.
 ```
 
-Every later start is a no-op for the schema: tables are only created when missing, and settings you
-have changed are never overwritten. It is safe to restart as often as you like.
+Note what is *not* there: no connection attempt, no migration, no failure that can stop Passenger
+from starting the app. The database is opened on the first request that needs it, tables are created
+only when missing, and settings you have changed are never overwritten. Restart as often as you like.
 
 ---
 
@@ -172,14 +235,18 @@ have changed are never overwritten. It is safe to restart as often as you like.
 
 | Symptom | Cause and fix |
 | --- | --- |
-| `✖ Could not connect … (ER_ACCESS_DENIED_ERROR)` | Wrong user/password, or the user was not added to the database. Re-check step 1.3 (`ALL PRIVILEGES`). |
-| `… the database does not exist and this user cannot create it` | The `DB_NAME` is wrong or the database was never created. Use the **full** prefixed name. |
-| `ECONNREFUSED` / `ETIMEDOUT` | `DB_HOST` is wrong. On cPanel it is always `localhost`. |
-| The site shows a Passenger error page | Check the application's **stderr log** in cPanel; the app prints a specific reason and exits. |
+| Installer says *"The database rejected these credentials"* (`ER_ACCESS_DENIED_ERROR`) | Wrong user/password, or the user was never added to the database. Re-check step 1.3 (`ALL PRIVILEGES`), then resubmit the form. |
+| *"…the database `gravy` does not exist and this user cannot create it"* | Use the **full** prefixed name (`myaccount_gravy`) in the installer / `DB_NAME`. |
+| *"Nothing is listening on that host/port"* (`ECONNREFUSED` / `ETIMEDOUT`) | Host is wrong. On cPanel it is always `localhost`, port `3306`. |
+| Every page redirects to `/admin/setup` | Nothing is configured yet — that is step 6. Or the installer was interrupted before an administrator existed. |
+| `503 Database unreachable` on every page | Saved details went stale (password rotated, database renamed). Click **Fix the database settings**. |
+| `500` with *"the tables could not be created"* | The user lacks DDL rights. Grant ALL PRIVILEGES (step 1.3) and resubmit. |
+| The site shows a Passenger error page | Check the application's **stderr log** in cPanel. Database problems no longer appear there — they are reported in the browser. |
 | `Dependencies are missing` | **Run NPM Install** again, or `npm install --omit=dev`. |
 | Blank page, assets 404 | `public/` was not uploaded, or the application root is one level too deep. |
 | Uploads fail | `public/uploads` is not writable (step 7). |
-| Logged out on every restart | `SESSION_SECRET` changes between restarts, or the `sessions` table is missing (restart once after the DB is reachable). |
+| Logged out on every restart | `SESSION_SECRET` changes between restarts, or the `sessions` table is missing (restart once after the DB is reachable). Sessions live in memory only until the installer connects a database. |
+| Want to run the installer again | Delete `data/install.json` (and clear `DB_*` from the environment) and restart. |
 | 502 / app keeps restarting | Node version below 20, or `app.js` is not the startup file. |
 
 ---
