@@ -41,6 +41,21 @@ const bool = (value: string | number | boolean | undefined, fallback: boolean) =
 };
 
 /**
+ * `SameSite` attribute for the session cookie. Anything unrecognised — including
+ * an unset variable — falls back to `lax`, which is the safe default for a site
+ * served top-level on its own domain.
+ *
+ * `none` is only for embedding the Studio in an iframe on a *different* site.
+ * A cross-site iframe makes every request cross-site, and browsers withhold a
+ * `lax` cookie from those entirely, so the session never survives to the next
+ * request and every form POST fails its CSRF check.
+ */
+const sameSite = (value: string | undefined): 'lax' | 'strict' | 'none' => {
+  const v = (value ?? '').trim().toLowerCase();
+  return v === 'strict' || v === 'none' ? v : 'lax';
+};
+
+/**
  * Passenger (cPanel) sometimes hands the app a unix socket path in `PORT`
  * instead of a number. Keep both shapes.
  */
@@ -168,6 +183,8 @@ export const config = {
   host: process.env.HOST ?? '0.0.0.0',
   siteUrl: (process.env.SITE_URL ?? '').replace(/\/$/, ''),
   sessionSecret: process.env.SESSION_SECRET ?? 'azure-gravy-development-secret-change-me',
+  /** See `sameSite()` above — `none` is only for cross-site iframe hosting. */
+  sessionSameSite: sameSite(process.env.SESSION_SAMESITE),
   db: {
     /**
      * `mysql`    — any MariaDB/MySQL server (cPanel, Namecheap, RDS, PlanetScale…).

@@ -194,7 +194,9 @@ Canonical URLs, Open Graph and Twitter cards, JSON-LD `Article` / `BreadcrumbLis
 
 ### Security
 
-- Session cookies (HTTP-only, same-site) backed by a MariaDB session store, so restarts keep logins.
+- Session cookies (HTTP-only, `SameSite=Lax` by default) backed by a MariaDB session store, so restarts
+  keep logins. Set `SESSION_SAMESITE=none` only if you embed the Studio in an iframe on a *different*
+  domain — see the configuration table below.
 - **CSRF token on every mutating request**, including uploads and API routes.
 - `scrypt` password hashing with per-user salt and timing-safe comparison.
 - Login throttling (six failed attempts per IP + email locks sign-in for 15 minutes), honeypot fields
@@ -381,6 +383,7 @@ are prefixed with your account name — see the [cPanel guide](docs/DEPLOY-CPANE
 | `NODE_ENV` | `development` | `production` enables long asset caching and same-origin framing |
 | `SITE_URL` | *(detected)* | Canonical links, RSS and sitemap. Blank = follow the request host |
 | `SESSION_SECRET` | dev fallback | **Set a long random string in production** |
+| `SESSION_SAMESITE` | `lax` | `strict`, `lax` or `none`. Set `none` **only** when the Studio is embedded in an iframe on a different domain — see the note below |
 | `DB_DRIVER` | *(unset)* | `mysql` or `embedded`. Unset = the installer asks |
 | `DB_HOST` / `DB_PORT` | *(unset)* / `3306` | Database server. On cPanel: `localhost` |
 | `DB_NAME` | *(unset)* | Database name (full cPanel name) |
@@ -393,6 +396,32 @@ are prefixed with your account name — see the [cPanel guide](docs/DEPLOY-CPANE
 | `ADMIN_EMAIL` / `ADMIN_PASSWORD` | *(empty)* | Blank = the installer creates the administrator |
 | `UPLOAD_MAX_MB` | `12` | Upload size limit |
 | `DB_DATA_DIR` | `./data/mariadb` | Embedded driver only |
+
+**`SESSION_SAMESITE=none`** is for one situation: the Studio is embedded in an `<iframe>` served from a
+*different* domain. A cross-site iframe makes every request cross-site, and browsers withhold a `lax`
+cookie from those — so the session never survives to the next request and every form submit fails with
+`419 Session expired`. Browsers only accept `SameSite=None` alongside `Secure`, so this mode also forces
+the `Secure` flag and treats incoming requests as HTTPS; use it only behind TLS. Leave it unset for a
+normal top-level site, where `lax` is the stronger default.
+
+This mode also sets the CHIPS **`Partitioned`** attribute, which browsers that block third-party cookies
+require before they will store a cross-site cookie at all.
+
+**Treat `none` as best-effort, not a guarantee.** Whether a cross-site iframe keeps *any* cookie is
+decided by the browser and the embedding host, not by this app. Measured against one real preview host,
+the cookie was refused on every request even with `SameSite=None; Secure; Partitioned` — the most
+permissive combination that exists — so there are hosts where no attribute setting helps. If `none` does
+not clear the 419, stop tuning attributes and open the app as a top-level tab, where the cookie is
+first-party. Worth understanding why this matters beyond forms: sessions carry the login, the flash
+messages and the installer's step 1 → step 2 handoff, so a cookieless iframe breaks the whole Studio
+rather than just its submits.
+
+Two further consequences of `Partitioned`:
+
+- A partitioned cookie is scoped to the *embedding* site, so opening the same URL as a top-level tab
+  gets its own separate session rather than sharing the iframe's.
+- Do not reach for `none` to solve a cross-site **POST** flow (a payment redirect back, say) — there
+  the partitioning would silently split the session. `none` here means "embedded in an iframe".
 
 With no `DB_*` values the app is **not** broken — it serves the installer at `/admin/setup` and waits.
 `data/install.json` (written by the installer, `0600`, git-ignored) holds the same five values; delete
