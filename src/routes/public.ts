@@ -9,9 +9,10 @@ import {
   approvedCommentsTree, addComment,
 } from '../services/comments.js';
 import {
-  getAdjacentPosts, getArchiveMonths, getCategoryBySlug, getPostBySlug, getRelatedPosts,
+  getAdjacentPosts, getArchiveMonths, getCategoryBySlug, getPostById, getPostBySlug, getRelatedPosts,
   getTagBySlug, listCategories, listPosts, listTags,
 } from '../services/posts.js';
+import { parsePreviewRef } from '../lib/preview.js';
 import { getUser, listUsers } from '../services/users.js';
 import { errorPage } from './helpers.js';
 
@@ -543,6 +544,104 @@ router.get(
 function h_excerpt(value: string): string {
   return value.length > 96 ? `${value.slice(0, 96).trim()}…` : value;
 }
+
+/* ------------------------------------------------------- staff-only preview */
+/**
+ * Render a story that is not public yet, for its author or a super admin.
+ *
+ * Registered above the `/:slug` catch-all on purpose: `/preview` is a single
+ * path segment and would otherwise be matched as a page slug.
+ *
+ * Deliberate differences from the public article route:
+ *  - no view counting, so an author refreshing a draft does not inflate analytics;
+ *  - no comments, related stories or share affordances, which would all point at
+ *    a URL visitors cannot reach;
+ *  - `noindex` plus `X-Robots-Tag` and `no-store`, so a preview can never be
+ *    indexed or cached;
+ *  - no canonical/og:url (suppressed in the layout) and no JSON-LD, so the draft
+ *    is never advertised to crawlers or social scrapers.
+ *
+ * Unauthorised callers get 404 rather than 403, so the route never confirms that
+ * another author's draft exists.
+ */
+router.get(
+  '/preview/:ref',
+  asyncRoute(async (req, res) => {
+    const id = parsePreviewRef(req.params.ref);
+    if (id === null) {
+      return errorPage(res, 404, 'Preview not found', 'This preview link is invalid or has expired.');
+    }
+
+    const user = res.locals.currentUser as { id: number; role: string } | null;
+    if (!user) {
+      return res.redirect(`/admin/login?next=${encodeURIComponent(req.originalUrl)}`);
+    }
+
+    const post = await getPostById(id);
+    if (!post || post.status === 'trash') {
+      return errorPage(res, 404, 'Preview not found', 'This story no longer exists.');
+    }
+    if (post.author_id !== user.id && user.role !== 'admin') {
+      return errorPage(res, 404, 'Preview not found', 'You can only preview your own stories.');
+    }
+
+    const { html, toc } = renderMarkdown(post.content);
+
+    res.set('Cache-Control', 'no-store, private');
+    res.set('X-Robots-Tag', 'noindex, nofollow, noarchive');
+
+    const noindex = '<meta name="robots" content="noindex, nofollow">';
+
+    // Pages have their own templates; rendering one through the story view would
+    // silently drop the page layout (and the contact template's form).
+    if (post.type === 'page') {
+      return res.render(post.template === 'contact' ? 'public/page-contact' : 'public/page', {
+        layout: 'layouts/public',
+        title: post.title,
+        pageTitle: post.seo_title || post.title,
+        metaDescription: post.seo_description || post.excerpt || '',
+        ogImage: post.featured_image ? `${siteBase()}${post.featured_image}` : res.locals.ogImage,
+        post,
+        contentHtml: html,
+        toc,
+        previewMode: true,
+        extraHead: noindex,
+      });
+    }
+
+    const [adjacent, categories, tags] = await Promise.all([
+      getAdjacentPosts(post),
+      listCategories({ withCounts: true }),
+      listTags(true),
+    ]);
+
+    res.render('public/post', {
+      layout: 'layouts/public',
+      title: post.title,
+      pageTitle: post.seo_title || post.title,
+      metaDescription: post.seo_description || post.excerpt || '',
+      ogType: 'article',
+      ogImage: post.featured_image
+        ? (post.featured_image.startsWith('http') ? post.featured_image : `${siteBase()}${post.featured_image}`)
+        : res.locals.ogImage,
+      bodyClass: 'page-post page-post--preview',
+      post,
+      contentHtml: html,
+      toc,
+      adjacent,
+      related: [],
+      comments: [],
+      commentTotal: 0,
+      allowComments: false,
+      categories,
+      tags,
+      commentError: null,
+      commentOk: false,
+      previewMode: true,
+      extraHead: noindex,
+    });
+  }),
+);
 
 /* --------------------------------------------------------------- pages */
 router.get(

@@ -969,3 +969,74 @@ label.field > span { color: var(--admin-ink-2); }
   rule above wins on specificity, so the driver toggle still works.
 */
 #db-server-fields, #db-embedded-fields { display: grid; gap: 16px; }
+
+/* ------------------------------------------- preview / permalink link rows */
+/*
+  One row under the title in the Stories and Pages lists, and under the title
+  field in the editor. Published items get their real permalink; anything not
+  public yet gets a private preview link (author or super admin only — the
+  template gates it with the same rule the /preview/:ref route enforces).
+*/
+.table .cell-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  margin-top: 3px;
+  font-size: 0.72rem;
+  line-height: 1.3;
+  color: var(--admin-ink-3);
+  text-decoration: none;
+}
+.table .cell-link:hover { color: var(--admin-accent); }
+.table .cell-link svg { flex: none; opacity: 0.9; }
+.table .cell-link__url {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 280px;
+}
+.table .cell-link--preview { color: var(--admin-accent); }
+.table .cell-link__status {
+  padding: 1px 6px;
+  border-radius: 980px;
+  background: var(--admin-accent-soft);
+  color: var(--admin-accent);
+  font-size: 0.67rem;
+  font-weight: 560;
+  text-transform: capitalize;
+}
+
+.editor-titlelink {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 2px 0 0;
+  padding: 0 2px;
+  font-size: 0.78rem;
+}
+.editor-titlelink a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--admin-accent);
+  font-weight: 500;
+  text-decoration: none;
+}
+.editor-titlelink a:hover { text-decoration: underline; }
+.editor-titlelink__url {
+  padding: 2px 7px;
+  border: 1px solid var(--admin-line);
+  border-radius: 6px;
+  background: var(--admin-bg);
+  color: var(--admin-ink-3);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.71rem;
+}
+.editor-titlelink__note { color: var(--admin-ink-3); font-size: 0.72rem; }
+
+@media (max-width: 720px) {
+  .table .cell-link__url { max-width: 150px; }
+  .editor-titlelink__note { flex-basis: 100%; }
+}

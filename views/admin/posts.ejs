@@ -97,6 +97,25 @@
                       <a href="/admin/posts/<%= post.id %>/edit"><%= post.title %></a>
                       <% if (post.is_sticky) { %><%- h.icon('star', '', 11) %><% } %>
                     </b>
+                    <%
+                      // A preview link is offered only to the author or a super admin,
+                      // matching the server-side rule in the /preview/:ref route.
+                      const canPreview = !!currentUser
+                        && (currentUser.role === 'admin' || post.author_id === currentUser.id);
+                    %>
+                    <% if (post.status === 'published') { %>
+                      <a class="cell-link" href="<%= h.postUrl(post) %>" target="_blank" rel="noopener noreferrer"
+                         title="Open the live <%= post.type === 'page' ? 'page' : 'story' %> in a new tab">
+                        <%- h.icon('external', '', 11) %>
+                        <span class="cell-link__url"><%= h.postUrl(post) %></span>
+                      </a>
+                    <% } else if (post.status !== 'trash' && canPreview) { %>
+                      <a class="cell-link cell-link--preview" href="<%= h.previewUrl(post) %>" target="_blank" rel="noopener noreferrer"
+                         title="Private preview — only you and site admins can open this link">
+                        <%- h.icon('eye', '', 11) %>
+                        <span>Preview <span class="cell-link__status"><%= post.status %></span></span>
+                      </a>
+                    <% } %>
                     <small><%= post.excerpt ? h.truncate(post.excerpt, 62) : 'No excerpt yet' %></small>
                   </div>
                 </div>
@@ -108,7 +127,11 @@
               <td class="text-xs text-muted nowrap"><%= h.formatNumber(post.views) %></td>
               <td>
                 <div class="cell-actions">
-                  <a class="row-action" href="<%= h.postUrl(post) %>" target="_blank" rel="noopener" title="View"><%- h.icon('eye', '', 14) %></a>
+                  <% if (post.status === 'published') { %>
+                    <a class="row-action" href="<%= h.postUrl(post) %>" target="_blank" rel="noopener" title="View live"><%- h.icon('eye', '', 14) %></a>
+                  <% } else if (post.status !== 'trash' && canPreview) { %>
+                    <a class="row-action" href="<%= h.previewUrl(post) %>" target="_blank" rel="noopener" title="Preview — private link"><%- h.icon('eye', '', 14) %></a>
+                  <% } %>
                   <a class="row-action" href="/admin/posts/<%= post.id %>/edit" title="Edit"><%- h.icon('pen', '', 14) %></a>
                   <% if (post.status === 'trash') { %>
                     <form method="post" action="/admin/posts/<%= post.id %>/status">
