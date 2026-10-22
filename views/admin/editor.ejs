@@ -205,12 +205,10 @@
               <div><span>Views</span><b><%= h.formatNumber(post.views) %></b></div>
               <div><span>Comments</span><b><%= post.comment_count || 0 %></b></div>
             </div>
-            <form method="post" action="/admin/posts/<%= post.id %>/delete" style="margin-top:6px"
-                  data-confirm="Move this <%= isPage ? 'page' : 'story' %> to trash?">
-              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-              <input type="hidden" name="redirect" value="/admin/posts?type=<%= type %>">
-              <button class="btn btn--ghost btn--sm btn--block" type="submit" style="color:#c0392b"><%- h.icon('trash', '', 13) %> Move to trash</button>
-            </form>
+            <% /* The form itself lives after </form> below — see the note there. */ %>
+            <button class="btn btn--ghost btn--sm btn--block" type="submit" form="deletePostForm"
+                    style="margin-top:6px;color:#c0392b"
+                    data-confirm="Move this <%= isPage ? 'page' : 'story' %> to trash?"><%- h.icon('trash', '', 13) %> Move to trash</button>
           <% } %>
         </div>
       </div>
@@ -287,10 +285,9 @@
                 <li>
                   <span class="flex-1 truncate"><%= revision.title %></span>
                   <time><%= h.timeAgo(revision.created_at) %></time>
-                  <form method="post" action="/admin/posts/<%= post.id %>/revisions/<%= revision.id %>/restore" data-confirm="Restore this revision?">
-                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-                    <button class="row-action" type="submit" title="Restore"><%- h.icon('undo', '', 13) %></button>
-                  </form>
+                  <button class="row-action" type="submit" title="Restore"
+                          form="restoreRevisionForm-<%= revision.id %>"
+                          data-confirm="Restore this revision?"><%- h.icon('undo', '', 13) %></button>
                 </li>
               <% }); %>
             </ul>
@@ -301,6 +298,42 @@
     </aside>
   </div>
 </form>
+
+<%
+  /*
+    These action forms live OUTSIDE #editorForm on purpose, and the buttons above
+    reach them through the HTML5 `form` attribute.
+
+    They used to be nested inside #editorForm, which is invalid HTML, and the
+    parser's error recovery made that actively destructive: an inner <form> start
+    tag is dropped when a form is already open, but its </form> is still honoured
+    and closes the *outer* form. So the "Move to trash" form's </form> terminated
+    #editorForm early, which meant
+
+      1. every field after it — categories, tags, featured_image_id — sat outside
+         the form and was silently discarded when saving an existing story, and
+      2. the absorbed hidden _csrf input gave #editorForm two fields of that name.
+         A duplicate key parses to an array, verifyCsrf() requires a string, and
+         the submit failed with a misleading "419 Session expired".
+
+    Only the existing-post path rendered those nested forms, which is why creating
+    a story worked while publishing or updating one did not.
+  */
+%>
+<% if (post && post.id) { %>
+  <form id="deletePostForm" method="post" action="/admin/posts/<%= post.id %>/delete">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <input type="hidden" name="redirect" value="/admin/posts?type=<%= type %>">
+  </form>
+<% } %>
+<% if (revisions.length) { %>
+  <% revisions.slice(0, 6).forEach(function (revision) { %>
+    <form id="restoreRevisionForm-<%= revision.id %>" method="post"
+          action="/admin/posts/<%= post.id %>/revisions/<%= revision.id %>/restore">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    </form>
+  <% }); %>
+<% } %>
 
 <script>
   document.addEventListener('click', function (event) {
