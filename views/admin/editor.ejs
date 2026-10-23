@@ -20,8 +20,10 @@
       <div class="row" style="gap:8px;margin-bottom:4px">
         <a class="text-xs text-muted" href="/admin/posts?type=<%= type %>">← All <%= isPage ? 'pages' : 'stories' %></a>
         <% if (post && post.id) { %>
-          <span class="text-xs text-muted">·</span>
-          <a class="text-xs text-muted" href="<%= h.postUrl(post) %>" target="_blank" rel="noopener">View live ↗</a>
+          <% if (post.status === 'published') { %>
+            <span class="text-xs text-muted">·</span>
+            <a class="text-xs text-muted" href="<%= h.postUrl(post) %>" target="_blank" rel="noopener">View live ↗</a>
+          <% } %>
           <span class="text-xs text-muted">·</span>
           <a class="text-xs text-muted" href="/admin/posts/<%= post.id %>/revisions"><%= revisions.length %> revision<%= revisions.length === 1 ? "" : "s" %></a>
         <% } %>
@@ -42,6 +44,29 @@
       <div class="panel">
         <input class="editor-title" id="title" name="title" type="text" required
                placeholder="<%= isPage ? 'Page title' : 'Story title…' %>" value="<%= post ? post.title : '' %>" autocomplete="off">
+        <% if (post && post.id && post.status !== 'trash') { %>
+          <%
+            // Mirrors the server-side rule in the /preview/:ref route: the author
+            // of the piece, or a super admin. Not editors, not other authors.
+            const canPreview = !!currentUser
+              && (currentUser.role === 'admin' || post.author_id === currentUser.id);
+          %>
+          <div class="editor-titlelink">
+            <% if (post.status === 'published') { %>
+              <a href="<%= h.postUrl(post) %>" target="_blank" rel="noopener noreferrer">
+                <%- h.icon('external', '', 12) %> View live <%= isPage ? 'page' : 'story' %>
+              </a>
+              <code class="editor-titlelink__url"><%= h.postUrl(post) %></code>
+            <% } else if (canPreview) { %>
+              <a href="<%= h.previewUrl(post) %>" target="_blank" rel="noopener noreferrer">
+                <%- h.icon('eye', '', 12) %> Preview <%= post.status %>
+              </a>
+              <span class="editor-titlelink__note">
+                Private link — opens in a new tab, visible only to you and site admins.
+              </span>
+            <% } %>
+          </div>
+        <% } %>
         <div class="slug-row">
           <%- h.icon('link', '', 13) %>
           <span><%= base %></span>
@@ -250,29 +275,51 @@
         <div class="side-card__head"><h3>Featured image</h3></div>
         <div class="side-card__body">
           <input type="hidden" id="featured_image_id" name="featured_image_id" value="<%= featured %>">
-          <div class="image-picker <%= featured ? 'has-image' : '' %>">
-            <% if (featuredPath) { %>
-              <img id="featured_image_id-preview" src="<%= featuredPath %>" alt="">
-            <% } else { %>
-              <img id="featured_image_id-preview" src="" alt="" style="display:none">
-              <span class="image-picker__empty">
-                <%- h.icon('image-plus', '', 22) %>
-                <span>No image selected</span>
-              </span>
-            <% } %>
+          <%
+            /*
+              One preview <img> is always in the DOM and CSS decides whether it is
+              visible, keyed off .has-image on the wrapper. The previous markup
+              branched server-side and gave the empty state an inline
+              style="display:none" that admin.js never cleared — so choosing an
+              image on an unsaved story updated src but left it invisible until
+              the page reloaded.
+            */
+            const quickPicks = media.filter(function (m) { return /^image\//.test(m.mime_type || ''); }).slice(0, 4);
+          %>
+          <div class="image-picker <%= featuredPath ? 'has-image' : '' %>">
+            <img id="featured_image_id-preview" src="<%= featuredPath %>" alt="">
+            <span class="image-picker__empty">
+              <%- h.icon('image-plus', '', 22) %>
+              <span>No image selected</span>
+            </span>
             <span class="image-picker__actions">
-              <button type="button" data-pick-media="featured_image_id" title="Choose image"><%- h.icon('image', '', 13) %></button>
+              <button type="button" data-pick-media="featured_image_id" title="Browse library"><%- h.icon('image', '', 13) %></button>
               <button type="button" data-remove-media="featured_image_id" title="Remove image"><%- h.icon('close', '', 13) %></button>
             </span>
           </div>
-          <div class="media-grid" style="grid-template-columns:repeat(4,1fr);gap:5px;margin-top:8px">
-            <% media.slice(0, 8).forEach(function (item) { %>
-              <button type="button" data-pick-media="featured_image_id" style="border:1px solid var(--admin-line);border-radius:6px;overflow:hidden;padding:0;aspect-ratio:1;background:var(--admin-bg)">
-                <img src="<%= item.path %>" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover">
-              </button>
-            <% }); %>
-          </div>
-          <span class="hint">For a quick pick, click a recent image above or browse the full library.</span>
+          <% if (quickPicks.length) { %>
+            <div class="quick-picks">
+              <% quickPicks.forEach(function (item) { %>
+                <button type="button"
+                        class="quick-pick <%= String(item.id) === String(featured) ? 'is-selected' : '' %>"
+                        data-quick-pick="featured_image_id"
+                        data-id="<%= item.id %>"
+                        data-path="<%= item.path %>"
+                        title="<%= item.original_name || 'Use this image' %>"
+                        aria-label="Use this image as the featured image"
+                        aria-pressed="<%= String(item.id) === String(featured) ? 'true' : 'false' %>">
+                  <img src="<%= item.path %>" alt="" loading="lazy">
+                </button>
+              <% }); %>
+            </div>
+          <% } %>
+          <span class="hint">
+            <% if (quickPicks.length) { %>
+              Click a thumbnail to use it straight away, or browse the full library.
+            <% } else { %>
+              No images in the library yet — upload one to set a featured image.
+            <% } %>
+          </span>
         </div>
       </div>
 

@@ -671,8 +671,21 @@ label.field > span { color: var(--admin-ink-2); }
   transition: border-color 0.2s var(--ease);
 }
 .image-picker:hover { border-color: var(--admin-accent); }
-.image-picker img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+/*
+  The preview <img> is permanent markup and .has-image alone decides visibility.
+  It used to be the other way round: the server rendered an empty state carrying
+  an inline display:none, and the picker JS only ever set .src — inline styles
+  outrank CSS, so a chosen image stayed invisible until the page was reloaded.
+*/
+.image-picker img {
+  display: none;
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  object-fit: cover;
+}
+.image-picker.has-image img { display: block; }
 .image-picker__empty { display: grid; gap: 6px; place-items: center; padding: 16px; }
+.image-picker.has-image .image-picker__empty { display: none; }
 .image-picker__empty svg { width: 22px; height: 22px; }
 .image-picker__actions { position: absolute; right: 6px; bottom: 6px; display: flex; gap: 5px; z-index: 2; }
 .image-picker__actions button {
@@ -684,6 +697,41 @@ label.field > span { color: var(--admin-ink-2); }
   backdrop-filter: blur(6px);
 }
 .image-picker__actions svg { width: 13px; height: 13px; }
+
+/*
+  Four recent images under the picker, as a quick way to set a featured image
+  without opening the library. These reproduce the inline styles the buttons
+  used to carry, plus a selected state so the current choice is visible.
+*/
+.quick-picks {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 5px;
+  margin-top: 8px;
+}
+.quick-pick {
+  position: relative;
+  padding: 0;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border: 1px solid var(--admin-line);
+  border-radius: 6px;
+  background: var(--admin-bg);
+  cursor: pointer;
+  transition: border-color 0.18s var(--ease), box-shadow 0.18s var(--ease), transform 0.18s var(--ease);
+}
+.quick-pick img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.quick-pick:hover { border-color: var(--admin-accent); transform: translateY(-1px); }
+.quick-pick:focus-visible { outline: 2px solid var(--admin-accent); outline-offset: 2px; }
+.quick-pick.is-selected { border-color: var(--admin-accent); box-shadow: 0 0 0 2px var(--admin-accent-soft); }
+.quick-pick.is-selected::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border: 2px solid var(--admin-accent);
+  border-radius: 5px;
+  pointer-events: none;
+}
 
 .seo-preview {
   border: 1px solid var(--admin-line);
@@ -969,3 +1017,74 @@ label.field > span { color: var(--admin-ink-2); }
   rule above wins on specificity, so the driver toggle still works.
 */
 #db-server-fields, #db-embedded-fields { display: grid; gap: 16px; }
+
+/* ------------------------------------------- preview / permalink link rows */
+/*
+  One row under the title in the Stories and Pages lists, and under the title
+  field in the editor. Published items get their real permalink; anything not
+  public yet gets a private preview link (author or super admin only — the
+  template gates it with the same rule the /preview/:ref route enforces).
+*/
+.table .cell-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  margin-top: 3px;
+  font-size: 0.72rem;
+  line-height: 1.3;
+  color: var(--admin-ink-3);
+  text-decoration: none;
+}
+.table .cell-link:hover { color: var(--admin-accent); }
+.table .cell-link svg { flex: none; opacity: 0.9; }
+.table .cell-link__url {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 280px;
+}
+.table .cell-link--preview { color: var(--admin-accent); }
+.table .cell-link__status {
+  padding: 1px 6px;
+  border-radius: 980px;
+  background: var(--admin-accent-soft);
+  color: var(--admin-accent);
+  font-size: 0.67rem;
+  font-weight: 560;
+  text-transform: capitalize;
+}
+
+.editor-titlelink {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 2px 0 0;
+  padding: 0 2px;
+  font-size: 0.78rem;
+}
+.editor-titlelink a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--admin-accent);
+  font-weight: 500;
+  text-decoration: none;
+}
+.editor-titlelink a:hover { text-decoration: underline; }
+.editor-titlelink__url {
+  padding: 2px 7px;
+  border: 1px solid var(--admin-line);
+  border-radius: 6px;
+  background: var(--admin-bg);
+  color: var(--admin-ink-3);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.71rem;
+}
+.editor-titlelink__note { color: var(--admin-ink-3); font-size: 0.72rem; }
+
+@media (max-width: 720px) {
+  .table .cell-link__url { max-width: 150px; }
+  .editor-titlelink__note { flex-basis: 100%; }
+}

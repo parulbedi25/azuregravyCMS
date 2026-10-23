@@ -3,10 +3,14 @@ import {
   colorFromSeed, escapeHtml, formatDate, formatDateTime, formatNumber, initials, isoDate,
   makeExcerpt, pluralize, readingTime, slugify, timeAgo, truncate, toLocalInput, fromLocalInput, safeUrl,
 } from './text.js';
+import { previewPath } from './preview.js';
 import type { SettingsMap } from '../types.js';
 
 export const postUrl = (post: { slug: string; type?: string }) =>
   post.type === 'page' ? `/${post.slug}` : `/stories/${post.slug}`;
+
+/** Signed preview link for a story that is not public yet. See lib/preview.ts. */
+export const previewUrl = (post: { id: number }) => previewPath(post);
 
 export const categoryUrl = (slug: string) => `/category/${slug}`;
 export const tagUrl = (slug: string) => `/tag/${slug}`;
@@ -54,6 +58,7 @@ export function buildHelpers(settings: SettingsMap) {
     fromLocalInput,
     colorFromSeed,
     postUrl,
+    previewUrl,
     categoryUrl,
     tagUrl,
     authorUrl,

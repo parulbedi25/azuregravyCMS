@@ -178,25 +178,71 @@
     document.body.style.overflow = '';
   }
 
+  /**
+   * Point a media field at an image and reflect it immediately, without saving.
+   *
+   * Shared by the library modal and the quick-pick thumbnails so both behave the
+   * same. Two things here are load-bearing:
+   *  - the preview <img> is permanent markup, so visibility is driven by the
+   *    .has-image class and never by an inline display:none. The old empty state
+   *    carried an inline display:none that nothing ever cleared, so choosing an
+   *    image updated src but left it invisible until the page reloaded;
+   *  - nothing is removed from the DOM. The old remove handler deleted the <img>,
+   *    after which the pick handler could not restore it (its fallback was gated
+   *    on a wrapper derived from the very element that had just gone), so
+   *    pick -> remove -> pick showed no image at all.
+   */
+  function applyMediaSelection(target, id, path) {
+    const field = document.getElementById(target);
+    if (field) field.value = id == null ? '' : String(id);
+
+    const preview = document.getElementById(`${target}-preview`);
+    if (preview) {
+      preview.src = path || '';
+      preview.style.display = '';
+      preview.hidden = false;
+    }
+
+    const wrap = preview ? preview.closest('.image-picker') : null;
+    if (wrap) {
+      wrap.classList.toggle('has-image', !!path);
+    } else if (preview) {
+      // The social-image thumbnail is not inside an .image-picker, so it has no
+      // class-driven visibility and needs its own switch.
+      preview.style.display = path ? '' : 'none';
+    }
+
+    $$(`[data-quick-pick="${target}"]`).forEach((button) => {
+      const on = id != null && id !== '' && String(button.dataset.id) === String(id);
+      button.classList.toggle('is-selected', on);
+      button.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+  }
+
+  function clearMediaSelection(target) {
+    applyMediaSelection(target, '', '');
+  }
+
   $$('[data-pick-media]').forEach((button) => {
     button.addEventListener('click', (event) => {
       event.preventDefault();
       openMediaModal(button.dataset.pickMedia);
     });
   });
+
+  /* Quick-pick thumbnails select straight away — no modal round trip. */
+  $$('[data-quick-pick]').forEach((button) => {
+    button.addEventListener('click', (event) => {
+      event.preventDefault();
+      applyMediaSelection(button.dataset.quickPick, button.dataset.id, button.dataset.path);
+      toast('Featured image set.', 'success');
+    });
+  });
+
   $$('[data-remove-media]').forEach((button) => {
     button.addEventListener('click', (event) => {
       event.preventDefault();
-      const target = document.getElementById(button.dataset.removeMedia);
-      if (target) target.value = '';
-      const preview = document.getElementById(`${button.dataset.removeMedia}-preview`);
-      if (preview) preview.src = '';
-      const wrap = button.closest('.image-picker');
-      if (wrap) {
-        wrap.classList.remove('has-image');
-        const img = $('img', wrap);
-        if (img) img.remove();
-      }
+      clearMediaSelection(button.dataset.removeMedia);
     });
   });
 
@@ -205,19 +251,7 @@
     modal.addEventListener('click', (event) => {
       const pick = event.target.closest('[data-pick]');
       if (!pick) return;
-      const field = document.getElementById(mediaTarget);
-      if (field) field.value = pick.dataset.pick;
-      const preview = document.getElementById(`${mediaTarget}-preview`);
-      if (preview) preview.src = pick.dataset.path;
-      const wrap = preview ? preview.closest('.image-picker') : null;
-      if (wrap && !wrap.querySelector('img')) {
-        const img = document.createElement('img');
-        img.src = pick.dataset.path;
-        img.alt = '';
-        wrap.prepend(img);
-        wrap.classList.add('has-image');
-      }
-      if (wrap) wrap.classList.add('has-image');
+      applyMediaSelection(mediaTarget, pick.dataset.pick, pick.dataset.path);
       closeMediaModal();
       toast('Image selected.', 'success');
     });

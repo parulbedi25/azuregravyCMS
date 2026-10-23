@@ -1270,3 +1270,57 @@ body.pop-open { overflow: hidden; }
 /* -------------------------------------------------- empty state helpers */
 .empty__suggest { margin-top: 18px; display: grid; gap: 10px; justify-items: center; }
 .empty__suggest .tag-cloud { justify-content: center; }
+
+/* ---------------------------------------------- staff-only preview banner */
+/* Rendered only for /preview/:ref, so a visitor never sees this. Colours come
+   from the shared tokens so light and dark themes both work. */
+.preview-banner {
+  background: var(--accent-soft);
+  border-bottom: 1px solid var(--line);
+  color: var(--ink);
+}
+.preview-banner__inner {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 10px 0;
+}
+.preview-banner__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  padding: 4px 11px;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  color: var(--accent-contrast);
+  font-size: 0.74rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+.preview-banner p {
+  margin: 0;
+  flex: 1 1 260px;
+  min-width: 0;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: var(--ink-2);
+}
+.preview-banner p strong { color: var(--ink); text-transform: capitalize; }
+.preview-banner__back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  padding: 6px 12px;
+  border-radius: var(--btn-radius);
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 0.78rem;
+  font-weight: 500;
+  text-decoration: none;
+  transition: border-color 160ms var(--ease), color 160ms var(--ease);
+}
+.preview-banner__back:hover { border-color: var(--accent); color: var(--accent); }

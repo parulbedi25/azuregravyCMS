@@ -1,4 +1,5 @@
 <%
+  const isPreview = typeof previewMode !== 'undefined' && !!previewMode;
   const shareUrl = encodeURIComponent((settings.site_url || '') + '/stories/' + post.slug);
   const shareTitle = encodeURIComponent(post.title);
   const author = { name: post.author_name || 'Azure Gravy', avatar: post.author_avatar, bio: post.author_bio };
@@ -37,6 +38,7 @@
           <span><time datetime="<%= h.isoDate(post.published_at) %>"><%= h.formatDate(post.published_at, 'long') %></time></span>
         </span>
       </a>
+      <% if (!isPreview) { %>
       <div class="article-meta__actions">
         <span class="share-label">Share</span>
         <a class="icon-btn" href="https://twitter.com/intent/tweet?url=<%= shareUrl %>&text=<%= shareTitle %>" target="_blank" rel="noopener" aria-label="Share on Twitter"><%- h.icon('twitter', '', 16) %></a>
@@ -45,6 +47,7 @@
         <button class="icon-btn" type="button" data-copy-link aria-label="Copy link"><%- h.icon('link', '', 16) %></button>
         <button class="icon-btn" type="button" data-bookmark aria-label="Save for later"><%- h.icon('bookmark', '', 16) %></button>
       </div>
+      <% } %>
     </div>
   </div>
 </section>
@@ -137,6 +140,7 @@
         </section>
       <% } %>
 
+      <% if (!isPreview) { %>
       <section class="comments" id="comments">
         <div class="comments__head">
           <h2>Conversation</h2>
@@ -184,6 +188,7 @@
           <div class="alert">Comments are closed on this story.</div>
         <% } %>
       </section>
+      <% } %>
     </div>
 
     <aside class="article-layout__aside">
@@ -198,6 +203,7 @@
         </nav>
       <% } %>
 
+      <% if (!isPreview) { %>
       <div class="aside-card">
         <h4>Share this story</h4>
         <div class="aside-share">
@@ -207,6 +213,7 @@
           <button class="icon-btn" type="button" data-copy-link aria-label="Copy link"><%- h.icon('link', '', 16) %></button>
         </div>
       </div>
+      <% } %>
 
       <div class="aside-card">
         <h4><%= h.setting('newsletter_heading', 'The Sunday Letter') %></h4>

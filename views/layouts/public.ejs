@@ -6,13 +6,18 @@
   <% const _site = typeof siteName !== "undefined" ? siteName : "Azure Gravy"; %>
   <title><%= pageTitle %><% if (String(pageTitle).indexOf(_site) === -1) { %> · <%= _site %><% } %></title>
   <meta name="description" content="<%= metaDescription %>">
+  <% const _preview = typeof previewMode !== 'undefined' && previewMode; %>
+  <% if (!_preview) { %>
   <link rel="canonical" href="<%= settings.site_url || '' %><%= currentPath %>">
+  <% } %>
   <meta name="theme-color" content="<%= theme === 'dark' ? '#000000' : '#ffffff' %>">
   <meta property="og:site_name" content="<%= typeof siteName !== "undefined" ? siteName : "Azure Gravy" %>">
   <meta property="og:type" content="<%= typeof ogType !== 'undefined' ? ogType : 'website' %>">
   <meta property="og:title" content="<%= pageTitle %>">
   <meta property="og:description" content="<%= metaDescription %>">
+  <% if (!_preview) { %>
   <meta property="og:url" content="<%= settings.site_url || '' %><%= currentPath %>">
+  <% } %>
   <meta property="og:image" content="<%= ogImage %>">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="<%= pageTitle %>">
@@ -38,6 +43,21 @@
 </head>
 <body class="<%= bodyClass %>">
   <a class="skip-link" href="#main">Skip to content</a>
+  <% if (_preview && typeof post !== 'undefined' && post) { %>
+  <div class="preview-banner" role="status">
+    <div class="container preview-banner__inner">
+      <span class="preview-banner__badge"><%- h.icon('eye', '', 14) %> Preview</span>
+      <p>
+        This <strong><%= post.status %></strong> <%= post.type === 'page' ? 'page' : 'story' %>
+        is visible only to you and site admins. Visitors cannot reach it, and search
+        engines are told to ignore it.
+      </p>
+      <a class="preview-banner__back" href="/admin/posts/<%= post.id %>/edit">
+        <%- h.icon('pen', '', 13) %> Back to editor
+      </a>
+    </div>
+  </div>
+  <% } %>
   <div class="reading-progress" id="readingProgress" hidden></div>
   <%- include('../partials/header') %>
   <main id="main" class="page-shell">
