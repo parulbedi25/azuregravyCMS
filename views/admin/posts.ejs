@@ -60,11 +60,19 @@
   </div>
 
   <% if (posts.length === 0) { %>
+    <% const inTrash = activeStatus === 'trash'; %>
     <div class="empty-state">
-      <%- h.icon('file-text') %>
-      <h3>No <%= plural %> here yet</h3>
-      <p><%= filters.q ? 'Nothing matched that search.' : 'Start the first one — it only takes a title.' %></p>
-      <a class="btn btn--accent btn--sm" href="/admin/posts/new?type=<%= type %>"><%- h.icon('plus', '', 14) %> New <%= noun %></a>
+      <%- h.icon(inTrash ? 'trash' : 'file-text') %>
+      <h3><%= inTrash ? 'Trash is empty' : `No ${plural} here yet` %></h3>
+      <p>
+        <% if (filters.q) { %>Nothing matched that search.
+        <% } else if (inTrash) { %>Anything you move to trash lands here. Restore it, or delete it for good.
+        <% } else { %>Start the first one — it only takes a title.
+        <% } %>
+      </p>
+      <% if (!inTrash) { %>
+        <a class="btn btn--accent btn--sm" href="/admin/posts/new?type=<%= type %>"><%- h.icon('plus', '', 14) %> New <%= noun %></a>
+      <% } %>
     </div>
   <% } else { %>
     <div class="table-wrap">
@@ -134,12 +142,22 @@
                   <% } %>
                   <a class="row-action" href="/admin/posts/<%= post.id %>/edit" title="Edit"><%- h.icon('pen', '', 14) %></a>
                   <% if (post.status === 'trash') { %>
-                    <form method="post" action="/admin/posts/<%= post.id %>/status">
+                    <form method="post" action="/admin/posts/<%= post.id %>/restore">
                       <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-                      <input type="hidden" name="status" value="draft">
                       <input type="hidden" name="redirect" value="/admin/posts?type=<%= type %>&status=trash">
-                      <button class="row-action" type="submit" title="Restore"><%- h.icon('refresh', '', 14) %></button>
+                      <button class="row-action" type="submit" title="Restore"
+                        aria-label="Restore “<%= post.title %>”"><%- h.icon('refresh', '', 14) %></button>
                     </form>
+                    <% if (canDelete) { %>
+                      <form method="post" action="/admin/posts/<%= post.id %>/delete">
+                        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                        <input type="hidden" name="mode" value="permanent">
+                        <input type="hidden" name="redirect" value="/admin/posts?type=<%= type %>&status=trash">
+                        <button class="row-action row-action--danger" type="submit" title="Delete permanently"
+                          aria-label="Delete “<%= post.title %>” permanently"
+                          data-confirm="Delete “<%= post.title %>” permanently? This cannot be undone."><%- h.icon('x-circle', '', 14) %></button>
+                      </form>
+                    <% } %>
                   <% } else { %>
                     <form method="post" action="/admin/posts/<%= post.id %>/delete">
                       <input type="hidden" name="_csrf" value="<%= csrfToken %>">

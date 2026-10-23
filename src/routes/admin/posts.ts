@@ -4,7 +4,8 @@ import { canEditPost, roleAtLeast } from '../../lib/auth.js';
 import { renderMarkdown } from '../../lib/markdown.js';
 import { parseIds, parseTags, str } from '../helpers.js';
 import {
-  createPost, getPostById, listPosts, permanentlyDeletePost, saveRevision, setPostStatus, updatePost,
+  createPost, getPostById, listPosts, permanentlyDeletePost, restorePost, saveRevision,
+  setPostStatus, trashPost, updatePost,
 } from '../../services/posts.js';
 import { listCategories, listTags } from '../../services/posts.js';
 import { listMedia } from '../../services/media.js';
@@ -55,6 +56,8 @@ async function loadEditorPage(
     media: media.media,
     revisions,
     statusTabs: STATUS_TABS,
+    // Mirrors the list route: only editors and above may erase content for good.
+    canDelete: roleAtLeast(res.locals.currentUser.role, 'editor'),
   });
 }
 
@@ -74,7 +77,10 @@ router.get(
     const user = res.locals.currentUser;
     const { posts, total } = await listPosts({
       type,
-      statuses: tab.statuses ?? ['published', 'draft', 'scheduled', 'private', 'trash'],
+      // "All" means every *active* status. Trashed content is deliberately
+      // excluded here so a deleted story disappears from the list it was in
+      // and can only be reached through the Trash tab.
+      statuses: tab.statuses ?? ['published', 'draft', 'scheduled', 'private'],
       search: search || undefined,
       category: category || undefined,
       authorId: Number.isFinite(authorId) ? authorId : undefined,
@@ -95,7 +101,9 @@ router.get(
     const statusCounts: Record<string, number> = { all: 0 };
     for (const row of counts) {
       statusCounts[row.status] = Number(row.total);
-      statusCounts.all += Number(row.total);
+      // Mirror the list query above: the "All" badge counts active content
+      // only, so the number matches what the tab actually shows.
+      if (row.status !== 'trash') statusCounts.all += Number(row.total);
     }
 
     res.render('admin/posts', {
@@ -280,10 +288,10 @@ router.post(
           await setPostStatus(id, 'draft');
           break;
         case 'trash':
-          await setPostStatus(id, 'trash');
+          await trashPost(id);
           break;
         case 'restore':
-          await setPostStatus(id, 'draft');
+          await restorePost(id);
           break;
         case 'sticky':
           await db.execute('UPDATE posts SET is_sticky = 1 WHERE id = ?', [id]);
@@ -321,13 +329,40 @@ router.post(
       }
       await permanentlyDeletePost(post.id);
       await logActivity(res.locals.currentUser.id, 'deleted', post.title);
-      setFlash(req, 'success', 'Deleted permanently.');
-      return res.redirect('/admin/posts?status=trash');
+      setFlash(req, 'success', `“${post.title}” was deleted permanently.`);
+      // Stay on the trash for the right content type — a page must not bounce
+      // back to the stories list.
+      return res.redirect(
+        str(req.body.redirect, `/admin/posts?type=${post.type === 'page' ? 'page' : 'post'}&status=trash`),
+      );
     }
-    await setPostStatus(post.id, 'trash');
+    await trashPost(post.id);
     await logActivity(res.locals.currentUser.id, 'trashed', post.title);
     setFlash(req, 'success', 'Moved to trash. You can restore it any time.');
     res.redirect(str(req.body.redirect, '/admin/posts'));
+  }),
+);
+
+/* --------------------------------------------------------------- restore */
+router.post(
+  '/posts/:id/restore',
+  asyncRoute(async (req, res) => {
+    const post = await getPostById(Number(req.params.id));
+    if (!post) return res.redirect('/admin/posts');
+    if (!canEditPost(res.locals.currentUser, post)) {
+      setFlash(req, 'error', 'You cannot restore that story.');
+      return res.redirect('/admin/posts?status=trash');
+    }
+    const status = await restorePost(post.id);
+    await logActivity(res.locals.currentUser.id, 'restored', post.title);
+    setFlash(
+      req,
+      'success',
+      `“${post.title}” was restored${status === 'draft' ? ' as a draft' : ` to ${status}`}.`,
+    );
+    res.redirect(
+      str(req.body.redirect, `/admin/posts?type=${post.type === 'page' ? 'page' : 'post'}`),
+    );
   }),
 );
 
