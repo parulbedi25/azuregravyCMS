@@ -429,7 +429,21 @@ body.admin-body {
   position: fixed;
   left: 50%;
   bottom: 24px;
-  transform: translate(-50%, 120%);
+  /*
+    The parked position has to clear BOTH the bar's own height and the 24px
+    bottom offset. translateY(120%) on its own leaves the top
+    `24px - 0.2 * height` of the bar above the fold — on a ~50px bar that is
+    a ~14px black strip stuck to the bottom of every admin screen, with the
+    blue Apply button's top edge just showing.
+
+    visibility: hidden matters separately from the transform: it takes the
+    action <select> and the Apply <button> out of the tab order and the
+    accessibility tree while the bar is off-screen, so tabbing through a page
+    cannot focus controls nobody can see.
+  */
+  transform: translate(-50%, calc(100% + 24px));
+  visibility: hidden;
+  opacity: 0;
   display: flex; align-items: center; gap: 12px;
   padding: 10px 14px 10px 18px;
   background: var(--admin-ink);
@@ -437,10 +451,10 @@ body.admin-body {
   border-radius: var(--radius-pill);
   box-shadow: var(--shadow-lg);
   z-index: 80;
-  transition: transform 0.3s var(--ease);
+  transition: transform 0.3s var(--ease), opacity 0.25s var(--ease), visibility 0.3s var(--ease);
   font-size: 0.82rem;
 }
-.bulk-bar.is-visible { transform: translate(-50%, 0); }
+.bulk-bar.is-visible { transform: translate(-50%, 0); visibility: visible; opacity: 1; }
 .bulk-bar select { background: rgba(255, 255, 255, 0.12); border: 0; color: inherit; border-radius: var(--radius-pill); padding: 6px 10px; font-size: 0.8rem; }
 .bulk-bar select option { color: #111; }
 .bulk-bar .btn { --btn-bg: var(--admin-bg); --btn-fg: var(--admin-ink); padding: 6px 14px; font-size: 0.8rem; }

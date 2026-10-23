@@ -230,10 +230,21 @@
               <div><span>Views</span><b><%= h.formatNumber(post.views) %></b></div>
               <div><span>Comments</span><b><%= post.comment_count || 0 %></b></div>
             </div>
-            <% /* The form itself lives after </form> below — see the note there. */ %>
-            <button class="btn btn--ghost btn--sm btn--block" type="submit" form="deletePostForm"
-                    style="margin-top:6px;color:#c0392b"
-                    data-confirm="Move this <%= isPage ? 'page' : 'story' %> to trash?"><%- h.icon('trash', '', 13) %> Move to trash</button>
+            <% /* The forms themselves live after </form> below — see the note there. */ %>
+            <% if (post.status === 'trash') { %>
+              <button class="btn btn--ghost btn--sm btn--block" type="submit" form="restorePostForm"
+                      style="margin-top:6px"
+                      data-confirm="Restore this <%= isPage ? 'page' : 'story' %> out of the trash?"><%- h.icon('refresh', '', 13) %> Restore from trash</button>
+              <% if (canDelete) { %>
+                <button class="btn btn--ghost btn--sm btn--block" type="submit" form="purgePostForm"
+                        style="margin-top:6px;color:#c0392b"
+                        data-confirm="Delete this <%= isPage ? 'page' : 'story' %> permanently? This cannot be undone."><%- h.icon('x-circle', '', 13) %> Delete permanently</button>
+              <% } %>
+            <% } else { %>
+              <button class="btn btn--ghost btn--sm btn--block" type="submit" form="deletePostForm"
+                      style="margin-top:6px;color:#c0392b"
+                      data-confirm="Move this <%= isPage ? 'page' : 'story' %> to trash?"><%- h.icon('trash', '', 13) %> Move to trash</button>
+            <% } %>
           <% } %>
         </div>
       </div>
@@ -372,6 +383,19 @@
     <input type="hidden" name="_csrf" value="<%= csrfToken %>">
     <input type="hidden" name="redirect" value="/admin/posts?type=<%= type %>">
   </form>
+  <form id="restorePostForm" method="post" action="/admin/posts/<%= post.id %>/restore">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <input type="hidden" name="redirect" value="/admin/posts?type=<%= type %>">
+  </form>
+  <% /* Only render the purge form for roles that may actually use it — the
+        button above is gated the same way, and the server enforces it too. */ %>
+  <% if (canDelete) { %>
+    <form id="purgePostForm" method="post" action="/admin/posts/<%= post.id %>/delete">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <input type="hidden" name="mode" value="permanent">
+      <input type="hidden" name="redirect" value="/admin/posts?type=<%= type %>&status=trash">
+    </form>
+  <% } %>
 <% } %>
 <% if (revisions.length) { %>
   <% revisions.slice(0, 6).forEach(function (revision) { %>

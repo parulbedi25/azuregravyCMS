@@ -75,7 +75,9 @@
       <option value="unsticky">Remove sticky</option>
       <option value="trash">Move to trash</option>
       <option value="restore">Restore</option>
-      <option value="delete">Delete permanently</option>
+      <% /* The server ignores a bulk purge from anyone below editor; do not offer
+            a control that silently does nothing. */ %>
+      <% if (can.editor) { %><option value="delete">Delete permanently</option><% } %>
     </select>
     <button class="btn" type="button" id="bulkApply">Apply</button>
   </div>
