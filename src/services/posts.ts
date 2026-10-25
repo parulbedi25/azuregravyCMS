@@ -160,6 +160,17 @@ export async function getPostBySlug(slug: string, options: { type?: PostType; st
 }
 
 export async function getPostById(id: number): Promise<Post | null> {
+  /*
+    Guard the id here rather than at each call site.
+
+    Routes do `getPostById(Number(req.params.id))`, and `Number('bulk')` is NaN.
+    The embedded driver refuses to bind NaN and throws, so a route that meant to
+    fall through with `if (!existing) return next()` instead produced a 500.
+    That is exactly what happened to POST /admin/posts/bulk: '/posts/:id' is
+    declared first, matches it with id='bulk', and used to swallow the request.
+    Returning null keeps typo'd URLs at 404 and lets later routes match.
+  */
+  if (!Number.isInteger(id) || id <= 0) return null;
   const db = await getDb();
   const rows = await db.query<Post>(
     `SELECT ${POST_COLUMNS} FROM posts p
@@ -434,6 +445,76 @@ export async function permanentlyDeletePost(id: number): Promise<void> {
     const prefix = post.type === 'page' ? '/' : '/stories/';
     await db.execute('DELETE FROM redirects WHERE from_path = ?', [`${prefix}${post.slug}`]);
   }
+}
+
+/* ------------------------------- post meta -------------------------------- */
+
+/** Meta key holding the status a post had before it was moved to the trash. */
+export const PRE_TRASH_STATUS_KEY = 'pre_trash_status';
+
+/** Statuses a post may be restored *to*. Deliberately excludes 'trash'. */
+const RESTORABLE_STATUSES: PostStatus[] = ['draft', 'published', 'scheduled', 'private'];
+
+export async function setPostMeta(postId: number, key: string, value: string): Promise<void> {
+  const db = await getDb();
+  await db.execute(
+    `INSERT INTO post_meta (post_id, meta_key, meta_value) VALUES (?, ?, ?)
+     ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value)`,
+    [postId, key, value],
+  );
+}
+
+export async function getPostMeta(postId: number, key: string): Promise<string | null> {
+  const db = await getDb();
+  const rows = await db.query<{ meta_value: string | null }>(
+    'SELECT meta_value FROM post_meta WHERE post_id = ? AND meta_key = ?',
+    [postId, key],
+  );
+  return rows[0]?.meta_value ?? null;
+}
+
+export async function deletePostMeta(postId: number, key: string): Promise<void> {
+  const db = await getDb();
+  await db.execute('DELETE FROM post_meta WHERE post_id = ? AND meta_key = ?', [postId, key]);
+}
+
+/* --------------------------------- trash ---------------------------------- */
+
+/**
+ * Soft-delete a post.
+ *
+ * Records the status the post currently has so {@link restorePost} can put it
+ * back exactly where it was, then moves it to the trash. Trashing something
+ * that is already in the trash leaves the recorded status alone, so an
+ * accidental second delete cannot overwrite the real one with 'trash'.
+ */
+export async function trashPost(id: number): Promise<void> {
+  const post = await getPostById(id);
+  if (!post) return;
+  if (post.status !== 'trash' && RESTORABLE_STATUSES.includes(post.status)) {
+    await setPostMeta(id, PRE_TRASH_STATUS_KEY, post.status);
+  }
+  await setPostStatus(id, 'trash');
+}
+
+/**
+ * Undo a soft-delete and return the status the post now has.
+ *
+ * Uses the status recorded by {@link trashPost}. Falls back to 'draft' when
+ * there is no record — content trashed before this existed, or a post whose
+ * status was never one we could restore to. Never restores to 'trash'.
+ *
+ * Note this is deliberately *not* derived from `published_at`: setPostStatus
+ * preserves that column, so a story someone intentionally demoted
+ * published → draft → trash would otherwise come back publicly live.
+ */
+export async function restorePost(id: number): Promise<PostStatus> {
+  const stored = await getPostMeta(id, PRE_TRASH_STATUS_KEY);
+  const target: PostStatus =
+    stored && RESTORABLE_STATUSES.includes(stored as PostStatus) ? (stored as PostStatus) : 'draft';
+  await setPostStatus(id, target);
+  await deletePostMeta(id, PRE_TRASH_STATUS_KEY);
+  return target;
 }
 
 /* ------------------------------ taxonomy -------------------------------- */

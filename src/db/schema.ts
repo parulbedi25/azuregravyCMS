@@ -157,6 +157,24 @@ export const SCHEMA_STATEMENTS: string[] = [
     CONSTRAINT fk_media_meta FOREIGN KEY (media_id) REFERENCES media(id) ON DELETE CASCADE
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 
+  /*
+    Per-post key/value sidecar.
+
+    This exists so the trash can remember the status a post had before it was
+    binned, and restore it to exactly that status. It is a *new table* rather
+    than a column on `posts` on purpose: migrate() only ever runs
+    CREATE TABLE IF NOT EXISTS statements, so a new table reaches databases that
+    were installed by an earlier version, whereas an ALTER TABLE would not.
+  */
+  `CREATE TABLE IF NOT EXISTS post_meta (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    post_id BIGINT UNSIGNED NOT NULL,
+    meta_key VARCHAR(80) NOT NULL,
+    meta_value TEXT NULL,
+    UNIQUE KEY uq_post_meta (post_id, meta_key),
+    CONSTRAINT fk_post_meta FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
   `CREATE TABLE IF NOT EXISTS subscribers (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
     email VARCHAR(190) NOT NULL UNIQUE,
@@ -226,7 +244,7 @@ export const SCHEMA_STATEMENTS: string[] = [
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 ];
 
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 export const DEFAULT_SETTINGS: Record<string, string> = {
   site_title: 'Azure Gravy',
