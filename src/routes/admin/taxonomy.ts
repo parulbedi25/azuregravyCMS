@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { asyncRoute, setFlash } from '../../lib/http.js';
+import { asyncRoute, idParam, setFlash } from '../../lib/http.js';
 import { requireRole } from '../../lib/auth.js';
 import { slugify } from '../../lib/text.js';
 import { str } from '../helpers.js';
@@ -61,7 +61,11 @@ router.post(
 router.post(
   '/categories/:id',
   asyncRoute(async (req, res) => {
-    const id = Number(req.params.id);
+    const id = idParam(req.params.id);
+    if (!id) {
+      setFlash(req, 'error', 'That category does not exist.');
+      return res.redirect('/admin/categories');
+    }
     const name = str(req.body.name);
     if (!name) {
       setFlash(req, 'error', 'A category needs a name.');
@@ -95,7 +99,7 @@ router.post(
   requireRole('editor'),
   asyncRoute(async (req, res) => {
     const db = await getDb();
-    await db.execute('DELETE FROM categories WHERE id = ?', [Number(req.params.id)]);
+    await db.execute('DELETE FROM categories WHERE id = ?', [idParam(req.params.id)]);
     invalidateNavigation();
     setFlash(req, 'success', 'Category deleted. Stories were kept.');
     res.redirect('/admin/categories');
@@ -147,7 +151,7 @@ router.post(
       name.slice(0, 120),
       slugify(str(req.body.slug) || name),
       str(req.body.description) || null,
-      Number(req.params.id),
+      idParam(req.params.id),
     ]);
     setFlash(req, 'success', 'Tag updated.');
     res.redirect('/admin/tags');
@@ -158,7 +162,7 @@ router.post(
   '/tags/:id/delete',
   requireRole('editor'),
   asyncRoute(async (req, res) => {
-    await (await getDb()).execute('DELETE FROM tags WHERE id = ?', [Number(req.params.id)]);
+    await (await getDb()).execute('DELETE FROM tags WHERE id = ?', [idParam(req.params.id)]);
     setFlash(req, 'success', 'Tag deleted.');
     res.redirect('/admin/tags');
   }),

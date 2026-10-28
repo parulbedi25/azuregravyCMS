@@ -68,7 +68,7 @@ router.post('/logout', (req, res) => {
   const user = res.locals.currentUser;
   req.session.destroy(() => {
     res.clearCookie('gravy.sid');
-    if (user) console.log(`[auth] ${user.email} signed out`);
+    if (user) console.log(`[auth] user ${user.id} signed out`);
     void setFlash;
     res.redirect('/admin/login');
   });

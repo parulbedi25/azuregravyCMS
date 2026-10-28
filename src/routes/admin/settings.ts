@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { asyncRoute, setFlash } from '../../lib/http.js';
+import { asyncRoute, idParam, setFlash } from '../../lib/http.js';
 import { requireRole } from '../../lib/auth.js';
 import { loadSettings, saveSettings, settingFrom } from '../../lib/settings.js';
 import { invalidateNavigation } from '../../services/navigation.js';
@@ -179,7 +179,7 @@ router.post(
         Number(req.body.sort_order) || 0,
         req.body.is_active ? 1 : 0,
         str(req.body.target, '_self'),
-        Number(req.params.id),
+        idParam(req.params.id),
       ],
     );
     invalidateNavigation();
@@ -192,7 +192,7 @@ router.post(
   '/menus/:id/delete',
   requireRole('editor'),
   asyncRoute(async (req, res) => {
-    await (await getDb()).execute('DELETE FROM menu_items WHERE id = ?', [Number(req.params.id)]);
+    await (await getDb()).execute('DELETE FROM menu_items WHERE id = ?', [idParam(req.params.id)]);
     invalidateNavigation();
     setFlash(req, 'success', 'Link removed.');
     res.redirect('/admin/menus');
@@ -242,7 +242,7 @@ router.post(
   '/redirects/:id/delete',
   requireRole('editor'),
   asyncRoute(async (req, res) => {
-    await (await getDb()).execute('DELETE FROM redirects WHERE id = ?', [Number(req.params.id)]);
+    await (await getDb()).execute('DELETE FROM redirects WHERE id = ?', [idParam(req.params.id)]);
     setFlash(req, 'success', 'Redirect deleted.');
     res.redirect('/admin/redirects');
   }),

@@ -11,9 +11,9 @@
       { key: 'media', label: 'Media', url: '/admin/media', icon: 'image' },
     ]},
     { group: 'Community', items: [
-      { key: 'comments', label: 'Comments', url: '/admin/comments', icon: 'comment', count: navCounts.pending || 0, hot: true },
-      { key: 'subscribers', label: 'Subscribers', url: '/admin/subscribers', icon: 'mail' },
-      { key: 'messages', label: 'Inbox', url: '/admin/messages', icon: 'message-square', count: navCounts.unread || 0 },
+      { key: 'comments', label: 'Comments', url: '/admin/comments', icon: 'comment', count: navCounts.pending || 0, hot: true, editorOnly: true },
+      { key: 'subscribers', label: 'Subscribers', url: '/admin/subscribers', icon: 'mail', adminOnly: true },
+      { key: 'messages', label: 'Inbox', url: '/admin/messages', icon: 'message-square', count: navCounts.unread || 0, adminOnly: true },
     ]},
     { group: 'Publication', items: [
       { key: 'appearance', label: 'Appearance', url: '/admin/appearance', icon: 'palette', adminOnly: true },

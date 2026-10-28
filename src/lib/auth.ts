@@ -49,7 +49,9 @@ export async function attachUser(req: Request, res: Response, next: NextFunction
       req.session.userId = undefined;
       return next();
     }
-    res.locals.currentUser = user;
+    // Strip password_hash before the record enters res.locals, so no template,
+    // error page or JSON dump can ever reach a credential hash.
+    res.locals.currentUser = publicUser(user);
     res.locals.can = {
       admin: user.role === 'admin',
       editor: roleAtLeast(user.role, 'editor'),
