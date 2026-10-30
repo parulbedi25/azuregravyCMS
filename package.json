@@ -18,6 +18,10 @@
     "db:reset": "tsx src/db/seed.ts --reset",
     "typecheck": "tsc --noEmit"
   },
+  "allowScripts": {
+    "esbuild": false,
+    "fsevents": false
+  },
   "keywords": [
     "cms",
     "blog",
@@ -36,7 +40,7 @@
     "express-session": "^1.19.0",
     "image-size": "^2.0.2",
     "marked": "^18.1.1",
-    "multer": "^2.4.0",
+    "multer": "^2.5.0",
     "mysql2": "^3.24.6",
     "sanitize-html": "^2.18.1",
     "tsx": "^4.23.15",
