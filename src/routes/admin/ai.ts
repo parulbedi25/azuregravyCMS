@@ -257,6 +257,9 @@ router.post(
         mode,
         characters: result.markdown.length,
         diagrams: result.diagramsCreated,
+        /* Only ever non-zero in `article` mode; recorded so a run that produced
+           no headlines is distinguishable from one that was never asked for any. */
+        titleSuggestions: result.titleSuggestions.length,
       });
 
       return res.json({ ok: true, ...result });

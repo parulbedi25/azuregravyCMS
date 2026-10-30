@@ -21,7 +21,7 @@ import type { SettingsMap } from '../types.js';
  * draws the SVG. See the header comment there for why that split matters.
  */
 
-export type ComposeMode = 'full' | 'continue' | 'selection' | 'outline';
+export type ComposeMode = 'full' | 'article' | 'continue' | 'selection' | 'outline';
 
 export interface AiConfig {
   enabled: boolean;
@@ -48,6 +48,13 @@ export interface ComposeResult {
   diagramsCreated: number;
   diagramsSkipped: number;
   model: string;
+  /**
+   * Headlines offered by the `article` mode, in the order the model gave them.
+   *
+   * Empty for every other mode, and empty rather than an error when the model
+   * ignored the instruction — a draft with no headline choice is still a draft.
+   */
+  titleSuggestions: string[];
 }
 
 /** An error with a message safe to show an administrator. */
@@ -60,6 +67,7 @@ export class AiError extends Error {
 
 export const AI_MODES: Array<{ id: ComposeMode; label: string; help: string }> = [
   { id: 'full', label: 'Write the whole post', help: 'Replaces the body with a complete draft built from your title.' },
+  { id: 'article', label: 'Write the article and propose titles', help: 'Drafts the whole article from your subject, then offers five headlines to choose from. The one you pick fills the Title field and stays editable.' },
   { id: 'outline', label: 'Outline only', help: 'Headings and one-line beats, so you can fill in the detail yourself.' },
   { id: 'continue', label: 'Continue from here', help: 'Keeps what you have written and carries on from the end of it.' },
   { id: 'selection', label: 'Rewrite the selection', help: 'Expands or improves only the text you have highlighted.' },
@@ -465,6 +473,22 @@ function userPrompt(request: ComposeRequest): string {
   } else if (request.mode === 'selection') {
     parts.push('Rewrite only the highlighted passage below. Keep its meaning and any facts intact, improve clarity and rhythm, and return just the replacement text with no surrounding commentary.');
     parts.push('', '--- SELECTION ---', (request.selection ?? '').trim().slice(0, 8_000), '--- END ---');
+  } else if (request.mode === 'article') {
+    /*
+      In this mode the title above is a subject to write from, not a headline to
+      keep, so the wording says "subject" and the headlines are asked for
+      separately in a fence — the same trick the diagrams use, because a fence
+      is far more reliable to split out of free-form Markdown than a delimiter
+      the model might also use in the prose.
+    */
+    parts.push('Write the complete post body for that subject.');
+    parts.push(
+      '',
+      'Then end your reply with ONE fenced block labelled titles, holding exactly five alternative',
+      'headlines for this article: one per line, plain text, no numbering, no quotation marks and no',
+      'commentary inside the fence. Each headline must be genuinely different from the others, under',
+      '90 characters, and must not simply repeat the subject above.',
+    );
   } else {
     parts.push('Write the complete post body for that title.');
   }
@@ -684,6 +708,61 @@ export async function inlineDiagrams(
 }
 
 /* ------------------------------------------------------------------ */
+/* title suggestions                                                  */
+/* ------------------------------------------------------------------ */
+
+/** How many headlines are offered. Five is asked for; anything from one up is accepted. */
+export const MAX_TITLE_SUGGESTIONS = 5;
+
+/*
+  Singular and plural, `title` or `headline`: models rename a fence they were
+  not told to keep verbatim often enough that accepting four spellings costs
+  nothing and saves a surprising number of drafts.
+*/
+const TITLES_FENCE = /```[ \t]*(?:titles?|headlines?)[ \t]*\r?\n([\s\S]*?)```/gi;
+
+/**
+ * Pull a headline fence out of a draft.
+ *
+ * The fence is stripped in EVERY mode, not just `article`: a block of raw
+ * headlines left behind would land in the editor as literal text. Which modes
+ * then get the suggestions handed back is the caller's decision.
+ *
+ * Never throws. A model that ignores the instruction yields no suggestions and
+ * the caller says so, rather than throwing away a good draft.
+ */
+export function extractTitleSuggestions(markdown: string): { markdown: string; suggestions: string[] } {
+  const collected: string[] = [];
+
+  const withoutFence = markdown.replace(TITLES_FENCE, (_block, body: string) => {
+    for (const line of body.split(/\r?\n/)) {
+      const cleaned = line
+        /* "1. ", "- ", "• ", "(2)", "Title 3:" — models add these even when told not to. */
+        .replace(/^\s*(?:[-*+•·]|\(\d+\)|\d+[.)]|(?:title|headline|option)\s*\d*\s*[:\-–—.)])\s*/i, '')
+        /* wrapping quotes, including the typographic ones models favour */
+        .replace(/^[\s"'`“”‘’]+|[\s"'`“”‘’]+$/g, '')
+        .trim();
+      /* A whole paragraph is not a headline; drop it rather than show it. */
+      if (cleaned && cleaned.length <= 140) collected.push(cleaned);
+    }
+    return '';
+  });
+
+  /* Case- and punctuation-insensitive de-dupe, keeping the first spelling seen. */
+  const seen = new Set<string>();
+  const suggestions: string[] = [];
+  for (const candidate of collected) {
+    const key = candidate.toLowerCase().replace(/[^a-z0-9\u0080-\uffff]+/g, ' ').trim();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    suggestions.push(candidate);
+    if (suggestions.length >= MAX_TITLE_SUGGESTIONS) break;
+  }
+
+  return { markdown: withoutFence.replace(/\n{3,}/g, '\n\n').trim(), suggestions };
+}
+
+/* ------------------------------------------------------------------ */
 /* orchestration                                                      */
 /* ------------------------------------------------------------------ */
 
@@ -698,7 +777,18 @@ export async function composeDraft(
 
   const title = (request.title ?? '').trim();
   if (title.length < 3) {
-    throw new AiError('Give the assistant a title of at least three characters.', '', 400);
+    /*
+      `article` is the mode someone reaches for precisely because they have no
+      headline yet, so asking it for "a title" reads as though the feature does
+      not work. It still needs a subject to write from — just say so.
+    */
+    throw new AiError(
+      request.mode === 'article'
+        ? 'Describe the article in a few words — the assistant will propose titles from it.'
+        : 'Give the assistant a title of at least three characters.',
+      '',
+      400,
+    );
   }
   if (request.mode === 'continue' && !(request.existing ?? '').trim()) {
     throw new AiError('There is nothing to continue from yet.', 'Write an opening first, or choose "Write the whole post".', 400);
@@ -716,17 +806,27 @@ export async function composeDraft(
   // as literal backticks, so unwrap exactly one outer fence if present.
   const unwrapped = raw.replace(/^```[a-zA-Z0-9_-]*\s*\r?\n([\s\S]*?)\r?\n```\s*$/, '$1').trim();
 
+  /*
+    Split the headline fence out before the diagrams are touched, so neither can
+    end up nested inside the other. Stripping happens in every mode; only
+    `article` hands the suggestions back, which leaves the other modes behaving
+    exactly as they did before this mode existed.
+  */
+  const { markdown: body, suggestions } = extractTitleSuggestions(unwrapped);
+  const titleSuggestions = request.mode === 'article' ? suggestions : [];
+
   if (!config.diagrams) {
-    const stripped = unwrapped.replace(DIAGRAM_FENCE, '').replace(/\n{3,}/g, '\n\n').trim();
-    return { markdown: stripped, diagramsCreated: 0, diagramsSkipped: 0, model: config.model };
+    const stripped = body.replace(DIAGRAM_FENCE, '').replace(/\n{3,}/g, '\n\n').trim();
+    return { markdown: stripped, diagramsCreated: 0, diagramsSkipped: 0, model: config.model, titleSuggestions };
   }
 
-  const inlined = await inlineDiagrams(unwrapped, { title, uploadedBy: options.uploadedBy });
+  const inlined = await inlineDiagrams(body, { title, uploadedBy: options.uploadedBy });
   return {
     markdown: inlined.markdown,
     diagramsCreated: inlined.created,
     diagramsSkipped: inlined.skipped,
     model: config.model,
+    titleSuggestions,
   };
 }
 
