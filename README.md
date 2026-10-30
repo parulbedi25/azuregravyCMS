@@ -1,4 +1,4 @@
-# Azure Gravy CMS
+# Gravy CMS
 
 **A complete, self-hosted editorial blogging CMS — Node.js + TypeScript + MariaDB.**
 Magazine-style public site, full writing studio, WordPress-class publishing features, zero front-end
@@ -23,7 +23,7 @@ MariaDB/MySQL details, tests the connection right there in the page, creates eve
 creates your administrator account. No `.env` editing, no SQL import, no crash when the credentials
 are wrong — a wrong password is a form error you can correct and resubmit.
 
-![Azure Gravy home page](docs/screenshots/home-fold.png)
+![Gravy home page](docs/screenshots/home-fold.png)
 
 ---
 
@@ -118,7 +118,7 @@ The account is created on the first request (or by `npm run db:setup`), and the 
 SEED_DEMO=1 npm start      # 18 posts, 4 pages, 8 categories, 42 images, 6 writers
 ```
 
-Demo accounts all use the password `gravy123`; the admin is `admin@azuregravy.local`.
+Demo accounts all use the password `gravy123`; the admin is `admin@gravy.local`.
 
 ### Local development
 
@@ -399,9 +399,9 @@ A failed connection never stops the process. Depending on where it fails you get
 ### Creating the database yourself (VPS / local)
 
 ```sql
-CREATE DATABASE azuregravy CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-CREATE USER 'azuregravy'@'localhost' IDENTIFIED BY 'a-strong-password';
-GRANT ALL PRIVILEGES ON azuregravy.* TO 'azuregravy'@'localhost';
+CREATE DATABASE gravy CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER 'gravy'@'localhost' IDENTIFIED BY 'a-strong-password';
+GRANT ALL PRIVILEGES ON gravy.* TO 'gravy'@'localhost';
 FLUSH PRIVILEGES;
 ```
 

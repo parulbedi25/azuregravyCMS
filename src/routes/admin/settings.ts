@@ -102,7 +102,7 @@ router.post(
   requireRole('admin'),
   asyncRoute(async (req, res) => {
     await saveSettings({
-      logo_text: str(req.body.logo_text, 'Azure Gravy'),
+      logo_text: str(req.body.logo_text, 'Gravy'),
       accent_color: str(req.body.accent_color, '#206bea'),
       default_theme: str(req.body.default_theme, 'light'),
       homepage_layout: str(req.body.homepage_layout, 'editorial'),

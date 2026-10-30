@@ -14,16 +14,16 @@ export interface SeedUser {
 export const SEED_USERS: SeedUser[] = [
   {
     name: 'Avery Cole',
-    email: 'admin@azuregravy.local',
+    email: 'admin@gravy.local',
     password: 'gravy123',
     role: 'admin',
-    bio: 'Editor-in-chief at Azure Gravy. Writes about work, tools and the quiet parts of a creative life. Previously at a magazine you have probably never heard of.',
+    bio: 'Editor-in-chief at Gravy. Writes about work, tools and the quiet parts of a creative life. Previously at a magazine you have probably never heard of.',
     website: 'https://example.com',
     twitter: 'averywrites',
   },
   {
     name: 'Maya Ferreira',
-    email: 'maya@azuregravy.local',
+    email: 'maya@gravy.local',
     password: 'gravy123',
     role: 'editor',
     bio: 'Editor and occasional essayist. Interested in how teams actually make decisions when nobody is watching.',
@@ -31,28 +31,28 @@ export const SEED_USERS: SeedUser[] = [
   },
   {
     name: 'Rowan Blake',
-    email: 'rowan@azuregravy.local',
+    email: 'rowan@gravy.local',
     password: 'gravy123',
     role: 'author',
     bio: 'Rowan writes about productivity without the shouting. Based in Lisbon, usually between two notebooks.',
   },
   {
     name: 'Ines Duarte',
-    email: 'ines@azuregravy.local',
+    email: 'ines@gravy.local',
     password: 'gravy123',
     role: 'author',
     bio: 'Travel and culture writer. Believes the best stories start where the guidebook ends.',
   },
   {
     name: 'Tobias Lindqvist',
-    email: 'tobias@azuregravy.local',
+    email: 'tobias@gravy.local',
     password: 'gravy123',
     role: 'author',
     bio: 'Engineer-turned-writer covering tools, craft and the economics of building software that lasts.',
   },
   {
     name: 'Priya Raman',
-    email: 'priya@azuregravy.local',
+    email: 'priya@gravy.local',
     password: 'gravy123',
     role: 'author',
     bio: 'Writes about health, endurance sport and the long game. Twelve marathons, zero shortcuts.',
@@ -776,12 +776,12 @@ export interface SeedPage {
 
 export const SEED_PAGES: SeedPage[] = [
   {
-    title: 'About Azure Gravy',
+    title: 'About Gravy',
     slug: 'about',
     excerpt: 'An independent journal about good work, slow travel and the creative life — served warm, twice a week.',
     content: `## A small publication, on purpose
 
-Azure Gravy started as a shared document between four friends who were tired of two kinds of writing: the breathless kind and the empty kind. We wanted something in between — careful, useful, and occasionally funny.
+Gravy started as a shared document between four friends who were tired of two kinds of writing: the breathless kind and the empty kind. We wanted something in between — careful, useful, and occasionally funny.
 
 We publish two or three pieces a week, plus a letter on Sundays. There are no sponsored posts inside the essays, and no AI-generated filler disguised as reporting. If we do not have something to say, we do not publish.
 
@@ -877,12 +877,12 @@ export interface SeedComment {
 
 export const SEED_COMMENTS: SeedComment[] = [
   { postSlug: 'quiet-power-of-doing-one-thing-at-a-time', author: 'Daniel Osei', email: 'daniel@example.com', content: 'The “one card, one outcome” idea landed for me. I have been keeping three priorities and finishing none of them.', status: 'approved', daysAgo: 1 },
-  { postSlug: 'quiet-power-of-doing-one-thing-at-a-time', author: 'Avery Cole', email: 'admin@azuregravy.local', content: 'Glad it helped, Daniel. The card trick works because it is physical — you cannot scroll past it.', status: 'approved', daysAgo: 1, replyTo: 'Daniel Osei' },
+  { postSlug: 'quiet-power-of-doing-one-thing-at-a-time', author: 'Avery Cole', email: 'admin@gravy.local', content: 'Glad it helped, Daniel. The card trick works because it is physical — you cannot scroll past it.', status: 'approved', daysAgo: 1, replyTo: 'Daniel Osei' },
   { postSlug: 'quiet-power-of-doing-one-thing-at-a-time', author: 'Hannah Weiss', email: 'hannah@example.com', content: 'Curious how you handle a job where interruptions are genuinely part of the role? I work in support and “deep work” feels like a luxury.', status: 'approved', daysAgo: 0 },
   { postSlug: 'what-travel-teaches-about-culture-and-life', author: 'Marco Rossi', email: 'marco@example.com', content: 'The laundrette story is perfect. The best travel memories are always admin.', status: 'approved', daysAgo: 3 },
   { postSlug: 'field-guide-to-deep-work', author: 'Sana Iqbal', email: 'sana@example.com', content: 'We adopted the three-block day after reading this and our stand-ups got shorter. Small sample size, but promising.', status: 'approved', daysAgo: 6 },
   { postSlug: 'the-case-for-slow-mornings', author: 'Leo Martins', email: 'leo@example.com', content: 'I delayed coffee by ninety minutes for a week. I am not a new man, but the mornings are noticeably less jagged.', status: 'approved', daysAgo: 12 },
-  { postSlug: 'the-case-for-slow-mornings', author: 'Priya Raman', email: 'priya@azuregravy.local', content: 'That is exactly the right expectation, Leo. Less jagged is the goal.', status: 'approved', daysAgo: 11, replyTo: 'Leo Martins' },
+  { postSlug: 'the-case-for-slow-mornings', author: 'Priya Raman', email: 'priya@gravy.local', content: 'That is exactly the right expectation, Leo. Less jagged is the goal.', status: 'approved', daysAgo: 11, replyTo: 'Leo Martins' },
   { postSlug: 'small-teams-ship-big-things', author: 'Guy who sells synergy', email: 'promo@spam.example', content: 'Great post! Check my profile for 10x growth secrets and a free funnel template.', status: 'spam', daysAgo: 8 },
   { postSlug: 'money-quietly', author: 'Elena Petrova', email: 'elena@example.com', content: 'The “low number of surprises” line is going on my wall. Would love a follow-up on freelancer cash flow.', status: 'pending', daysAgo: 2 },
   { postSlug: 'designing-a-life-you-do-not-need-to-escape', author: 'Tom Becker', email: 'tom@example.com', content: 'What if your Tuesday is fine but your Sunday is dreadful? Asking for a friend (me).', status: 'pending', daysAgo: 4 },
@@ -911,7 +911,7 @@ export const SEED_MESSAGES = [
     email: 'clara@example.com',
     subject: 'Pitch: the four-day week, two years on',
     message:
-      'Hi — I run a small design studio that moved to a four-day week in 2024. I have two years of data, including the failures, and would love to write it up for Azure Gravy. Happy to send an outline.',
+      'Hi — I run a small design studio that moved to a four-day week in 2024. I have two years of data, including the failures, and would love to write it up for Gravy. Happy to send an outline.',
     daysAgo: 1,
     isRead: false,
   },

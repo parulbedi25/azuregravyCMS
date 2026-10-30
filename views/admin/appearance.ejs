@@ -15,7 +15,7 @@
     <div class="panel">
       <div class="panel__head"><div><h2>Identity</h2><p>How the masthead reads across the site.</p></div></div>
       <div class="panel__body form-grid">
-        <label class="field"><span>Wordmark</span><input class="input" name="logo_text" value="<%= settings.logo_text || 'Azure Gravy' %>" placeholder="Azure Gravy"><span class="hint">Set in the site's display face. Keep it short.</span></label>
+        <label class="field"><span>Wordmark</span><input class="input" name="logo_text" value="<%= settings.logo_text || 'Gravy' %>" placeholder="Gravy"><span class="hint">Set in the site's display face. Keep it short.</span></label>
         <div class="form-grid form-grid--2">
           <label class="field"><span>Default theme</span>
             <select class="select" name="default_theme">
@@ -97,7 +97,7 @@
       <div class="panel__body">
         <div class="side-card" style="border-radius:10px;overflow:hidden">
           <div style="padding:14px 16px;border-bottom:1px solid var(--admin-line);display:flex;align-items:center;justify-content:space-between">
-            <span class="serif" style="font-size:1.35rem"><%= settings.logo_text || 'Azure Gravy' %></span>
+            <span class="serif" style="font-size:1.35rem"><%= settings.logo_text || 'Gravy' %></span>
             <span class="flex gap-8" style="gap:10px;font-size:.7rem;color:var(--admin-ink-3)"><span>Home</span><span>Posts</span><span>Topics</span></span>
           </div>
           <div style="padding:16px">

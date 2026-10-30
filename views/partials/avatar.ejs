@@ -2,5 +2,5 @@
 <% if (typeof avatar !== 'undefined' && avatar) { %>
   <img class="avatar <%= _size === 'lg' ? 'avatar--lg' : (_size === 'xl' ? 'avatar--xl' : '') %>" src="<%= h.mediaUrl(avatar) %>" alt="<%= typeof name !== 'undefined' ? name : '' %>" loading="lazy">
 <% } else { %>
-  <span class="avatar avatar--initials <%= _size === 'lg' ? 'avatar--lg' : (_size === 'xl' ? 'avatar--xl' : '') %>" style="background: <%= h.colorFromSeed(typeof name !== 'undefined' ? name : 'Azure Gravy') %>"><%= h.initials(typeof name !== 'undefined' ? name : 'AG') %></span>
+  <span class="avatar avatar--initials <%= _size === 'lg' ? 'avatar--lg' : (_size === 'xl' ? 'avatar--xl' : '') %>" style="background: <%= h.colorFromSeed(typeof name !== 'undefined' ? name : 'Gravy') %>"><%= h.initials(typeof name !== 'undefined' ? name : 'Gravy') %></span>
 <% } %>

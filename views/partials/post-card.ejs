@@ -26,7 +26,7 @@
       <p><%= h.excerptOf(post, _variant === 'feature' ? 210 : 140) %></p>
     <% } %>
     <div class="post-meta">
-      <a href="/author/<%= post.author_id %>" class="post-meta__author"><%= post.author_name || 'Azure Gravy' %></a>
+      <a href="/author/<%= post.author_id %>" class="post-meta__author"><%= post.author_name || 'Gravy' %></a>
       <span class="dot"></span>
       <time datetime="<%= h.isoDate(post.published_at || post.created_at) %>"><%= h.formatDate(post.published_at || post.created_at, 'medium') %></time>
       <% if (typeof post.comment_count !== 'undefined' && post.comment_count > 0) { %>

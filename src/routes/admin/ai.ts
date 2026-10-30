@@ -248,7 +248,7 @@ router.post(
           length: (['short', 'medium', 'long'] as const).includes(req.body.length as 'short')
             ? (req.body.length as 'short' | 'medium' | 'long')
             : 'medium',
-          siteName: (await loadSettings()).site_title || 'Azure Gravy',
+          siteName: (await loadSettings()).site_title || 'Gravy',
         },
         { uploadedBy: res.locals.currentUser?.id ?? null },
       );

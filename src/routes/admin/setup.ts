@@ -88,7 +88,7 @@ const EmbeddedForm = z.object({
     .max(64)
     .regex(/^$|^[A-Za-z0-9_$.\-]+$/, 'Use letters, numbers, underscore, dot or dash only.')
     .optional()
-    .default('azuregravy'),
+    .default('gravy'),
 });
 
 const AdminSchema = z
@@ -136,10 +136,10 @@ function dbFormFrom(_state: InstallState, stored: SessionDb | undefined): DbForm
       the intended split on this screen: host and port have universal well-known
       values worth prefilling, whereas the database name and user are account-
       specific — on cPanel they are prefixed (`myaccount_gravy`), so prefilling
-      `azuregravy` here would actively mislead. Do not "make these consistent" with
+      `gravy` here would actively mislead. Do not "make these consistent" with
       host above by switching to `||`.
     */
-    database: stored?.database ?? snapshot.database ?? 'azuregravy',
+    database: stored?.database ?? snapshot.database ?? 'gravy',
     user: stored?.user ?? snapshot.user ?? '',
     // Passwords are never kept in the session; the applied config still has it.
     password: snapshot.password ?? '',
@@ -240,7 +240,7 @@ router.post(
       let candidate: DbConfigInput;
 
       if (submittedDb.driver === 'embedded') {
-        const parsed = EmbeddedForm.safeParse({ database: submittedDb.database || 'azuregravy' });
+        const parsed = EmbeddedForm.safeParse({ database: submittedDb.database || 'gravy' });
         if (!parsed.success) {
           return render(res, {
             step,
@@ -254,7 +254,7 @@ router.post(
         }
         candidate = {
           driver: 'embedded',
-          database: parsed.data.database || 'azuregravy',
+          database: parsed.data.database || 'gravy',
           dataDir: config.db.dataDir,
         };
       } else {

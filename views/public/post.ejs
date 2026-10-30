@@ -2,7 +2,7 @@
   const isPreview = typeof previewMode !== 'undefined' && !!previewMode;
   const shareUrl = encodeURIComponent((settings.site_url || '') + h.postUrl(post));
   const shareTitle = encodeURIComponent(post.title);
-  const author = { name: post.author_name || 'Azure Gravy', avatar: post.author_avatar, bio: post.author_bio };
+  const author = { name: post.author_name || 'Gravy', avatar: post.author_avatar, bio: post.author_bio };
 %>
 
 <section class="container article-header">
