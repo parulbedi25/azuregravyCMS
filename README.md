@@ -151,6 +151,22 @@ Node and keeps its files under `./data` (optional dependency: `lite4mariadb`, in
 - **Taxonomies** — categories and tags with descriptions, colours and editable slugs; author pages.
 - **Automatic 301s** — renaming a slug keeps old links alive and records the redirect.
 
+### AI drafting assistant
+
+- **Title to draft** — administrators can turn a title into a complete story body, an outline, a
+  continuation of what is already written, or a rewrite of just the highlighted passage. The result
+  lands directly in the editor textarea, ready to edit and save.
+- **Embedded diagrams** — the model returns a small JSON flow spec and the app draws it as a
+  draw.io-style SVG (fixed palette, orthogonal routing, ranked columns), saves it to the media
+  library and inserts it as an image. The model never emits markup, so a hostile label cannot become
+  script.
+- **Provider-agnostic** — any endpoint that speaks OpenAI's `POST {base_url}/chat/completions` with
+  `Authorization: Bearer` auth: OpenAI, Groq, OpenRouter, or a local Ollama. Configured under
+  **Studio → AI assistant**, with an on/off switch in the sidebar. The key is stored in the
+  database, masked in the UI and redacted from the settings export.
+- **Off means off** — the switch is enforced server-side on every request rather than merely hiding
+  the panel, and the whole surface is administrator-only.
+
 ### Media
 
 - Drag-and-drop or browse, multi-file upload, per-file validation, 12 MB limit, JPEG / PNG / WebP /
