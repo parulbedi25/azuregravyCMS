@@ -17,6 +17,15 @@ export async function listUsers(): Promise<UserWithCounts[]> {
 }
 
 export async function getUser(id: number): Promise<User | null> {
+  /*
+    Guard the id here rather than at each call site, exactly as getPostById does.
+
+    The public route /author/:id does `getUser(Number(req.params.id))`, and
+    Number('anything-not-a-number') is NaN. The driver refuses to bind NaN and
+    throws, so an unauthenticated visitor could turn /author/1'OR'1'='1 into a
+    500. Returning null keeps a malformed author URL at 404.
+  */
+  if (!Number.isInteger(id) || id <= 0) return null;
   const db = await getDb();
   const rows = await db.query<User>('SELECT * FROM users WHERE id = ? LIMIT 1', [id]);
   return rows[0] ?? null;
@@ -70,6 +79,7 @@ export async function updateUser(
     password_hash?: string;
   },
 ): Promise<void> {
+  if (!Number.isInteger(id) || id <= 0) return;
   const db = await getDb();
   const sets = ['name = ?', 'email = ?', 'role = ?', 'bio = ?', 'website = ?', 'twitter = ?', 'linkedin = ?', 'avatar = ?'];
   const params: unknown[] = [
@@ -85,6 +95,7 @@ export async function updateUser(
 }
 
 export async function deleteUser(id: number): Promise<void> {
+  if (!Number.isInteger(id) || id <= 0) return;
   const db = await getDb();
   await db.execute('DELETE FROM users WHERE id = ?', [id]);
 }

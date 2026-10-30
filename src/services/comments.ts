@@ -72,6 +72,8 @@ export async function commentCounts(): Promise<Record<CommentStatus | 'all', num
 }
 
 export async function getComment(id: number): Promise<Comment | null> {
+  // See getUser: a non-numeric :id must not reach the driver as NaN.
+  if (!Number.isInteger(id) || id <= 0) return null;
   const db = await getDb();
   const rows = await db.query<Comment>(`SELECT ${COMMENT_COLUMNS} FROM comments c JOIN posts p ON p.id = c.post_id WHERE c.id = ?`, [id]);
   return rows[0] ?? null;
@@ -98,26 +100,46 @@ export async function addComment(input: AddCommentInput, autoApprove: boolean): 
 }
 
 export async function moderateComment(id: number, status: CommentStatus): Promise<void> {
+  if (!Number.isInteger(id) || id <= 0) return;
   const db = await getDb();
   await db.execute('UPDATE comments SET status = ? WHERE id = ?', [status, id]);
 }
 
 export async function deleteComment(id: number): Promise<void> {
+  if (!Number.isInteger(id) || id <= 0) return;
   const db = await getDb();
   await db.execute('DELETE FROM comments WHERE id = ?', [id]);
 }
 
-export async function approvedCommentsTree(postId: number): Promise<{ comments: CommentWithChildren[]; total: number }> {
+/**
+ * The only comment fields a public page is ever allowed to see.
+ *
+ * A commenter's email address, IP address and user agent are moderation data:
+ * they belong to the admin queue and must never enter the scope of a public
+ * template, where one stray `JSON.stringify(locals)` or locals-dumping error
+ * page would publish strangers' personal data. Selecting them explicitly (rather
+ * than `c.*`) makes that guarantee a property of the query, not of the view.
+ */
+export interface PublicComment {
+  id: number;
+  parent_id: number | null;
+  author_name: string;
+  content: string;
+  created_at: string;
+  children: PublicComment[];
+}
+
+export async function approvedCommentsTree(postId: number): Promise<{ comments: PublicComment[]; total: number }> {
   const db = await getDb();
-  const rows = await db.query<Comment>(
-    `SELECT c.* FROM comments c
+  const rows = await db.query<Omit<PublicComment, 'children'>>(
+    `SELECT c.id, c.parent_id, c.author_name, c.content, c.created_at FROM comments c
       WHERE c.post_id = ? AND c.status = 'approved'
       ORDER BY c.created_at ASC, c.id ASC`,
     [postId],
   );
-  const map = new Map<number, CommentWithChildren>();
+  const map = new Map<number, PublicComment>();
   for (const row of rows) map.set(row.id, { ...row, children: [] });
-  const roots: CommentWithChildren[] = [];
+  const roots: PublicComment[] = [];
   for (const comment of map.values()) {
     if (comment.parent_id && map.has(comment.parent_id)) map.get(comment.parent_id)!.children.push(comment);
     else roots.push(comment);

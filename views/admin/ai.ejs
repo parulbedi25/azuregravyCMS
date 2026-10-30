@@ -1,0 +1,124 @@
+<%
+  /*
+    Administrators only — routes/admin/ai.ts applies requireRole('admin').
+    The API key is never echoed back: the form shows a mask and a blank
+    password input, because browsers do not round-trip password values and
+    rendering a live secret into HTML would put it in view-source, caches
+    and the bfcache.
+  */
+  const keySaved = !!maskedKey;
+%>
+
+<div class="admin-page-head">
+  <div>
+    <div class="row" style="gap:8px;margin-bottom:4px">
+      <h1>AI assistant</h1>
+      <span class="pill <%= readiness.ready ? 'pill--published' : 'pill--draft' %>">
+        <%= readiness.ready ? 'ready' : (config.enabled ? 'needs setup' : 'off') %>
+      </span>
+    </div>
+    <p>Drafting help for administrators. Give it a title and it writes into the editor, drawing draw.io-style diagrams where the subject is genuinely structural.</p>
+  </div>
+  <div class="admin-page-head__actions">
+    <a class="btn btn--ghost btn--sm" href="/admin/posts/new"><%- h.icon('pen', '', 14) %> Open the editor</a>
+  </div>
+</div>
+
+<div class="admin-grid-side">
+  <div class="panel">
+    <div class="panel__head"><h2>Provider</h2></div>
+    <form method="post" action="/admin/ai/settings" class="panel__body form-grid">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+
+      <label class="switch">
+        <input type="checkbox" name="ai_enabled" value="1" <%= config.enabled ? 'checked' : '' %>>
+        <span class="switch__track"></span>
+        <span class="switch__text">
+          <b>Enable the assistant</b>
+          <span>Off by default. While off, nothing is sent anywhere and the editor panel stays hidden.</span>
+        </span>
+      </label>
+
+      <div class="form-grid form-grid--2">
+        <label class="field">
+          <span>Base URL</span>
+          <input class="input" type="url" name="ai_base_url" value="<%= config.baseUrl %>" placeholder="https://api.openai.com/v1">
+          <span class="hint">Any OpenAI-compatible endpoint: OpenAI, Azure OpenAI, Groq, OpenRouter, or a local Ollama server.</span>
+        </label>
+        <label class="field">
+          <span>Model</span>
+          <input class="input" name="ai_model" value="<%= config.model %>" placeholder="gpt-4o-mini">
+          <span class="hint">The exact model id your provider expects.</span>
+        </label>
+      </div>
+
+      <label class="field">
+        <span>API key</span>
+        <input class="input" type="password" name="ai_api_key" value="" autocomplete="off" spellcheck="false"
+               placeholder="<%= keySaved ? maskedKey + '  —  leave blank to keep it' : 'sk-…' %>">
+        <span class="hint">
+          <%= keySaved ? 'A key is saved. Leaving this blank keeps it; typing a new one replaces it.' : 'Stored in your own database and redacted from System → Export.' %>
+        </span>
+      </label>
+
+      <% if (keySaved) { %>
+        <label class="switch">
+          <input type="checkbox" name="ai_api_key_clear" value="1">
+          <span class="switch__track"></span>
+          <span class="switch__text"><b>Remove the saved key</b><span>Disarms the assistant until a new key is entered.</span></span>
+        </label>
+      <% } %>
+
+      <div class="form-grid form-grid--2">
+        <label class="field">
+          <span>Max tokens</span>
+          <input class="input" type="number" name="ai_max_tokens" min="200" max="8000" step="100" value="<%= config.maxTokens %>">
+          <span class="hint">Caps how long a single draft can be, and what it costs.</span>
+        </label>
+        <label class="switch" style="align-self:end">
+          <input type="checkbox" name="ai_diagrams" value="1" <%= config.diagrams ? 'checked' : '' %>>
+          <span class="switch__track"></span>
+          <span class="switch__text"><b>Draw diagrams</b><span>Render draw.io-style figures into the draft.</span></span>
+        </label>
+      </div>
+
+      <div class="row" style="gap:8px;margin-top:4px">
+        <button class="btn btn--accent btn--sm" type="submit"><%- h.icon('save', '', 14) %> Save assistant</button>
+        <a class="btn btn--ghost btn--sm" href="/admin/ai">Discard changes</a>
+      </div>
+    </form>
+  </div>
+
+  <div class="stack-16">
+    <div class="panel">
+      <div class="panel__head"><h2>How it writes</h2></div>
+      <div class="panel__body stack-10">
+        <p class="text-sm text-muted" style="margin-top:0">In the story editor, administrators get an <b>AI assistant</b> card. A title is the only required input — then choose how much it should write.</p>
+        <ul class="text-sm stack-6" style="margin:0;padding-left:18px">
+          <% modes.forEach(function (mode) { %>
+            <li><b><%= mode.label %></b> — <%= mode.help %></li>
+          <% }); %>
+        </ul>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel__head"><h2>Diagrams</h2></div>
+      <div class="panel__body stack-10">
+        <p class="text-sm text-muted" style="margin-top:0">The model never writes image markup. It returns a small JSON description, and this server draws the picture — so the styling is always consistent draw.io, and no model output is ever trusted as markup.</p>
+        <ul class="text-sm stack-6" style="margin:0;padding-left:18px">
+          <li>Saved to your media library as SVG, so you can reuse or delete it like any upload.</li>
+          <li>Served with a strict <span class="mono">Content-Security-Policy</span>, so opening a diagram file directly cannot run script.</li>
+          <li>A description that fails validation is dropped quietly rather than breaking the draft.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel__head"><h2>Who can use it</h2></div>
+      <div class="panel__body">
+        <p class="text-sm text-muted" style="margin-top:0">Administrators only. Editors and authors never see the panel, and the endpoint refuses them with a 403 even if they call it directly — hiding a button is not authorisation.</p>
+      </div>
+    </div>
+  </div>
+</div>

@@ -91,6 +91,19 @@ export function pageParam(value: unknown): number {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
 }
 
+/**
+ * Coerce a `:id` route parameter to a positive integer, or null.
+ *
+ * Routes habitually write `Number(req.params.id)`, and `Number('bulk')` is NaN.
+ * The embedded driver refuses to bind NaN and throws, which turns a typo'd or
+ * hostile URL into a 500 instead of a 404 or a harmless no-op. This mirrors the
+ * guard `getPostById` already carries, for the call sites that build SQL inline.
+ */
+export function idParam(value: unknown): number | null {
+  const parsed = Number.parseInt(String(value ?? ''), 10);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+}
+
 /** Build a query string preserving existing params but replacing some. */
 export function withQuery(current: Record<string, unknown>, updates: Record<string, string | number | undefined>): string {
   const params = new URLSearchParams();

@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { asyncRoute, pageParam, paginate, setFlash } from '../../lib/http.js';
+import { asyncRoute, idParam, pageParam, paginate, setFlash } from '../../lib/http.js';
 import { canEditPost, roleAtLeast } from '../../lib/auth.js';
 import { renderMarkdown } from '../../lib/markdown.js';
 import { parseIds, parseTags, str } from '../helpers.js';
@@ -403,7 +403,7 @@ router.post(
     const db = await getDb();
     const rows = await db.query<{ title: string; content: string; excerpt: string | null }>(
       'SELECT title, content, excerpt FROM revisions WHERE id = ? AND post_id = ?',
-      [Number(req.params.revisionId), post.id],
+      [idParam(req.params.revisionId), post.id],
     );
     if (!rows[0]) {
       setFlash(req, 'error', 'That revision no longer exists.');

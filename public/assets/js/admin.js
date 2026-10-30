@@ -644,6 +644,62 @@
     }
   });
 
+  /* ------------------------------------------- AI assistant sidebar switch */
+  /*
+    The sidebar renders a real <form> with an Apply button so the switch still
+    works with JS off. When this runs, the switch becomes instant and the button
+    is removed. Failure reverts the checkbox rather than leaving the UI claiming
+    a state the server does not have.
+  */
+  (function () {
+    const form = $('form[data-ai-toggle]');
+    if (!form) return;
+    const box = $('input[data-ai-switch]', form);
+    if (!box) return;
+
+    const label = $('[data-ai-label]', form);
+    const status = $('[data-ai-status]', form);
+    const apply = $('.sidebar-ai__apply', form);
+    const redirect = $('input[name="redirect"]', form);
+    if (apply) apply.style.display = 'none';
+
+    let busy = false;
+
+    box.addEventListener('change', async () => {
+      if (busy) return;
+      busy = true;
+      box.disabled = true;
+      const next = box.checked;
+
+      try {
+        const response = await fetch(form.action, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            Accept: 'application/json',
+            'x-csrf-token': csrf,
+          },
+          body: new URLSearchParams({
+            enabled: next ? '1' : '0',
+            redirect: redirect ? redirect.value : '/admin',
+          }),
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || !data.ok) throw new Error(data.error || 'Could not update the assistant.');
+
+        if (label) label.textContent = data.enabled ? 'Enabled' : 'Disabled';
+        if (status && data.readiness) status.textContent = data.readiness.reason;
+        toast(data.enabled ? 'AI assistant enabled.' : 'AI assistant disabled.', 'success');
+      } catch (error) {
+        box.checked = !next;
+        toast(error.message || 'Could not update the assistant.', 'error');
+      } finally {
+        box.disabled = false;
+        busy = false;
+      }
+    });
+  })();
+
   /* Expose a tiny API for inline view scripts. */
   window.GravyStudio = { toast };
 })();

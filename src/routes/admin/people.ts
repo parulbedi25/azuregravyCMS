@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { asyncRoute, pageParam, paginate, setFlash } from '../../lib/http.js';
+import { asyncRoute, idParam, pageParam, paginate, setFlash } from '../../lib/http.js';
 import { hashPassword, requireRole, verifyPassword } from '../../lib/auth.js';
 import { str } from '../helpers.js';
 import { getDb } from '../../db/index.js';
@@ -206,6 +206,7 @@ router.post(
 /* ----------------------------------------------------------- subscribers */
 router.get(
   '/subscribers',
+  requireRole('admin'),
   asyncRoute(async (req, res) => {
     const db = await getDb();
     const page = pageParam(req.query.page);
@@ -237,6 +238,7 @@ router.get(
 
 router.post(
   '/subscribers',
+  requireRole('admin'),
   asyncRoute(async (req, res) => {
     const email = str(req.body.email).toLowerCase();
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
@@ -255,8 +257,9 @@ router.post(
 
 router.post(
   '/subscribers/:id/delete',
+  requireRole('admin'),
   asyncRoute(async (req, res) => {
-    await (await getDb()).execute('DELETE FROM subscribers WHERE id = ?', [Number(req.params.id)]);
+    await (await getDb()).execute('DELETE FROM subscribers WHERE id = ?', [idParam(req.params.id)]);
     setFlash(req, 'success', 'Subscriber removed.');
     res.redirect('/admin/subscribers');
   }),
@@ -264,6 +267,7 @@ router.post(
 
 router.get(
   '/subscribers/export.csv',
+  requireRole('admin'),
   asyncRoute(async (_req, res) => {
     const rows = await (await getDb()).query<{ email: string; name: string | null; status: string; created_at: string }>(
       'SELECT email, name, status, created_at FROM subscribers ORDER BY created_at DESC',
@@ -278,6 +282,7 @@ router.get(
 /* -------------------------------------------------------------- messages */
 router.get(
   '/messages',
+  requireRole('admin'),
   asyncRoute(async (_req, res) => {
     const db = await getDb();
     const messages = await db.query<{
@@ -296,10 +301,11 @@ router.get(
 
 router.post(
   '/messages/:id',
+  requireRole('admin'),
   asyncRoute(async (req, res) => {
     await (await getDb()).execute('UPDATE contact_messages SET is_read = ? WHERE id = ?', [
       str(req.body.is_read) === '1' ? 1 : 0,
-      Number(req.params.id),
+      idParam(req.params.id),
     ]);
     res.redirect('/admin/messages');
   }),
@@ -307,8 +313,9 @@ router.post(
 
 router.post(
   '/messages/:id/delete',
+  requireRole('admin'),
   asyncRoute(async (req, res) => {
-    await (await getDb()).execute('DELETE FROM contact_messages WHERE id = ?', [Number(req.params.id)]);
+    await (await getDb()).execute('DELETE FROM contact_messages WHERE id = ?', [idParam(req.params.id)]);
     setFlash(req, 'success', 'Message deleted.');
     res.redirect('/admin/messages');
   }),

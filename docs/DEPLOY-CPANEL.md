@@ -198,6 +198,69 @@ chmod -R 775 public/uploads data
 
 ---
 
+## 8. Optional: the AI drafting assistant
+
+The assistant ships switched off, and nothing else in the CMS depends on it.
+
+Configure it in the browser under **Studio → AI assistant** (`/admin/ai`). There are no environment
+variables for it: the base URL, model name, token limit and API key are stored in the `settings`
+table, so they survive restarts and travel with your database backups. The key is masked in the UI
+and redacted from **Tools → Export**.
+
+### The one host requirement: outbound HTTPS
+
+Generating a draft makes *your server* call the provider directly:
+
+```text
+POST {base_url}/chat/completions        (90 second timeout)
+```
+
+Shared hosting frequently blocks outbound requests to third parties. Check from the cPanel terminal
+before you rely on it:
+
+```bash
+node -e "fetch('https://api.openai.com/v1/models').then(r => console.log('outbound OK - HTTP', r.status)).catch(e => console.log('BLOCKED:', e.message))"
+```
+
+Any HTTP status proves outbound works — `401` only means the probe sent no API key. A `BLOCKED` line
+(`ENOTFOUND`, `ETIMEDOUT`, `ECONNREFUSED`) means the host will not let the app reach the provider:
+ask support to allowlist the hostname, or point **Base URL** at a provider they do permit.
+
+If outbound is blocked, the assistant reports *"Could not reach …"* and stops there. It fails closed
+— no crash, no partial draft, and the rest of the site is unaffected.
+
+### Diagrams need the writable folder
+
+Generated diagrams are written to `public/uploads/diagrams/`, so the `chmod -R 775 public/uploads`
+from step 7 already covers them. They appear in the media library like any other upload, and are
+served with a locked-down `Content-Security-Policy` plus `X-Content-Type-Options: nosniff`.
+
+### Which provider?
+
+Anything that speaks the OpenAI chat-completions shape and accepts `Authorization: Bearer <key>`.
+Set **Base URL** to:
+
+| Provider | Base URL |
+| --- | --- |
+| OpenAI | `https://api.openai.com/v1` |
+| Groq | `https://api.groq.com/openai/v1` |
+| OpenRouter | `https://openrouter.ai/api/v1` |
+| Ollama (self-hosted) | `http://127.0.0.1:11434/v1` |
+
+The default model name is `gpt-4o-mini`; change it to whatever your provider expects.
+
+> **Ollama and other keyless local providers:** the assistant refuses to run until an API key is
+> saved, because a blank key almost always means the form was never finished. Ollama does not check
+> the value, so type any placeholder — `ollama` is the convention — and it will be sent and ignored.
+
+> **Azure OpenAI is not supported by this field.** Azure authenticates with an `api-key` header and
+> requires an `api-version` query parameter, whereas the assistant sends a plain
+> `Authorization: Bearer` header to `{base_url}/chat/completions`. Pointing Base URL at an
+> `*.openai.azure.com` deployment will be rejected. Use an OpenAI-compatible gateway in front of it,
+> or one of the providers above.
+
+---
+
 ## What the first boot actually does
 
 Before the installer has run:

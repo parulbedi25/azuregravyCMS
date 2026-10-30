@@ -49,7 +49,9 @@ export async function attachUser(req: Request, res: Response, next: NextFunction
       req.session.userId = undefined;
       return next();
     }
-    res.locals.currentUser = user;
+    // Strip password_hash before the record enters res.locals, so no template,
+    // error page or JSON dump can ever reach a credential hash.
+    res.locals.currentUser = publicUser(user);
     res.locals.can = {
       admin: user.role === 'admin',
       editor: roleAtLeast(user.role, 'editor'),
@@ -100,6 +102,18 @@ export function canEditPost(user: User | null | undefined, post: Pick<Post, 'aut
 
 export function safeNext(value: unknown): string {
   if (typeof value !== 'string') return '/admin';
-  if (!value.startsWith('/') || value.startsWith('//')) return '/admin';
-  return value;
+  const next = value.trim();
+  /*
+    Browsers normalise a backslash to a forward slash when resolving a
+    special-scheme URL, so `/\evil.example` and `/\/evil.example` both resolve
+    to a protocol-relative external redirect even though neither starts with
+    `//`. Rejecting any backslash outright is sturdier than enumerating the
+    encodings that happen to survive today's parsers.
+
+    `%2F` is deliberately not decoded here: a browser resolving a Location
+    header treats `/%2F%2Fevil.example` as a path, not a host, so decoding it
+    would only create false rejections of legitimate in-site targets.
+  */
+  if (!next.startsWith('/') || next.startsWith('//') || next.includes('\\')) return '/admin';
+  return next;
 }

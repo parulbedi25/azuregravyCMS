@@ -249,6 +249,75 @@
         </div>
       </div>
 
+      <%
+        /*
+          AI drafting card — administrators only.
+
+          Deliberately not a <form>, and deliberately no name= attributes: this
+          card lives inside #editorForm, so a nested form would be invalid HTML
+          (browser recovery then duplicates _csrf, which is what caused the
+          publish-419 bug) and any named input would be posted with the story.
+          Everything is read by id and sent with fetch. Buttons are
+          type="button" so they can never submit the story form.
+        */
+        const aiOn = settings.ai_enabled === '1';
+        const aiReady = aiOn && !!settings.ai_api_key && !!settings.ai_model;
+        const aiSeedTitle = post && post.title ? post.title : '';
+      %>
+      <% if (can.admin) { %>
+      <div class="side-card side-card--collapsible side-card--open side-card--ai">
+        <div class="side-card__head">
+          <h3><%- h.icon('sparkles', '', 13) %> AI assistant</h3>
+          <span class="side-card__toggle"><%- h.icon('chevron-down', '', 15) %></span>
+        </div>
+        <div class="side-card__body">
+          <% if (!aiReady) { %>
+            <p class="hint" style="margin:0">
+              <%= aiOn ? 'Add an API key and a model name to start drafting.' : 'The assistant is switched off.' %>
+              <a href="/admin/ai">Configure it</a>, or use the switch in the sidebar.
+            </p>
+          <% } else { %>
+            <label class="field">
+              <span class="label">Title</span>
+              <input class="input" type="text" id="aiTitle" value="<%= aiSeedTitle %>" placeholder="What is the story about?" autocomplete="off">
+            </label>
+
+            <label class="field">
+              <span class="label">How much should it write?</span>
+              <select class="input" id="aiMode">
+                <option value="full">The whole story</option>
+                <option value="outline">An outline only</option>
+                <option value="continue">Continue from where I am</option>
+                <option value="selection">Rewrite my selection</option>
+              </select>
+            </label>
+
+            <div class="form-grid form-grid--2">
+              <label class="field">
+                <span class="label">Length</span>
+                <select class="input" id="aiLength">
+                  <option value="short">Short</option>
+                  <option value="medium" selected>Medium</option>
+                  <option value="long">Long</option>
+                </select>
+              </label>
+              <label class="field">
+                <span class="label">Tone</span>
+                <input class="input" type="text" id="aiTone" placeholder="optional" autocomplete="off">
+              </label>
+            </div>
+
+            <p class="hint" style="margin:0">Diagrams are drawn into the draft where the subject is genuinely structural.</p>
+
+            <button class="btn btn--accent btn--sm btn--block" type="button" id="aiGenerate">
+              <%- h.icon('sparkles', '', 14) %> <span data-ai-cta>Write it</span>
+            </button>
+            <p class="hint" id="aiStatus" role="status" aria-live="polite" style="margin:0;display:none"></p>
+          <% } %>
+        </div>
+      </div>
+      <% } %>
+
       <div class="side-card side-card--collapsible side-card--open">
         <div class="side-card__head"><h3>Categories</h3><span class="side-card__toggle"><%- h.icon('chevron-down', '', 15) %></span></div>
         <div class="side-card__body">
@@ -423,3 +492,152 @@
     }
   });
 </script>
+
+<% if (can.admin) { %>
+<script>
+  /*
+    AI drafting panel — administrators only.
+
+    Talks to /admin/ai/compose over fetch with the x-csrf-token header, the same
+    contract admin.js already uses. Nothing here is a form control with a name,
+    so none of it can be submitted with the story, and the generate button is
+    type="button" so it can never trigger the editor form.
+  */
+  (function () {
+    var button = document.getElementById('aiGenerate');
+    if (!button) return;
+
+    var titleInput = document.getElementById('aiTitle');
+    var modeSelect = document.getElementById('aiMode');
+    var lengthSelect = document.getElementById('aiLength');
+    var toneInput = document.getElementById('aiTone');
+    var status = document.getElementById('aiStatus');
+    var cta = button.querySelector('[data-ai-cta]');
+    var textarea = document.getElementById('content');
+    var csrfField = document.querySelector('#editorForm input[name="_csrf"]');
+    var csrf = csrfField ? csrfField.value : '';
+
+    function say(message, kind) {
+      if (!status) return;
+      status.textContent = message;
+      status.style.display = message ? 'block' : 'none';
+      status.style.color = kind === 'error' ? '#c0392b' : '';
+    }
+
+    function setBusy(on) {
+      button.disabled = on;
+      if (cta) cta.textContent = on ? 'Writing…' : 'Write it';
+    }
+
+    function insert(markdown, mode, selStart, selEnd) {
+      if (!textarea) return;
+      var next;
+      if (mode === 'continue') {
+        var existing = textarea.value.replace(/\s+$/, '');
+        next = existing ? existing + '\n\n' + markdown : markdown;
+      } else if (mode === 'selection') {
+        next = textarea.value.slice(0, selStart) + markdown + textarea.value.slice(selEnd);
+      } else {
+        next = markdown;
+      }
+      textarea.value = next;
+      /*
+        Assigning .value does not fire `input`, and admin.js depends on that
+        event for the live preview, the word count and unsaved-change tracking.
+        Without this the draft would be in the textarea but the preview blank.
+      */
+      textarea.dispatchEvent(new Event('input', { bubbles: true }));
+      textarea.focus();
+    }
+
+    async function generate() {
+      if (button.disabled) return;
+
+      var title = (titleInput ? titleInput.value : '').trim();
+      if (title.length < 3) {
+        say('Give the assistant a title of at least three characters.', 'error');
+        if (titleInput) titleInput.focus();
+        return;
+      }
+
+      var mode = modeSelect ? modeSelect.value : 'full';
+      var selStart = textarea ? textarea.selectionStart : 0;
+      var selEnd = textarea ? textarea.selectionEnd : 0;
+      var selection = textarea ? textarea.value.slice(selStart, selEnd) : '';
+
+      if (mode === 'selection' && !selection.trim()) {
+        say('Highlight the passage you want rewritten first.', 'error');
+        if (textarea) textarea.focus();
+        return;
+      }
+      if (mode === 'continue' && textarea && !textarea.value.trim()) {
+        say('There is nothing to continue from yet — write an opening, or choose “The whole story”.', 'error');
+        return;
+      }
+      if ((mode === 'full' || mode === 'outline') && textarea && textarea.value.trim()) {
+        if (!window.confirm('Replace everything in the editor with the new draft?')) return;
+      }
+
+      setBusy(true);
+      say('Writing… this can take half a minute.', 'info');
+
+      try {
+        var response = await fetch('/admin/ai/compose', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+            'x-csrf-token': csrf,
+          },
+          body: JSON.stringify({
+            title: title,
+            mode: mode,
+            length: lengthSelect ? lengthSelect.value : 'medium',
+            tone: toneInput ? toneInput.value : '',
+            existing: textarea ? textarea.value.slice(0, 20000) : '',
+            selection: selection.slice(0, 10000),
+          }),
+        });
+
+        var data = await response.json().catch(function () { return {}; });
+        if (!response.ok || !data.ok) {
+          throw new Error(data.error || 'The assistant returned ' + response.status + '.');
+        }
+
+        insert(data.markdown, mode, selStart, selEnd);
+        setBusy(false);
+
+        var note = 'Draft inserted.';
+        if (data.diagramsCreated) {
+          note += ' Drew ' + data.diagramsCreated + ' diagram' + (data.diagramsCreated === 1 ? '' : 's') + '.';
+        }
+        if (data.diagramsSkipped) {
+          note += ' Skipped ' + data.diagramsSkipped + ' that did not parse.';
+        }
+        say(note, 'ok');
+        if (window.GravyStudio) window.GravyStudio.toast('AI draft ready.', 'success');
+      } catch (error) {
+        setBusy(false);
+        var message = (error && error.message) || 'The assistant could not finish.';
+        say(message, 'error');
+        if (window.GravyStudio) window.GravyStudio.toast(message, 'error');
+      }
+    }
+
+    button.addEventListener('click', generate);
+
+    /*
+      Enter in the title field would otherwise submit #editorForm, silently
+      saving a half-written story instead of drafting one.
+    */
+    if (titleInput) {
+      titleInput.addEventListener('keydown', function (event) {
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          generate();
+        }
+      });
+    }
+  })();
+</script>
+<% } %>

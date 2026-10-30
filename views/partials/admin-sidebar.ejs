@@ -11,19 +11,29 @@
       { key: 'media', label: 'Media', url: '/admin/media', icon: 'image' },
     ]},
     { group: 'Community', items: [
-      { key: 'comments', label: 'Comments', url: '/admin/comments', icon: 'comment', count: navCounts.pending || 0, hot: true },
-      { key: 'subscribers', label: 'Subscribers', url: '/admin/subscribers', icon: 'mail' },
-      { key: 'messages', label: 'Inbox', url: '/admin/messages', icon: 'message-square', count: navCounts.unread || 0 },
+      { key: 'comments', label: 'Comments', url: '/admin/comments', icon: 'comment', count: navCounts.pending || 0, hot: true, editorOnly: true },
+      { key: 'subscribers', label: 'Subscribers', url: '/admin/subscribers', icon: 'mail', adminOnly: true },
+      { key: 'messages', label: 'Inbox', url: '/admin/messages', icon: 'message-square', count: navCounts.unread || 0, adminOnly: true },
     ]},
     { group: 'Publication', items: [
       { key: 'appearance', label: 'Appearance', url: '/admin/appearance', icon: 'palette', adminOnly: true },
       { key: 'menus', label: 'Navigation', url: '/admin/menus', icon: 'list', editorOnly: true },
       { key: 'redirects', label: 'Redirects', url: '/admin/redirects', icon: 'corner-down-right', editorOnly: true },
+      { key: 'ai', label: 'AI assistant', url: '/admin/ai', icon: 'sparkles', adminOnly: true },
       { key: 'settings', label: 'Settings', url: '/admin/settings', icon: 'settings', adminOnly: true },
       { key: 'users', label: 'People', url: '/admin/users', icon: 'users', adminOnly: true },
       { key: 'tools', label: 'System', url: '/admin/tools', icon: 'database', adminOnly: true },
     ]},
   ];
+
+  /*
+    Sidebar on/off state for the AI assistant, read straight from settings so
+    the switch is correct on every Studio page without an extra query.
+    Only ever the boolean and the model name reach the markup — never the key.
+  */
+  const aiOn = settings.ai_enabled === '1';
+  const aiConfigured = !!settings.ai_api_key && !!settings.ai_model;
+  const aiStatus = !aiOn ? 'Off' : (aiConfigured ? 'On · ' + settings.ai_model : 'On · needs a key');
 %>
 <aside class="sidebar" id="sidebar">
   <div class="sidebar__brand">
@@ -57,6 +67,35 @@
       <a href="/admin/media"><%- h.icon('upload') %><span>Upload media</span></a>
       <a href="/" target="_blank" rel="noopener"><%- h.icon('external') %><span>View site</span></a>
     </div>
+
+    <% if (can.admin) { %>
+      <%
+        /*
+          Enable or disable the AI assistant on demand, without leaving the page.
+
+          This is a real <form> (the sidebar is a sibling of the page body, not
+          nested inside #editorForm, so it cannot trigger the duplicate-_csrf
+          recovery that caused the publish-419 bug). admin.js upgrades it to a
+          fetch and hides the Apply button; without JS the button still works.
+        */
+      %>
+      <div class="nav-group sidebar-ai">
+        <div class="nav-group__title"><span>AI assistant</span></div>
+        <form method="post" action="/admin/ai/toggle" class="sidebar-ai__form" data-ai-toggle>
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <input type="hidden" name="redirect" value="<%= currentPath %>">
+          <label class="switch switch--rail">
+            <input type="checkbox" name="enabled" value="1" data-ai-switch <%= aiOn ? 'checked' : '' %>>
+            <span class="switch__track"></span>
+            <span class="switch__text">
+              <b data-ai-label><%= aiOn ? 'Enabled' : 'Disabled' %></b>
+              <span data-ai-status><%= aiStatus %></span>
+            </span>
+          </label>
+          <button class="sidebar-ai__apply" type="submit">Apply</button>
+        </form>
+      </div>
+    <% } %>
   </div>
 
   <div class="sidebar__foot">

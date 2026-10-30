@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { asyncRoute, setFlash } from '../../lib/http.js';
+import { asyncRoute, idParam, setFlash } from '../../lib/http.js';
 import { requireRole } from '../../lib/auth.js';
 import { loadSettings, saveSettings, settingFrom } from '../../lib/settings.js';
 import { invalidateNavigation } from '../../services/navigation.js';
@@ -179,7 +179,7 @@ router.post(
         Number(req.body.sort_order) || 0,
         req.body.is_active ? 1 : 0,
         str(req.body.target, '_self'),
-        Number(req.params.id),
+        idParam(req.params.id),
       ],
     );
     invalidateNavigation();
@@ -192,7 +192,7 @@ router.post(
   '/menus/:id/delete',
   requireRole('editor'),
   asyncRoute(async (req, res) => {
-    await (await getDb()).execute('DELETE FROM menu_items WHERE id = ?', [Number(req.params.id)]);
+    await (await getDb()).execute('DELETE FROM menu_items WHERE id = ?', [idParam(req.params.id)]);
     invalidateNavigation();
     setFlash(req, 'success', 'Link removed.');
     res.redirect('/admin/menus');
@@ -242,7 +242,7 @@ router.post(
   '/redirects/:id/delete',
   requireRole('editor'),
   asyncRoute(async (req, res) => {
-    await (await getDb()).execute('DELETE FROM redirects WHERE id = ?', [Number(req.params.id)]);
+    await (await getDb()).execute('DELETE FROM redirects WHERE id = ?', [idParam(req.params.id)]);
     setFlash(req, 'success', 'Redirect deleted.');
     res.redirect('/admin/redirects');
   }),
@@ -343,9 +343,16 @@ router.post(
   requireRole('admin'),
   asyncRoute(async (_req, res) => {
     const db = await getDb();
+    /*
+      The export is a plain JSON download that leaves the server, so the AI
+      provider key is replaced rather than copied. Every other setting is
+      needed to restore a site; a secret is not, and re-entering one key is
+      a far smaller cost than leaking it into someone's downloads folder.
+    */
+    const allSettings = await loadSettings(true);
     const payload = {
       exportedAt: new Date().toISOString(),
-      settings: await loadSettings(true),
+      settings: { ...allSettings, ai_api_key: allSettings.ai_api_key ? '[redacted]' : '' },
       users: (await db.query('SELECT id, name, email, role, bio, created_at FROM users')).map((row) => row),
       categories: await db.query('SELECT * FROM categories'),
       tags: await db.query('SELECT * FROM tags'),

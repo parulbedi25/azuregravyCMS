@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { asyncRoute, pageParam, paginate, setFlash } from '../../lib/http.js';
+import { requireRole } from '../../lib/auth.js';
 import { str } from '../helpers.js';
 import {
   commentCounts, deleteComment, listComments, markSpamAndRelated, moderateComment, getComment,
@@ -11,6 +12,7 @@ const router = Router();
 
 router.get(
   '/comments',
+  requireRole('editor'),
   asyncRoute(async (req, res) => {
     const status = (typeof req.query.status === 'string' ? req.query.status : 'pending') as CommentStatus | 'all';
     const search = typeof req.query.q === 'string' ? req.query.q.trim() : '';
@@ -36,6 +38,7 @@ router.get(
 
 router.post(
   '/comments/:id/status',
+  requireRole('editor'),
   asyncRoute(async (req, res) => {
     const status = str(req.body.status) as CommentStatus;
     if (!['approved', 'pending', 'spam', 'trash'].includes(status)) {
@@ -53,6 +56,7 @@ router.post(
 
 router.post(
   '/comments/:id/delete',
+  requireRole('editor'),
   asyncRoute(async (req, res) => {
     await deleteComment(Number(req.params.id));
     setFlash(req, 'success', 'Comment deleted.');

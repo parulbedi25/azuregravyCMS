@@ -35,6 +35,8 @@ export async function listMedia(options: { page?: number; perPage?: number; sear
 }
 
 export async function getMedia(id: number): Promise<Media | null> {
+  // See getUser: a non-numeric :id must not reach the driver as NaN.
+  if (!Number.isInteger(id) || id <= 0) return null;
   const db = await getDb();
   const rows = await db.query<Media>('SELECT * FROM media WHERE id = ? LIMIT 1', [id]);
   return rows[0] ?? null;
@@ -56,6 +58,7 @@ export async function updateMedia(
   id: number,
   fields: Partial<Pick<Media, 'alt_text' | 'caption' | 'title'>>,
 ): Promise<void> {
+  if (!Number.isInteger(id) || id <= 0) return;
   const db = await getDb();
   await db.execute('UPDATE media SET alt_text = ?, caption = ?, title = ? WHERE id = ?', [
     fields.alt_text ?? null,
