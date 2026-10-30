@@ -100,8 +100,8 @@ export function canEditPost(user: User | null | undefined, post: Pick<Post, 'aut
   return !!post && post.author_id === user.id;
 }
 
-export function safeNext(value: unknown): string {
-  if (typeof value !== 'string') return '/admin';
+export function safeNext(value: unknown, fallback = '/admin'): string {
+  if (typeof value !== 'string') return fallback;
   const next = value.trim();
   /*
     Browsers normalise a backslash to a forward slash when resolving a
@@ -114,6 +114,6 @@ export function safeNext(value: unknown): string {
     header treats `/%2F%2Fevil.example` as a path, not a host, so decoding it
     would only create false rejections of legitimate in-site targets.
   */
-  if (!next.startsWith('/') || next.startsWith('//') || next.includes('\\')) return '/admin';
+  if (!next.startsWith('/') || next.startsWith('//') || next.includes('\\')) return fallback;
   return next;
 }

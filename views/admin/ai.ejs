@@ -18,6 +18,9 @@
       </span>
     </div>
     <p>Drafting help for administrators. Give it a title and it writes into the editor, drawing draw.io-style diagrams where the subject is genuinely structural.</p>
+    <% if (!readiness.ready) { %>
+      <p class="muted" style="margin:6px 0 0"><%= readiness.reason %></p>
+    <% } %>
   </div>
   <div class="admin-page-head__actions">
     <a class="btn btn--ghost btn--sm" href="/admin/posts/new"><%- h.icon('pen', '', 14) %> Open the editor</a>
@@ -39,16 +42,34 @@
         </span>
       </label>
 
+      <div class="field">
+        <span>Free and open providers</span>
+        <div class="row" style="flex-wrap:wrap;gap:6px" id="aiProviders">
+          <% providers.forEach(function (provider) { %>
+            <button class="btn btn--soft btn--sm" type="button"
+                    data-base-url="<%= provider.baseUrl %>"
+                    data-model="<%= provider.model %>"
+                    data-key-hint="<%= provider.keyHint %>"
+                    data-privacy="<%= provider.privacy %>">
+              <%= provider.label %><%= provider.free ? ' · free' : '' %>
+            </button>
+          <% }); %>
+        </div>
+        <span class="hint">Pick one to fill in the base URL and a current model id. Every provider marked free issues a key with no credit card.</span>
+        <span class="hint" id="aiProviderKey" style="display:none"></span>
+        <span class="hint" id="aiProviderPrivacy" style="display:none"></span>
+      </div>
+
       <div class="form-grid form-grid--2">
         <label class="field">
           <span>Base URL</span>
-          <input class="input" type="url" name="ai_base_url" value="<%= config.baseUrl %>" placeholder="https://api.openai.com/v1">
-          <span class="hint">Any OpenAI-compatible endpoint: OpenAI, Azure OpenAI, Groq, OpenRouter, or a local Ollama server.</span>
+          <input class="input" type="url" name="ai_base_url" id="aiBaseUrl" value="<%= config.baseUrl %>" placeholder="https://api.openai.com/v1">
+          <span class="hint">Any endpoint taking OpenAI chat completions with a <span class="mono">Bearer</span> key. Azure OpenAI will not work — it needs an <span class="mono">api-key</span> header instead.</span>
         </label>
         <label class="field">
           <span>Model</span>
-          <input class="input" name="ai_model" value="<%= config.model %>" placeholder="gpt-4o-mini">
-          <span class="hint">The exact model id your provider expects.</span>
+          <input class="input" name="ai_model" id="aiModel" value="<%= config.model %>" placeholder="gpt-4o-mini">
+          <span class="hint">The exact model id your provider expects. Free tiers retire models often, so check the provider's list if one stops working.</span>
         </label>
       </div>
 
@@ -82,10 +103,14 @@
         </label>
       </div>
 
-      <div class="row" style="gap:8px;margin-top:4px">
+      <div class="row" style="gap:8px;margin-top:4px;flex-wrap:wrap">
         <button class="btn btn--accent btn--sm" type="submit"><%- h.icon('save', '', 14) %> Save assistant</button>
+        <button class="btn btn--soft btn--sm" type="submit" formaction="/admin/ai/test" id="aiTest"
+                data-label="Test connection">Test connection</button>
         <a class="btn btn--ghost btn--sm" href="/admin/ai">Discard changes</a>
       </div>
+      <p class="hint" id="aiTestResult" role="status" aria-live="polite" style="display:none;margin:0"></p>
+      <p class="hint" style="margin:0">Testing sends one eight-token request — a fraction of a cent on a paid provider, and free on the providers above. It works before you save, so you can try a provider without committing to it.</p>
     </form>
   </div>
 
@@ -122,3 +147,105 @@
     </div>
   </div>
 </div>
+
+<script>
+  /*
+    Provider presets and the connection test.
+
+    Progressive enhancement only: the Test button is a real submit with
+    `formaction="/admin/ai/test"`, so without this script it still posts the
+    form and comes back with a flash message. With it, the result appears
+    inline and nothing is saved.
+  */
+  (function () {
+    var baseUrl = document.getElementById('aiBaseUrl');
+    var model = document.getElementById('aiModel');
+    var keyNote = document.getElementById('aiProviderKey');
+    var privacyNote = document.getElementById('aiProviderPrivacy');
+    var testButton = document.getElementById('aiTest');
+    var testResult = document.getElementById('aiTestResult');
+    var form = document.querySelector('form[action="/admin/ai/settings"]');
+    if (!form) return;
+
+    var csrfField = form.querySelector('input[name="_csrf"]');
+    var csrf = csrfField ? csrfField.value : '';
+    var keyField = form.querySelector('input[name="ai_api_key"]');
+
+    function show(element, text) {
+      if (!element) return;
+      element.textContent = text;
+      element.style.display = text ? 'block' : 'none';
+    }
+
+    /* ---- presets: fill the two fields, and explain the key + the privacy ---- */
+    var presets = document.querySelectorAll('#aiProviders [data-base-url]');
+    Array.prototype.forEach.call(presets, function (button) {
+      button.addEventListener('click', function () {
+        if (baseUrl) baseUrl.value = button.getAttribute('data-base-url') || '';
+        if (model) model.value = button.getAttribute('data-model') || '';
+        show(keyNote, button.getAttribute('data-key-hint') || '');
+        show(privacyNote, button.getAttribute('data-privacy') || '');
+
+        Array.prototype.forEach.call(presets, function (other) {
+          other.classList.remove('btn--accent');
+          other.classList.add('btn--soft');
+        });
+        button.classList.remove('btn--soft');
+        button.classList.add('btn--accent');
+      });
+    });
+
+    /* ---- connection test ---- */
+    if (!testButton) return;
+
+    testButton.addEventListener('click', function (event) {
+      /* Let the plain form post through when fetch is unavailable. */
+      if (typeof fetch !== 'function') return;
+      event.preventDefault();
+      if (testButton.disabled) return;
+
+      var label = testButton.getAttribute('data-label') || 'Test connection';
+      testButton.disabled = true;
+      testButton.textContent = 'Testing…';
+      show(testResult, 'Contacting the provider…');
+
+      fetch('/admin/ai/test', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          'x-csrf-token': csrf,
+        },
+        body: JSON.stringify({
+          ai_base_url: baseUrl ? baseUrl.value : '',
+          ai_model: model ? model.value : '',
+          ai_api_key: keyField ? keyField.value : '',
+        }),
+      })
+        .then(function (response) {
+          return response.json().catch(function () { return {}; }).then(function (data) {
+            return { status: response.status, data: data };
+          });
+        })
+        .then(function (result) {
+          var data = result.data || {};
+          var text = data.message || 'No answer from the provider.';
+          if (data.hint) text += ' ' + data.hint;
+          if (data.ok && data.latencyMs) text += ' (' + data.latencyMs + ' ms)';
+          show(testResult, text);
+          testResult.style.color = data.ok ? '' : '#c0392b';
+          if (window.GravyStudio) {
+            window.GravyStudio.toast(data.ok ? 'Provider reachable.' : text, data.ok ? 'success' : 'error');
+          }
+        })
+        .catch(function () {
+          show(testResult, 'The test request did not complete. Check your connection and try again.');
+          testResult.style.color = '#c0392b';
+        })
+        .then(function () {
+          testButton.disabled = false;
+          testButton.textContent = label;
+        });
+    });
+  })();
+</script>

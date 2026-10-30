@@ -3,12 +3,13 @@ import session from 'express-session';
 import expressLayouts from 'express-ejs-layouts';
 import { config, PUBLIC_DIR, VIEWS_DIR } from './config.js';
 import { attachUser } from './lib/auth.js';
-import { clientIp, csrfProtection, flashMiddleware } from './lib/http.js';
+import { clientIp, csrfProtection, flashMiddleware, setFlash } from './lib/http.js';
 import { HybridSessionStore } from './lib/session-store.js';
 import { loadSettings } from './lib/settings.js';
 import { buildHelpers } from './lib/view.js';
 import { accentStylesheet } from './lib/theme.js';
 import { rememberRequestOrigin } from './lib/url.js';
+import { describeUploadError } from './lib/upload.js';
 import { getMenuItems, getNavCategories, getTicker } from './services/navigation.js';
 import { publishDuePosts, getDb, DbSetupError } from './db/index.js';
 import { getInstallState, type InstallState } from './db/bootstrap.js';
@@ -321,6 +322,25 @@ export async function createApp() {
       const state = (res.locals.install as InstallState | undefined) ?? null;
       const withError = { ...(state ?? EMPTY_INSTALL_STATE), error: { message: dbError.message, hint: dbError.hint, code: '' } };
       return renderDbError(req, res, withError);
+    }
+
+    // A refused upload is the visitor's mistake, not a server fault: answer with
+    // the reason instead of a 500 and a stack trace in the log.
+    const uploadProblem = describeUploadError(error);
+    if (uploadProblem) {
+      console.warn(`[upload] ${req.method} ${req.originalUrl} — ${uploadProblem.message}`);
+      /*
+        The media library posts to /admin/api/media/upload with plain `fetch`,
+        which sends neither X-Requested-With nor an Accept header, so the path
+        is the only dependable signal that JSON is wanted here.
+      */
+      if (req.path.includes('/api/') || req.xhr || (req.get('accept') ?? '').includes('application/json')) {
+        res.status(uploadProblem.status).json({ error: uploadProblem.message });
+        return;
+      }
+      setFlash(req, 'error', uploadProblem.message);
+      res.redirect(req.path.startsWith('/admin') ? '/admin/media' : '/');
+      return;
     }
 
     console.error('[error]', req.method, req.originalUrl, error);

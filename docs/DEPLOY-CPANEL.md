@@ -238,16 +238,31 @@ served with a locked-down `Content-Security-Policy` plus `X-Content-Type-Options
 ### Which provider?
 
 Anything that speaks the OpenAI chat-completions shape and accepts `Authorization: Bearer <key>`.
-Set **Base URL** to:
+The settings page has one-click presets for each of these, which fill in the base URL and a current
+model id:
 
-| Provider | Base URL |
-| --- | --- |
-| OpenAI | `https://api.openai.com/v1` |
-| Groq | `https://api.groq.com/openai/v1` |
-| OpenRouter | `https://openrouter.ai/api/v1` |
-| Ollama (self-hosted) | `http://127.0.0.1:11434/v1` |
+| Provider | Base URL | Free model to start with | Card? |
+| --- | --- | --- | --- |
+| Groq | `https://api.groq.com/openai/v1` | `openai/gpt-oss-120b` | no |
+| OpenRouter | `https://openrouter.ai/api/v1` | any id ending `:free` | no |
+| Mistral | `https://api.mistral.ai/v1` | `mistral-small-latest` | no |
+| Google Gemini | `https://generativelanguage.googleapis.com/v1beta/openai` | `gemini-2.5-flash` | no |
+| Ollama (self-hosted) | `http://127.0.0.1:11434/v1` | whatever you pulled | no |
+| OpenAI | `https://api.openai.com/v1` | *(paid only)* | yes |
 
-The default model name is `gpt-4o-mini`; change it to whatever your provider expects.
+Model ids rotate — free tiers retire models with little notice — so if one stops working, check the
+provider's current list rather than assuming the assistant broke.
+
+**Use the Test connection button.** It makes one eight-token request and reports what came back,
+including latency, so you can confirm the base URL, key and model all work *before* saving them.
+This is also the fastest way to find out whether your host blocks outbound HTTPS.
+
+> **Where your drafts go matters.** This feature sends *unpublished* writing to a third party, so
+> the free tiers are not equivalent. Groq states it does not retain inference data by default, and
+> Ollama never leaves the machine. Google's free tier uses content to improve its products,
+> OpenRouter's free models may be trained on by the provider behind them (there is a privacy
+> setting to refuse those), and Mistral's free mode may train unless you opt out. Each preset shows
+> its own note in the UI before you pick it.
 
 > **Ollama and other keyless local providers:** the assistant refuses to run until an API key is
 > saved, because a blank key almost always means the form was never finished. Ollama does not check
@@ -258,6 +273,9 @@ The default model name is `gpt-4o-mini`; change it to whatever your provider exp
 > `Authorization: Bearer` header to `{base_url}/chat/completions`. Pointing Base URL at an
 > `*.openai.azure.com` deployment will be rejected. Use an OpenAI-compatible gateway in front of it,
 > or one of the providers above.
+
+> **GitHub Models was shut down on 30 July 2026** — playground, catalog and inference API all gone.
+> Many tutorials still recommend it, so it is deliberately not offered as a preset.
 
 ---
 

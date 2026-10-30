@@ -161,11 +161,23 @@ Node and keeps its files under `./data` (optional dependency: `lite4mariadb`, in
   library and inserts it as an image. The model never emits markup, so a hostile label cannot become
   script.
 - **Provider-agnostic** — any endpoint that speaks OpenAI's `POST {base_url}/chat/completions` with
-  `Authorization: Bearer` auth: OpenAI, Groq, OpenRouter, or a local Ollama. Configured under
-  **Studio → AI assistant**, with an on/off switch in the sidebar. The key is stored in the
-  database, masked in the UI and redacted from the settings export.
-- **Off means off** — the switch is enforced server-side on every request rather than merely hiding
-  the panel, and the whole surface is administrator-only.
+  `Authorization: Bearer` auth. Configured under **Studio → AI assistant**, with an on/off switch in
+  the sidebar. The key is stored in the database, masked in the UI and redacted from the settings
+  export.
+- **One-click presets, including free tiers** — the settings page offers Groq, OpenRouter, Mistral,
+  Google Gemini, a local Ollama and OpenAI, each filling in its base URL and a model id that is free
+  to call today. Five of the six cost nothing. Every preset also states what that provider does with
+  your prompts, because drafting sends unpublished text to a third party: Groq says it does not
+  retain inference data, Gemini's free tier is used to improve Google products, and a local Ollama
+  never lets your draft leave the machine. Azure OpenAI is deliberately absent — it authenticates
+  with an `api-key` header rather than a bearer token, so this client would be rejected.
+- **Test connection** — one button probes the saved or in-progress settings with a one-token request
+  and reports which model answered and how long the round trip took, so a wrong key, a retired model
+  id or a host that blocks outbound requests is diagnosed before you try to draft.
+- **On by default, inert until configured** — the assistant ships switched on but refuses every
+  request until an API key and a model exist, so nothing is sent anywhere on a fresh install. The
+  switch is enforced server-side on every request rather than merely hiding the panel, and the whole
+  surface is administrator-only.
 
 ### Media
 
@@ -217,8 +229,11 @@ Canonical URLs, Open Graph and Twitter cards, JSON-LD `Article` / `BreadcrumbLis
 - `scrypt` password hashing with per-user salt and timing-safe comparison.
 - Login throttling (six failed attempts per IP + email locks sign-in for 15 minutes), honeypot fields
   on public forms, MIME and extension checks on uploads, path normalisation for media.
-- Output escaping by default (EJS `<%=`), `sanitize-html` on rendered Markdown, URL validation on
-  redirects.
+- Output escaping by default (EJS `<%=`), `sanitize-html` on rendered Markdown, and one shared
+  redirect guard that rejects protocol-relative (`//host`) and backslash (`/\host`) targets wherever
+  a redirect is user-supplied — the login `next` field, the AI toggle and the newsletter form.
+- A refused upload answers `400`/`413` with the actual reason (JSON for the API, a flash message for
+  the form) rather than a `500`, and the rejection is logged as a warning instead of a stack trace.
 - Standalone 404 / 419 / 500 pages that render without leaking the admin shell.
 
 ---

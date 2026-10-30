@@ -65,6 +65,93 @@ export const AI_MODES: Array<{ id: ComposeMode; label: string; help: string }> =
   { id: 'selection', label: 'Rewrite the selection', help: 'Expands or improves only the text you have highlighted.' },
 ];
 
+export interface AiProviderPreset {
+  id: string;
+  label: string;
+  baseUrl: string;
+  model: string;
+  free: boolean;
+  keyHint: string;
+  privacy: string;
+}
+
+/*
+  Provider presets offered in the settings UI.
+
+  Only providers verified to accept the OpenAI chat-completions shape with an
+  `Authorization: Bearer` header are listed, because that is exactly what
+  `callChatCompletion` sends. Two deliberate omissions:
+
+    - Azure OpenAI authenticates with an `api-key` header and requires an
+      `api-version` query parameter, so it cannot work through this client.
+    - GitHub Models was shut down on 30 July 2026, despite still being
+      recommended across many tutorials.
+
+  Model ids rotate often — free tiers retire models with little notice — so
+  treat these as a starting point rather than a promise.
+
+  The privacy line matters more than the price. What this feature sends is
+  *unpublished drafting*, so a provider that trains on prompts is an editorial
+  decision the administrator should make knowingly, not a footnote they
+  discover later.
+*/
+export const AI_PROVIDERS: AiProviderPreset[] = [
+  {
+    id: 'groq',
+    label: 'Groq',
+    baseUrl: 'https://api.groq.com/openai/v1',
+    model: 'openai/gpt-oss-120b',
+    free: true,
+    keyHint: 'console.groq.com/keys — email only, no card. About 30 requests a minute and 1,000 a day.',
+    privacy: 'Groq states it does not retain inference data by default. The safest free option for unpublished drafts.',
+  },
+  {
+    id: 'openrouter',
+    label: 'OpenRouter',
+    baseUrl: 'https://openrouter.ai/api/v1',
+    model: 'google/gemma-4-31b-it:free',
+    free: true,
+    keyHint: 'openrouter.ai/keys — no card. Any model id ending in ":free" costs nothing; about 20 requests a minute and 50 a day.',
+    privacy: 'The provider behind a free model may train on your prompts. OpenRouter has a privacy setting to refuse those — turn it on before drafting here.',
+  },
+  {
+    id: 'mistral',
+    label: 'Mistral',
+    baseUrl: 'https://api.mistral.ai/v1',
+    model: 'mistral-small-latest',
+    free: true,
+    keyHint: 'console.mistral.ai/api-keys — no card. Free mode has monthly usage shown on your Limits page.',
+    privacy: 'Free-mode prompts may be used for training unless you opt out in the console. European provider, open-weight models.',
+  },
+  {
+    id: 'gemini',
+    label: 'Google Gemini',
+    baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai',
+    model: 'gemini-2.5-flash',
+    free: true,
+    keyHint: 'aistudio.google.com — no card for the free tier. Limits are per project and shown in AI Studio.',
+    privacy: 'Free-tier content is used to improve Google products. Not recommended for unpublished work you need kept private.',
+  },
+  {
+    id: 'ollama',
+    label: 'Ollama (local)',
+    baseUrl: 'http://127.0.0.1:11434/v1',
+    model: 'llama3.1',
+    free: true,
+    keyHint: 'No account and no key — enter any placeholder such as "ollama". The server must be reachable from wherever this CMS runs.',
+    privacy: 'Nothing leaves the machine. The strongest privacy option, at the cost of your own hardware.',
+  },
+  {
+    id: 'openai',
+    label: 'OpenAI (paid)',
+    baseUrl: 'https://api.openai.com/v1',
+    model: 'gpt-4o-mini',
+    free: false,
+    keyHint: 'platform.openai.com/api-keys — requires billing. No free tier for chat models.',
+    privacy: 'API traffic is not used for training by default. Check your organisation settings.',
+  },
+];
+
 const DEFAULT_BASE_URL = 'https://api.openai.com/v1';
 
 export function loadAiConfig(settings: SettingsMap): AiConfig {
@@ -386,4 +473,71 @@ export async function composeDraft(
     diagramsSkipped: inlined.skipped,
     model: config.model,
   };
+}
+
+/* ------------------------------------------------------------------ */
+/* connection probe                                                    */
+/* ------------------------------------------------------------------ */
+
+export interface ProbeResult {
+  ok: boolean;
+  message: string;
+  hint: string;
+  model: string;
+  baseUrl: string;
+  latencyMs: number;
+}
+
+/**
+ * Make one tiny real call so an administrator can confirm their base URL, key
+ * and model actually work before they rely on them.
+ *
+ * Deliberately bypasses `composeDraft`: no diagrams are drawn, nothing is
+ * written to the media library, and `maxTokens` is forced down to 8 so a test
+ * costs a fraction of a cent even on a paid provider.
+ *
+ * Also deliberately ignores `config.enabled`. Testing before switching the
+ * assistant on is the normal order of operations, and requiring an admin to
+ * enable a feature in order to find out whether it works is backwards.
+ *
+ * A failed probe is returned as `{ ok: false }` rather than thrown: the request
+ * to *test* succeeded, and it successfully reported that the provider does not
+ * work. Reserving HTTP error codes for "the test itself broke" keeps the
+ * client-side handling to one branch.
+ */
+export async function probeProvider(config: AiConfig): Promise<ProbeResult> {
+  const started = Date.now();
+  const base = { model: config.model, baseUrl: config.baseUrl };
+
+  if (!config.apiKey) {
+    return {
+      ...base, ok: false, latencyMs: 0,
+      message: 'No API key is saved yet.',
+      hint: 'Enter a key below, or pick a free provider — Groq and Mistral need only an email address.',
+    };
+  }
+  if (!config.model) {
+    return {
+      ...base, ok: false, latencyMs: 0,
+      message: 'No model name is saved yet.',
+      hint: 'Pick a provider preset to fill in a current model id.',
+    };
+  }
+
+  try {
+    const reply = await callChatCompletion(
+      { ...config, maxTokens: 8 },
+      [{ role: 'user', content: 'Reply with the single word: ready' }],
+    );
+    const trimmed = reply.trim().slice(0, 60);
+    return {
+      ...base, ok: true, latencyMs: Date.now() - started,
+      message: trimmed ? `Connected — the model replied “${trimmed}”.` : 'Connected — the model replied.',
+      hint: '',
+    };
+  } catch (error) {
+    const message = error instanceof AiError ? error.message : 'The connection test failed unexpectedly.';
+    const hint = error instanceof AiError ? error.hint : 'Check the base URL and that this server can make outbound requests.';
+    return { ...base, ok: false, latencyMs: Date.now() - started, message, hint };
+  }
 }

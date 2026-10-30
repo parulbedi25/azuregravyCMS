@@ -23,15 +23,60 @@ const storage = multer.diskStorage({
   },
 });
 
+/** Field name the media forms and the JSON API both post files under. */
+export const UPLOAD_FIELD = 'files';
+/** How many files one request may carry. */
+export const MAX_UPLOAD_FILES = 12;
+
+/**
+ * An upload the app refused on purpose.
+ *
+ * Carrying a 4xx status is what stops a wrong file type from surfacing as a
+ * 500: the generic error handler falls back to `error.status ?? 500`, and a
+ * bare `Error` has no status of its own.
+ */
+export class UploadError extends Error {
+  readonly status: number;
+  constructor(message: string, status = 400) {
+    super(message);
+    this.name = 'UploadError';
+    this.status = status;
+  }
+}
+
 function fileFilter(_req: Request, file: Express.Multer.File, cb: multer.FileFilterCallback): void {
   if (config.uploads.allowedMime.includes(file.mimetype)) return cb(null, true);
-  cb(new Error('Only JPG, PNG, WebP, GIF or AVIF images can be uploaded.'));
+  cb(new UploadError('Only JPG, PNG, WebP, GIF or AVIF images can be uploaded.'));
+}
+
+/**
+ * Translate a refused upload into something a person can act on, or null when
+ * the error came from somewhere else entirely.
+ *
+ * Multer identifies its own failures by `name` and `code` rather than through a
+ * class that survives the ESM/CJS boundary reliably, so this matches on those.
+ */
+export function describeUploadError(error: unknown): { status: number; message: string } | null {
+  if (error instanceof UploadError) return { status: error.status, message: error.message };
+  const err = error as (Error & { name?: string; code?: string }) | null;
+  if (!err || err.name !== 'MulterError') return null;
+  const maxMb = Math.round(config.uploads.maxBytes / (1024 * 1024));
+  switch (err.code) {
+    case 'LIMIT_FILE_SIZE':
+      return { status: 413, message: `That file is larger than the ${maxMb} MB limit.` };
+    case 'LIMIT_FILE_COUNT':
+      return { status: 400, message: `At most ${MAX_UPLOAD_FILES} files can be uploaded at once.` };
+    case 'LIMIT_UNEXPECTED_FILE':
+      return { status: 400, message: `Uploads must be sent in the "${UPLOAD_FIELD}" field.` };
+    default:
+      return { status: 400, message: err.message || 'That upload was refused.' };
+  }
 }
 
 export const upload = multer({
   storage,
   fileFilter,
-  limits: { fileSize: config.uploads.maxBytes, files: 12 },
+  limits: { fileSize: config.uploads.maxBytes, files: MAX_UPLOAD_FILES },
 });
 
 /** Turn a multer file into values for the media table. */
