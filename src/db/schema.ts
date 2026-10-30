@@ -298,21 +298,24 @@ export const DEFAULT_SETTINGS: Record<string, string> = {
   /*
     AI drafting assistant — administrators only.
 
-    Off by default: nothing is sent to any third party until an admin switches
-    it on and saves a key. `ai_base_url` points at any OpenAI-compatible
-    /chat/completions endpoint, so OpenAI, Azure OpenAI, Groq, OpenRouter and a
-    local Ollama all work without a code change.
-  */
-  /*
-    Enabled by default, but that is not the same as live: `describeAiReadiness`
-    refuses every request until an API key and a model are saved, so nothing is
-    sent anywhere on a fresh install. What this changes is the first-run
-    experience — the administrator sees "add a key" and a row of free-provider
-    presets instead of a feature that looks absent and has to be discovered.
+    Enabled by default, but that is not the same as live. The defaults below
+    point at OpenAI, which requires a key, so `describeAiReadiness` reports not
+    ready and nothing is sent anywhere on a fresh install. What enabling it by
+    default changes is the first-run experience: the administrator sees the
+    provider presets and a ready/off pill, instead of a feature that looks
+    absent and has to be discovered.
+
+    `ai_base_url` points at any OpenAI-compatible /chat/completions endpoint, so
+    Groq, OpenRouter, Mistral, Gemini, OpenAI and a keyless local server
+    (Ollama, LM Studio, llama.cpp and the rest) all work without a code change.
+    `ai_api_key` is genuinely optional: when it is empty no Authorization header
+    is sent at all, which is what an unauthenticated server expects. Azure
+    OpenAI is the notable exception — it authenticates with an `api-key` header
+    and an `api-version` parameter, so it cannot work through this client.
 
     Seeding is non-destructive (ON DUPLICATE KEY UPDATE setting_value =
     setting_value), so an existing install that switched the assistant off keeps
-    it off.
+    it off — and an existing install keeps whatever provider it already chose.
   */
   ai_enabled: '1',
   ai_base_url: 'https://api.openai.com/v1',

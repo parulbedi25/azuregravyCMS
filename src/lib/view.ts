@@ -6,6 +6,7 @@ import {
 import { previewPath } from './preview.js';
 import { buildPostPath, postListPath, splitAroundSlug, structureFrom } from './permalink.js';
 import type { PermalinkSource } from './permalink.js';
+import { describeAiReadiness, loadAiConfig } from '../services/ai.js';
 import type { SettingsMap } from '../types.js';
 
 /**
@@ -85,6 +86,29 @@ export function buildHelpers(settings: SettingsMap) {
     coverUrl,
     excerptOf,
     setting: (key: string, fallback = '') => settingOf(settings, key, fallback),
+    /*
+      One source of truth for "can the assistant be used right now".
+
+      Three views used to re-derive this from raw settings, and two of them
+      demanded an API key — which quietly disabled every keyless provider
+      everywhere except the settings page that configured it. The sidebar and
+      the editor card now both read this instead of `settings.ai_api_key`.
+
+      Only the presence of a key is exposed here, never its value.
+    */
+    aiStatus: (() => {
+      const config = loadAiConfig(settings);
+      const readiness = describeAiReadiness(config);
+      return {
+        on: config.enabled,
+        ready: readiness.ready,
+        reason: readiness.reason,
+        model: config.model,
+        baseUrl: config.baseUrl,
+        keyless: readiness.keyless,
+        providerLabel: readiness.provider?.label ?? '',
+      };
+    })(),
     year: new Date().getFullYear(),
   };
 }

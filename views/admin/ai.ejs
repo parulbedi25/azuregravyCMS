@@ -7,6 +7,36 @@
     and the bfcache.
   */
   const keySaved = !!maskedKey;
+
+  /*
+    Providers are grouped by what they cost the administrator to begin with,
+    because "free" on its own hides the distinction that actually matters:
+    whether an account and a key are needed at all.
+  */
+  const keylessLocal = providers.filter(function (p) { return !p.requiresKey && p.kind === 'local'; });
+  const keylessHosted = providers.filter(function (p) { return !p.requiresKey && p.kind === 'hosted'; });
+  const keyedFree = providers.filter(function (p) { return p.requiresKey && p.free; });
+  const paidProviders = providers.filter(function (p) { return !p.free; });
+
+  /*
+    One renderer rather than the button markup repeated four times. Every
+    interpolated value goes through h.escapeHtml even though these presets are
+    constants of ours, not user input — the attributes land inside quoted HTML,
+    and a future preset containing a quote must not be able to break out.
+  */
+  function presetButton(p) {
+    return '<button class="btn btn--soft btn--sm" type="button"' +
+      ' data-base-url="' + h.escapeHtml(p.baseUrl) + '"' +
+      ' data-model="' + h.escapeHtml(p.model) + '"' +
+      ' data-key-hint="' + h.escapeHtml(p.keyHint) + '"' +
+      ' data-privacy="' + h.escapeHtml(p.privacy) + '"' +
+      ' data-requires-key="' + (p.requiresKey ? '1' : '0') + '"' +
+      ' data-label="' + h.escapeHtml(p.label) + '">' +
+      h.escapeHtml(p.label) +
+      (p.requiresKey ? '' : ' <span class="pill pill--plain">no key</span>') +
+      '</button>';
+  }
+  function presetRow(list) { return list.map(presetButton).join(''); }
 %>
 
 <div class="admin-page-head">
@@ -43,42 +73,87 @@
       </label>
 
       <div class="field">
-        <span>Free and open providers</span>
-        <div class="row" style="flex-wrap:wrap;gap:6px" id="aiProviders">
-          <% providers.forEach(function (provider) { %>
-            <button class="btn btn--soft btn--sm" type="button"
-                    data-base-url="<%= provider.baseUrl %>"
-                    data-model="<%= provider.model %>"
-                    data-key-hint="<%= provider.keyHint %>"
-                    data-privacy="<%= provider.privacy %>">
-              <%= provider.label %><%= provider.free ? ' · free' : '' %>
-            </button>
-          <% }); %>
+        <span>No API key needed — a model server on your own machine</span>
+        <div class="row" style="flex-wrap:wrap;gap:6px" id="aiProviders" data-preset-group>
+          <%- presetRow(keylessLocal) %>
         </div>
-        <span class="hint">Pick one to fill in the base URL and a current model id. Every provider marked free issues a key with no credit card.</span>
-        <span class="hint" id="aiProviderKey" style="display:none"></span>
-        <span class="hint" id="aiProviderPrivacy" style="display:none"></span>
+        <span class="hint">
+          Free, open-weight, and nothing leaves the building. You run the server yourself and it needs no account.
+          The catch: it must be reachable from wherever this CMS runs, so on shared hosting these will not connect —
+          use the hosted option below there.
+        </span>
       </div>
+
+      <div class="field">
+        <span>No API key needed — hosted</span>
+        <div class="row" style="flex-wrap:wrap;gap:6px" data-preset-group>
+          <%- presetRow(keylessHosted) %>
+        </div>
+        <span class="hint">
+          Works with no account and no local server, including on shared hosting. In exchange the drafts cross the
+          public internet and the endpoint can rate-limit or change without notice. Press <b>Test connection</b>
+          before relying on one.
+        </span>
+      </div>
+
+      <div class="field">
+        <span>Free with a key — no credit card</span>
+        <div class="row" style="flex-wrap:wrap;gap:6px" data-preset-group>
+          <%- presetRow(keyedFree) %>
+        </div>
+        <span class="hint">Pick one to fill in the base URL and a current model id. Each of these issues a key for an email address alone.</span>
+      </div>
+
+      <% if (paidProviders.length) { %>
+        <div class="field">
+          <span>Paid</span>
+          <div class="row" style="flex-wrap:wrap;gap:6px" data-preset-group>
+            <%- presetRow(paidProviders) %>
+          </div>
+        </div>
+      <% } %>
+
+      <span class="hint" id="aiProviderKey" style="display:none"></span>
+      <span class="hint" id="aiProviderPrivacy" style="display:none"></span>
 
       <div class="form-grid form-grid--2">
         <label class="field">
           <span>Base URL</span>
-          <input class="input" type="url" name="ai_base_url" id="aiBaseUrl" value="<%= config.baseUrl %>" placeholder="https://api.openai.com/v1">
-          <span class="hint">Any endpoint taking OpenAI chat completions with a <span class="mono">Bearer</span> key. Azure OpenAI will not work — it needs an <span class="mono">api-key</span> header instead.</span>
+          <input class="input" type="url" name="ai_base_url" id="aiBaseUrl" value="<%= config.baseUrl %>" placeholder="http://127.0.0.1:11434/v1">
+          <span class="hint">
+            Any endpoint taking OpenAI chat completions. A saved key is sent as a <span class="mono">Bearer</span>
+            header; with no key saved, no header is sent at all — which is what a local server expects. Azure OpenAI
+            will not work here: it wants an <span class="mono">api-key</span> header instead.
+          </span>
         </label>
-        <label class="field">
+        <div class="field">
           <span>Model</span>
-          <input class="input" name="ai_model" id="aiModel" value="<%= config.model %>" placeholder="gpt-4o-mini">
-          <span class="hint">The exact model id your provider expects. Free tiers retire models often, so check the provider's list if one stops working.</span>
-        </label>
+          <div class="row" style="gap:6px;align-items:center">
+            <input class="input" name="ai_model" id="aiModel" value="<%= config.model %>"
+                   placeholder="llama3.2" list="aiModelList" autocomplete="off" style="flex:1;min-width:0">
+            <button class="btn btn--soft btn--sm" type="submit" formaction="/admin/ai/discover" id="aiDiscover"
+                    data-label="Find models">Find models</button>
+          </div>
+          <datalist id="aiModelList"></datalist>
+          <span class="hint">
+            The exact model id your server expects. <b>Find models</b> reads the list from the server itself so you
+            do not have to guess it — on a local runtime it is whatever you downloaded.
+          </span>
+          <span class="hint" id="aiDiscoverResult" role="status" aria-live="polite" style="display:none"></span>
+        </div>
       </div>
 
       <label class="field">
-        <span>API key</span>
-        <input class="input" type="password" name="ai_api_key" value="" autocomplete="off" spellcheck="false"
-               placeholder="<%= keySaved ? maskedKey + '  —  leave blank to keep it' : 'sk-…' %>">
-        <span class="hint">
-          <%= keySaved ? 'A key is saved. Leaving this blank keeps it; typing a new one replaces it.' : 'Stored in your own database and redacted from System → Export.' %>
+        <span>
+          API key
+          <span class="pill pill--plain" id="aiKeyBadge" <%= readiness.keyless ? '' : 'style="display:none"' %>>optional</span>
+        </span>
+        <input class="input" type="password" name="ai_api_key" id="aiApiKey" value="" autocomplete="off" spellcheck="false"
+               placeholder="<%= keySaved ? maskedKey + '  —  leave blank to keep it' : (readiness.keyless ? 'Blank is fine — this provider needs none' : 'sk-…') %>">
+        <span class="hint" id="aiKeyHint">
+          <%= keySaved
+                ? 'A key is saved. Leaving this blank keeps it; typing a new one replaces it.'
+                : 'Optional. Leave it blank and no Authorization header is sent at all, which is what a local model server expects. A key you do save lives in your own database and is redacted from System → Export.' %>
         </span>
       </label>
 
@@ -86,7 +161,10 @@
         <label class="switch">
           <input type="checkbox" name="ai_api_key_clear" value="1">
           <span class="switch__track"></span>
-          <span class="switch__text"><b>Remove the saved key</b><span>Disarms the assistant until a new key is entered.</span></span>
+          <span class="switch__text">
+            <b>Remove the saved key</b>
+            <span>Switch this on when moving to a keyless provider, so no credential is sent at all. Left off, the saved key stays and keeps being sent.</span>
+          </span>
         </label>
       <% } %>
 
@@ -110,7 +188,11 @@
         <a class="btn btn--ghost btn--sm" href="/admin/ai">Discard changes</a>
       </div>
       <p class="hint" id="aiTestResult" role="status" aria-live="polite" style="display:none;margin:0"></p>
-      <p class="hint" style="margin:0">Testing sends one eight-token request — a fraction of a cent on a paid provider, and free on the providers above. It works before you save, so you can try a provider without committing to it.</p>
+      <p class="hint" style="margin:0">
+        Testing sends one eight-token request — a fraction of a cent on a paid provider, and nothing at all on the
+        keyless ones. It works before you save, and with no key in the field, so you can try a local server without
+        committing to it.
+      </p>
     </form>
   </div>
 
@@ -178,13 +260,37 @@
     }
 
     /* ---- presets: fill the two fields, and explain the key + the privacy ---- */
-    var presets = document.querySelectorAll('#aiProviders [data-base-url]');
+    /*
+      Selected across every group, not just #aiProviders: the presets are now
+      split into four labelled groups and only the first kept that id, so an
+      id-scoped selector would have quietly left three groups doing nothing.
+    */
+    var presets = document.querySelectorAll('[data-preset-group] [data-base-url]');
+    var keyBadge = document.getElementById('aiKeyBadge');
+    var keyHint = document.getElementById('aiKeyHint');
+
     Array.prototype.forEach.call(presets, function (button) {
       button.addEventListener('click', function () {
         if (baseUrl) baseUrl.value = button.getAttribute('data-base-url') || '';
         if (model) model.value = button.getAttribute('data-model') || '';
         show(keyNote, button.getAttribute('data-key-hint') || '');
         show(privacyNote, button.getAttribute('data-privacy') || '');
+
+        var needsKey = button.getAttribute('data-requires-key') === '1';
+        if (keyBadge) {
+          keyBadge.textContent = needsKey ? 'required' : 'optional';
+          keyBadge.style.display = '';
+        }
+        /*
+          A keyless provider with a key already saved still sends that key, so
+          say so rather than letting the admin assume switching presets was
+          enough to go keyless.
+        */
+        if (keyHint) {
+          keyHint.textContent = needsKey
+            ? (button.getAttribute('data-label') || 'This provider') + ' needs a key.'
+            : 'No key needed — leave the field blank. If one is already saved it will still be sent; use “Remove the saved key” to stop that.';
+        }
 
         Array.prototype.forEach.call(presets, function (other) {
           other.classList.remove('btn--accent');
@@ -194,6 +300,80 @@
         button.classList.add('btn--accent');
       });
     });
+
+    /* ---- model discovery: read the server's own model list ---- */
+    var discoverButton = document.getElementById('aiDiscover');
+    var discoverResult = document.getElementById('aiDiscoverResult');
+    var modelList = document.getElementById('aiModelList');
+
+    if (discoverButton) {
+      discoverButton.addEventListener('click', function (event) {
+        /* Let the plain form post through when fetch is unavailable. */
+        if (typeof fetch !== 'function') return;
+        event.preventDefault();
+        if (discoverButton.disabled) return;
+
+        var discoverLabel = discoverButton.getAttribute('data-label') || 'Find models';
+        discoverButton.disabled = true;
+        discoverButton.textContent = 'Looking…';
+        show(discoverResult, 'Asking the server which models it has…');
+        discoverResult.style.color = '';
+
+        fetch('/admin/ai/discover', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+            'x-csrf-token': csrf,
+          },
+          body: JSON.stringify({
+            ai_base_url: baseUrl ? baseUrl.value : '',
+            ai_model: model ? model.value : '',
+            ai_api_key: keyField ? keyField.value : '',
+          }),
+        })
+          .then(function (response) {
+            return response.json().catch(function () { return {}; }).then(function (data) {
+              return { status: response.status, data: data };
+            });
+          })
+          .then(function (result) {
+            var data = result.data || {};
+            var models = data.models || [];
+            if (data.ok && models.length) {
+              if (modelList) {
+                modelList.textContent = '';
+                models.forEach(function (id) {
+                  var option = document.createElement('option');
+                  option.value = id;
+                  modelList.appendChild(option);
+                });
+              }
+              /*
+                Fill the field only when it is empty. An admin who typed a model
+                id deliberately should not have it replaced by whichever id
+                happens to sort first.
+              */
+              if (model && !model.value.trim()) model.value = models[0];
+              show(discoverResult, (data.message || 'Models found.') + ' They are listed in the Model field.');
+              discoverResult.style.color = '';
+            } else {
+              var text = data.message || 'No models came back.';
+              if (data.hint) text += ' ' + data.hint;
+              show(discoverResult, text);
+              discoverResult.style.color = '#c0392b';
+            }
+          })
+          .catch(function () {
+            show(discoverResult, 'The request did not complete. Check the base URL and try again.');
+            discoverResult.style.color = '#c0392b';
+          })
+          .then(function () {
+            discoverButton.disabled = false;
+            discoverButton.textContent = discoverLabel;
+          });
+      });
+    }
 
     /* ---- connection test ---- */
     if (!testButton) return;
