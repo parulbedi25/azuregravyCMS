@@ -286,6 +286,21 @@ export const DEFAULT_SETTINGS: Record<string, string> = {
   timezone: 'UTC',
   date_format: 'long',
   admin_footer_note: 'Azure Gravy CMS',
+
+  /*
+    AI drafting assistant — administrators only.
+
+    Off by default: nothing is sent to any third party until an admin switches
+    it on and saves a key. `ai_base_url` points at any OpenAI-compatible
+    /chat/completions endpoint, so OpenAI, Azure OpenAI, Groq, OpenRouter and a
+    local Ollama all work without a code change.
+  */
+  ai_enabled: '0',
+  ai_base_url: 'https://api.openai.com/v1',
+  ai_api_key: '',
+  ai_model: 'gpt-4o-mini',
+  ai_max_tokens: '1400',
+  ai_diagrams: '1',
 };
 
 /** Small, deliberate set of navigation defaults (editable in Admin → Menus). */

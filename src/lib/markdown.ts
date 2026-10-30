@@ -53,7 +53,7 @@ export function renderMarkdown(markdown: string): RenderedContent {
     ],
     allowedAttributes: {
       a: ['href', 'name', 'target', 'rel', 'title'],
-      img: ['src', 'srcset', 'alt', 'title', 'width', 'height', 'loading'],
+        img: ['src', 'srcset', 'alt', 'title', 'width', 'height', 'loading', 'decoding'],
       source: ['src', 'srcset', 'type', 'media'],
       video: ['src', 'controls', 'poster', 'width', 'height'],
       audio: ['src', 'controls'],

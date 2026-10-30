@@ -343,9 +343,16 @@ router.post(
   requireRole('admin'),
   asyncRoute(async (_req, res) => {
     const db = await getDb();
+    /*
+      The export is a plain JSON download that leaves the server, so the AI
+      provider key is replaced rather than copied. Every other setting is
+      needed to restore a site; a secret is not, and re-entering one key is
+      a far smaller cost than leaking it into someone's downloads folder.
+    */
+    const allSettings = await loadSettings(true);
     const payload = {
       exportedAt: new Date().toISOString(),
-      settings: await loadSettings(true),
+      settings: { ...allSettings, ai_api_key: allSettings.ai_api_key ? '[redacted]' : '' },
       users: (await db.query('SELECT id, name, email, role, bio, created_at FROM users')).map((row) => row),
       categories: await db.query('SELECT * FROM categories'),
       tags: await db.query('SELECT * FROM tags'),

@@ -97,6 +97,20 @@ export async function createApp() {
       etag: true,
       setHeaders: (res, filePath) => {
         if (filePath.includes('/uploads/')) res.setHeader('Cache-Control', 'public, max-age=2592000');
+        /*
+          Generated diagrams are SVG. Referenced from an <img> they are inert,
+          but navigating straight to one renders it as a document, where a
+          <script> or onload handler would run in this origin. These files are
+          drawn by services/diagram.ts from a validated spec with every label
+          XML-escaped, so none can contain a handler — this is defence in depth,
+          pinning the risk to zero even if that renderer is later changed.
+          `sandbox` gives the document a unique origin; default-src 'none'
+          blocks script, fetch and navigation outright.
+        */
+        if (filePath.includes('/uploads/diagrams/')) {
+          res.setHeader('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; sandbox");
+          res.setHeader('X-Content-Type-Options', 'nosniff');
+        }
       },
     }),
   );

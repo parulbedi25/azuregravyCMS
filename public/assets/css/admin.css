@@ -899,6 +899,7 @@ label.field > span { color: var(--admin-ink-2); }
 }
 .stack-16 { display: grid; gap: 16px; }
 .stack-10 { display: grid; gap: 10px; }
+.stack-6 { display: grid; gap: 6px; }
 .row { display: flex; align-items: center; gap: 10px; }
 .row--between { justify-content: space-between; }
 .row--wrap { flex-wrap: wrap; }
@@ -1102,3 +1103,40 @@ label.field > span { color: var(--admin-ink-2); }
   .table .cell-link__url { max-width: 150px; }
   .editor-titlelink__note { flex-basis: 100%; }
 }
+
+/* ------------------------------------------------------------------ */
+/* AI assistant                                                        */
+/* ------------------------------------------------------------------ */
+
+/*
+  Sidebar on/off switch. The base .switch is designed for light panels, so on
+  the dark rail the ink and track are re-toned here rather than left to inherit
+  dark-on-dark. The Apply button is the no-JS path; admin.js hides it once the
+  switch has been upgraded to an instant fetch.
+*/
+.sidebar-ai { margin-bottom: 4px; }
+.sidebar-ai__form { padding: 4px 10px 8px; }
+.switch--rail { padding: 6px 0; gap: 9px; }
+.switch--rail .switch__track { background: rgba(255, 255, 255, 0.18); }
+.switch--rail input:checked + .switch__track { background: var(--admin-accent); }
+.switch--rail .switch__text b { color: #f2f4f8; font-size: 0.79rem; }
+.switch--rail .switch__text span { color: var(--admin-side-ink); font-size: 0.71rem; }
+.sidebar-ai__apply {
+  margin-top: 6px;
+  width: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.06);
+  color: #f2f4f8;
+  border-radius: 8px;
+  padding: 5px 10px;
+  font-size: 0.74rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+.sidebar-ai__apply:hover { background: rgba(255, 255, 255, 0.12); }
+
+/* Editor drafting card */
+.side-card--ai .side-card__head h3 { display: flex; align-items: center; gap: 6px; }
+.side-card--ai .side-card__head h3 svg { color: var(--admin-accent); }
+.side-card--ai #aiStatus { line-height: 1.5; }
+.side-card--ai #aiGenerate[disabled] { opacity: 0.65; cursor: progress; }

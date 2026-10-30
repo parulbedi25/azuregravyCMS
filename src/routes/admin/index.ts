@@ -11,6 +11,7 @@ import mediaRoutes from './media.js';
 import commentRoutes from './comments.js';
 import peopleRoutes from './people.js';
 import settingsRoutes from './settings.js';
+import aiRoutes from './ai.js';
 
 const router = Router();
 
@@ -63,6 +64,7 @@ router.use(mediaRoutes);
 router.use(commentRoutes);
 router.use(peopleRoutes);
 router.use(settingsRoutes);
+router.use(aiRoutes);
 
 router.post('/logout', (req, res) => {
   const user = res.locals.currentUser;
