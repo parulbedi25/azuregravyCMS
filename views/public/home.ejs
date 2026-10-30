@@ -33,8 +33,8 @@
             <h2><%= featured.title %></h2>
             <p><%= h.excerptOf(featured, 200) %></p>
             <div class="hero-card__meta">
-              <%- include('../partials/avatar', { avatar: featured.author_avatar, name: featured.author_name || 'Azure Gravy' }) %>
-              <span><%= featured.author_name || 'Azure Gravy' %></span>
+              <%- include('../partials/avatar', { avatar: featured.author_avatar, name: featured.author_name || 'Gravy' }) %>
+              <span><%= featured.author_name || 'Gravy' %></span>
               <span class="dot"></span>
               <time datetime="<%= h.isoDate(featured.published_at) %>"><%= h.formatDate(featured.published_at, 'long') %></time>
               <span class="dot"></span>

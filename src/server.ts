@@ -25,12 +25,12 @@ async function checkUploads(): Promise<string | null> {
  * that wizard — never a crash here.
  */
 async function bootstrap() {
-  console.log('\n  Azure Gravy CMS');
+  console.log('\n  Gravy CMS');
   line('environment', config.env);
   line('database', config.db.configured ? describeDbTarget() : 'not configured yet');
   if (config.db.configured) line('settings from', config.db.source === 'env+installer' ? '.env + data/install.json' : config.db.source === 'env' ? 'environment / .env' : 'data/install.json');
 
-  if (config.isProd && config.sessionSecret === 'azure-gravy-development-secret-change-me') {
+  if (config.isProd && config.sessionSecret === 'gravy-development-secret-change-me') {
     console.warn('  ⚠ SESSION_SECRET is the development fallback — set a long random value in .env.');
   }
   if (!config.siteUrl) {

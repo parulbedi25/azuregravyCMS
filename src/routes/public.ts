@@ -487,7 +487,7 @@ router.get(
     res.type('application/rss+xml').send(`<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
-    <title>${escape(settings.site_title ?? 'Azure Gravy')}</title>
+    <title>${escape(settings.site_title ?? 'Gravy')}</title>
     <link>${base}</link>
     <description>${escape(settings.site_description ?? '')}</description>
     <language>en</language>

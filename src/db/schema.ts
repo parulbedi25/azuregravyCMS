@@ -247,12 +247,12 @@ export const SCHEMA_STATEMENTS: string[] = [
 export const SCHEMA_VERSION = 2;
 
 export const DEFAULT_SETTINGS: Record<string, string> = {
-  site_title: 'Azure Gravy',
+  site_title: 'Gravy',
   site_tagline: 'A publication for people who make things.',
   site_description:
-    'Azure Gravy is an independent journal about good work, slow travel and the creative life — served warm, twice a week.',
+    'Gravy is an independent journal about good work, slow travel and the creative life — served warm, twice a week.',
   site_url: '',
-  logo_text: 'Azure Gravy',
+  logo_text: 'Gravy',
   logo_mark: 'drop',
   accent_color: '#206bea',
   default_theme: 'light',
@@ -282,8 +282,8 @@ export const DEFAULT_SETTINGS: Record<string, string> = {
   newsletter_text:
     'One thoughtful letter each week: what we read, what we made, and one idea worth keeping. No noise, ever.',
   footer_about:
-    'Azure Gravy is a small, independent publication about work that matters and the life around it. Written by humans. Read with coffee.',
-  footer_copyright: '© {year} Azure Gravy. All rights reserved.',
+    'Gravy is a small, independent publication about work that matters and the life around it. Written by humans. Read with coffee.',
+  footer_copyright: '© {year} Gravy. All rights reserved.',
   social_twitter: 'https://twitter.com/',
   social_instagram: 'https://instagram.com/',
   social_linkedin: 'https://linkedin.com/',
@@ -293,7 +293,7 @@ export const DEFAULT_SETTINGS: Record<string, string> = {
   analytics_snippet: '',
   timezone: 'UTC',
   date_format: 'long',
-  admin_footer_note: 'Azure Gravy CMS',
+  admin_footer_note: 'Gravy CMS',
 
   /*
     AI drafting assistant — administrators only.

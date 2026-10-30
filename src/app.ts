@@ -55,7 +55,7 @@ function renderDbError(req: Request, res: Response, state: InstallState | null, 
     code: state?.error?.code ?? '',
     target: config.db.configured ? `${config.db.user}@${config.db.host}:${config.db.port}/${config.db.database}` : '',
     path: req.originalUrl,
-    siteName: 'Azure Gravy',
+    siteName: 'Gravy',
     settings: DEFAULT_SETTINGS as Record<string, string>,
     h: buildHelpers(DEFAULT_SETTINGS as Record<string, string>),
   });
@@ -242,9 +242,9 @@ export async function createApp() {
       res.locals.h = buildHelpers(settings);
       res.locals.currentPath = req.path;
       res.locals.query = req.query;
-      res.locals.siteName = settings.site_title || 'Azure Gravy';
+      res.locals.siteName = settings.site_title || 'Gravy';
       res.locals.theme = settings.default_theme === 'dark' ? 'dark' : 'light';
-      res.locals.pageTitle = settings.site_title ?? 'Azure Gravy';
+      res.locals.pageTitle = settings.site_title ?? 'Gravy';
       res.locals.accentStyles = accentStylesheet(settings.accent_color);
       res.locals.metaDescription = settings.site_description ?? '';
       res.locals.ogImage = settings.seo_default_image || '/assets/seed/misc/og-default.webp';

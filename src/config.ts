@@ -145,7 +145,7 @@ const storedDb = installRecord.db ?? {};
  * Do we know *where* the database is?
  *
  * Deliberately strict: with nothing configured the app still starts and serves
- * the installer instead of guessing `root@127.0.0.1/azuregravy` and failing.
+ * the installer instead of guessing `root@127.0.0.1/gravy` and failing.
  */
 function isConfigured(input: DbConfigInput): boolean {
   if (input.driver === 'embedded') return true;
@@ -182,7 +182,7 @@ export const config = {
   socketPath: isSocketPort ? rawPort : null,
   host: process.env.HOST ?? '0.0.0.0',
   siteUrl: (process.env.SITE_URL ?? '').replace(/\/$/, ''),
-  sessionSecret: process.env.SESSION_SECRET ?? 'azure-gravy-development-secret-change-me',
+  sessionSecret: process.env.SESSION_SECRET ?? 'gravy-development-secret-change-me',
   /** See `sameSite()` above — `none` is only for cross-site iframe hosting. */
   sessionSameSite: sameSite(process.env.SESSION_SAMESITE),
   db: {

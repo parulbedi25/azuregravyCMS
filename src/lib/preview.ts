@@ -15,7 +15,7 @@ import { config } from '../config.js';
  * grants nothing — it only stops the id space from being guessable in logs,
  * referrers and browser history.
  */
-const PREFIX = 'azure-gravy:preview:v1';
+const PREFIX = 'gravy:preview:v1';
 
 /** Trimmed base64url HMAC — 22 chars is ~132 bits, ample for a capability tag. */
 function sign(id: number): string {

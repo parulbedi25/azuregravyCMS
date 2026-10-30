@@ -395,8 +395,8 @@ async function createEmbedded(target: ConnectionTarget): Promise<DbClient> {
   }
   await fs.mkdir(target.dataDir, { recursive: true });
   const engine = (await Lite4MariaDB.create({ dataDir: target.dataDir })) as EmbeddedEngine;
-  await engine.exec(`CREATE DATABASE IF NOT EXISTS \`${safeName(target.database || 'azuregravy')}\``);
-  await engine.exec(`USE \`${safeName(target.database || 'azuregravy')}\``);
+  await engine.exec(`CREATE DATABASE IF NOT EXISTS \`${safeName(target.database || 'gravy')}\``);
+  await engine.exec(`USE \`${safeName(target.database || 'gravy')}\``);
   return new EmbeddedDb(engine);
 }
 

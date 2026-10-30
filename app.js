@@ -1,5 +1,5 @@
 /**
- * Azure Gravy CMS — entry point.
+ * Gravy CMS — entry point.
  *
  * `npm install && npm start` runs this file directly (`node app.js`), and so does
  * cPanel's "Setup Node.js App" / Phusion Passenger, which expects a startup file

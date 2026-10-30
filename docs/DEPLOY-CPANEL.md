@@ -1,4 +1,4 @@
-# Deploying Azure Gravy on cPanel (Namecheap, Hostinger, GoDaddy…)
+# Deploying Gravy CMS on cPanel (Namecheap, Hostinger, GoDaddy…)
 
 Tested against the standard **cPanel → Setup Node.js App** flow (Phusion Passenger). You need:
 
@@ -36,15 +36,16 @@ Two options.
 
 ### a) Git (if the host offers "Git™ Version Control")
 
-Create a repository pointing at `https://github.com/parulbedi25/azuregravyCMS.git`, branch `main`,
-and deploy. The application root is the directory cPanel creates for it.
+Create a repository pointing at your own copy of Gravy CMS
+(`https://github.com/<your-username>/gravy-cms.git`), branch `main`, and deploy.
+The application root is the directory cPanel creates for it.
 
 ### b) File Manager / SFTP
 
 Upload the repository **without** `node_modules` and without `.git`:
 
 ```
-/home/myaccount/azuregravy/         ← application root
+/home/myaccount/gravy/         ← application root
 ├── app.js
 ├── package.json
 ├── src/
@@ -66,7 +67,7 @@ Upload the repository **without** `node_modules` and without `.git`:
 | --- | --- |
 | Node.js version | **20** or newer |
 | Application mode | **Production** |
-| Application root | the folder from step 2, e.g. `azuregravy` |
+| Application root | the folder from step 2, e.g. `gravy` |
 | Application URL | your domain or subdomain |
 | **Application startup file** | **`app.js`** |
 
@@ -112,7 +113,7 @@ Prefer a file? Copy `.env.example` to `.env` in the application root and fill in
 Click **Run NPM Install** in the Node.js App screen, or from a terminal:
 
 ```bash
-cd ~/azuregravy
+cd ~/gravy
 npm install --omit=dev
 ```
 
@@ -327,7 +328,7 @@ This is also the fastest way to find out whether your host blocks outbound HTTPS
 Before the installer has run:
 
 ```
-  Azure Gravy CMS
+  Gravy CMS
   environment : production
   database    : not configured yet
 
@@ -342,7 +343,7 @@ Before the installer has run:
 After it (or with `DB_*` environment variables set):
 
 ```
-  Azure Gravy CMS
+  Gravy CMS
   environment : production
   database    : myaccount_gravy@localhost:3306/myaccount_gravy
   settings from: data/install.json
@@ -380,7 +381,7 @@ only when missing, and settings you have changed are never overwritten. Restart 
 ## Updating
 
 ```bash
-cd ~/azuregravy
+cd ~/gravy
 git pull            # or re-upload the changed files
 npm install --omit=dev
 # then Restart in the Node.js App screen

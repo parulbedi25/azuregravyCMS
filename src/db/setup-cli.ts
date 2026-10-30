@@ -13,7 +13,7 @@ import { recordInstalled } from './install.js';
  * normal `npm start` does exactly the same work on boot.
  */
 async function main() {
-  console.log('\n  Azure Gravy — database setup');
+  console.log('\n  Gravy CMS — database setup');
 
   if (!config.db.configured) {
     console.log('  target       : not configured\n');
