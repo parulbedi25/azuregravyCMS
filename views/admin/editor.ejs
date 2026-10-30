@@ -270,8 +270,12 @@
           Everything is read by id and sent with fetch. Buttons are
           type="button" so they can never submit the post form.
         */
-        const aiOn = settings.ai_enabled === '1';
-        const aiReady = aiOn && !!settings.ai_api_key && !!settings.ai_model;
+        const aiOn = h.aiStatus.on;
+        // Readiness comes from the shared rule, not from settings.ai_api_key:
+        // a keyless local server is ready, and gating on a key here used to
+        // hide the whole card for exactly those providers.
+        const aiReady = h.aiStatus.ready;
+        const aiReason = h.aiStatus.reason;
         const aiSeedTitle = post && post.title ? post.title : '';
       %>
       <% if (can.admin) { %>
@@ -283,7 +287,10 @@
         <div class="side-card__body">
           <% if (!aiReady) { %>
             <p class="hint" style="margin:0">
-              <%= aiOn ? 'Add an API key and a model name to start drafting.' : 'The assistant is switched off.' %>
+              <%# aiReason is the shared readiness sentence: accurate for a
+                  missing model, a key-needing provider with no key, or the
+                  assistant being off — none of which is "add an API key". %>
+              <%= aiReason %>
               <a href="/admin/ai">Configure it</a>, or use the switch in the sidebar.
             </p>
           <% } else { %>

@@ -200,7 +200,8 @@ chmod -R 775 public/uploads data
 
 ## 8. Optional: the AI drafting assistant
 
-The assistant ships switched off, and nothing else in the CMS depends on it.
+The assistant ships switched on but inert: the default settings point at OpenAI, which needs a key,
+so nothing is sent anywhere until you configure it. Nothing else in the CMS depends on it.
 
 Configure it in the browser under **Studio → AI assistant** (`/admin/ai`). There are no environment
 variables for it: the base URL, model name, token limit and API key are stored in the `settings`
@@ -237,9 +238,42 @@ served with a locked-down `Content-Security-Policy` plus `X-Content-Type-Options
 
 ### Which provider?
 
-Anything that speaks the OpenAI chat-completions shape and accepts `Authorization: Bearer <key>`.
-The settings page has one-click presets for each of these, which fill in the base URL and a current
-model id:
+Anything that speaks the OpenAI chat-completions shape. A saved key is sent as
+`Authorization: Bearer`; with no key saved, no auth header is sent at all — so servers that do not
+authenticate work without any workaround. The settings page has one-click presets, grouped by what
+they need from you, which fill in the base URL and a current model id:
+
+**No API key — a model server you run yourself**
+
+| Provider | Base URL | Model | Card? |
+| --- | --- | --- | --- |
+| Ollama | `http://127.0.0.1:11434/v1` | whatever you pulled | no |
+| LM Studio | `http://127.0.0.1:1234/v1` | `local-model` | no |
+| llama.cpp | `http://127.0.0.1:8080/v1` | fixed at server start | no |
+| Jan | `http://127.0.0.1:1337/v1` | whichever is loaded | no |
+| GPT4All | `http://127.0.0.1:4891/v1` | whichever is loaded | no |
+| KoboldCpp | `http://127.0.0.1:5001/v1` | `local-model` | no |
+| vLLM | `http://127.0.0.1:8000/v1` | must match `--served-model-name` | no |
+| LocalAI | `http://127.0.0.1:8080/v1` | from its model gallery | no |
+| text-generation-webui | `http://127.0.0.1:5000/v1` | `local-model` | no |
+
+> **These will not work on shared cPanel hosting.** Every one of them expects a model server
+> listening on the same machine as the CMS. A shared account has no such server and no way to start
+> one, so on Namecheap-style hosting the local rows are for a VPS, a container or your own
+> workstation — not for the hosted site. Use the hosted keyless row below, or a keyed provider.
+
+**No API key — hosted**
+
+| Provider | Base URL | Model | Card? |
+| --- | --- | --- | --- |
+| Pollinations | `https://text.pollinations.ai/openai` | `openai` | no |
+
+This is the only keyless option that works on shared hosting. It is a public, unauthenticated free
+endpoint: it can rate-limit, change shape or disappear without notice, and every prompt crosses the
+public internet, so treat unpublished drafts as no longer private. **Press Test connection before
+relying on it** — its availability is not something this CMS can promise.
+
+**Free with a key — no credit card**
 
 | Provider | Base URL | Free model to start with | Card? |
 | --- | --- | --- | --- |
@@ -247,11 +281,17 @@ model id:
 | OpenRouter | `https://openrouter.ai/api/v1` | any id ending `:free` | no |
 | Mistral | `https://api.mistral.ai/v1` | `mistral-small-latest` | no |
 | Google Gemini | `https://generativelanguage.googleapis.com/v1beta/openai` | `gemini-2.5-flash` | no |
-| Ollama (self-hosted) | `http://127.0.0.1:11434/v1` | whatever you pulled | no |
+
+**Paid**
+
+| Provider | Base URL | Free model to start with | Card? |
+| --- | --- | --- | --- |
 | OpenAI | `https://api.openai.com/v1` | *(paid only)* | yes |
 
 Model ids rotate — free tiers retire models with little notice — so if one stops working, check the
-provider's current list rather than assuming the assistant broke.
+provider's current list rather than assuming the assistant broke. On a server you run yourself, use
+**Find models**: it reads the model list from that server's own `/models` endpoint and offers it in
+the Model field, which is the reliable answer to "what id does it want?".
 
 **Use the Test connection button.** It makes one eight-token request and reports what came back,
 including latency, so you can confirm the base URL, key and model all work *before* saving them.
@@ -264,15 +304,18 @@ This is also the fastest way to find out whether your host blocks outbound HTTPS
 > setting to refuse those), and Mistral's free mode may train unless you opt out. Each preset shows
 > its own note in the UI before you pick it.
 
-> **Ollama and other keyless local providers:** the assistant refuses to run until an API key is
-> saved, because a blank key almost always means the form was never finished. Ollama does not check
-> the value, so type any placeholder — `ollama` is the convention — and it will be sent and ignored.
+> **Keyless providers need no placeholder.** Earlier builds refused to run without a saved key, so
+> the convention was to type something like `ollama` and let the server ignore it. That is no longer
+> necessary: leave the key field blank and the CMS sends no `Authorization` header at all, which is
+> what an unauthenticated local server expects. One thing to watch when moving *from* a keyed
+> provider *to* a keyless one — turn on **Remove the saved key**, otherwise the old key is still
+> stored and still sent.
 
 > **Azure OpenAI is not supported by this field.** Azure authenticates with an `api-key` header and
 > requires an `api-version` query parameter, whereas the assistant sends a plain
-> `Authorization: Bearer` header to `{base_url}/chat/completions`. Pointing Base URL at an
-> `*.openai.azure.com` deployment will be rejected. Use an OpenAI-compatible gateway in front of it,
-> or one of the providers above.
+> `Authorization: Bearer` header (or none at all when no key is saved) to
+> `{base_url}/chat/completions`. Pointing Base URL at an `*.openai.azure.com` deployment will be
+> rejected. Use an OpenAI-compatible gateway in front of it, or one of the providers above.
 
 > **GitHub Models was shut down on 30 July 2026** — playground, catalog and inference API all gone.
 > Many tutorials still recommend it, so it is deliberately not offered as a preset.

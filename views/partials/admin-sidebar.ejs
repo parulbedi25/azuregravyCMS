@@ -28,13 +28,19 @@
   ];
 
   /*
-    Sidebar on/off state for the AI assistant, read straight from settings so
-    the switch is correct on every Studio page without an extra query.
-    Only ever the boolean and the model name reach the markup — never the key.
+    Sidebar on/off state for the AI assistant.
+
+    Read through `h.aiStatus` rather than straight from settings, because the
+    readiness rule lives in one place now: a keyless provider is configured, and
+    testing `settings.ai_api_key` here used to label it "needs a key" no matter
+    what the settings page said. Still no extra query — the helpers are built
+    from the settings already loaded for this request.
+
+    Only the boolean and the model name reach the markup — never the key.
   */
-  const aiOn = settings.ai_enabled === '1';
-  const aiConfigured = !!settings.ai_api_key && !!settings.ai_model;
-  const aiStatus = !aiOn ? 'Off' : (aiConfigured ? 'On · ' + settings.ai_model : 'On · needs a key');
+  const ai = h.aiStatus;
+  const aiOn = ai.on;
+  const aiStatus = !aiOn ? 'Off' : (ai.ready ? 'On · ' + ai.model : 'On · needs setup');
 %>
 <aside class="sidebar" id="sidebar">
   <div class="sidebar__brand">

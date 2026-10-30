@@ -168,24 +168,37 @@ Node and keeps its files under `./data` (optional dependency: `lite4mariadb`, in
   draw.io-style SVG (fixed palette, orthogonal routing, ranked columns), saves it to the media
   library and inserts it as an image. The model never emits markup, so a hostile label cannot become
   script.
-- **Provider-agnostic** — any endpoint that speaks OpenAI's `POST {base_url}/chat/completions` with
-  `Authorization: Bearer` auth. Configured under **Studio → AI assistant**, with an on/off switch in
-  the sidebar. The key is stored in the database, masked in the UI and redacted from the settings
-  export.
-- **One-click presets, including free tiers** — the settings page offers Groq, OpenRouter, Mistral,
-  Google Gemini, a local Ollama and OpenAI, each filling in its base URL and a model id that is free
-  to call today. Five of the six cost nothing. Every preset also states what that provider does with
-  your prompts, because drafting sends unpublished text to a third party: Groq says it does not
-  retain inference data, Gemini's free tier is used to improve Google products, and a local Ollama
-  never lets your draft leave the machine. Azure OpenAI is deliberately absent — it authenticates
-  with an `api-key` header rather than a bearer token, so this client would be rejected.
-- **Test connection** — one button probes the saved or in-progress settings with a one-token request
-  and reports which model answered and how long the round trip took, so a wrong key, a retired model
-  id or a host that blocks outbound requests is diagnosed before you try to draft.
+- **Provider-agnostic** — any endpoint that speaks OpenAI's `POST {base_url}/chat/completions`.
+  A saved key is sent as `Authorization: Bearer`; with no key saved, no auth header is sent at all,
+  which is what an unauthenticated local server expects. Configured under **Studio → AI assistant**,
+  with an on/off switch in the sidebar. A key you do save is stored in the database, masked in the UI
+  and redacted from the settings export.
+- **No API key required** — ten of the fifteen presets need no account and no key. Nine are model
+  servers you run yourself (Ollama, LM Studio, llama.cpp, Jan, GPT4All, KoboldCpp, vLLM, LocalAI and
+  text-generation-webui), so an unpublished draft never leaves the machine; the tenth is a public
+  keyless endpoint, which is the only keyless option that works on shared hosting where there is no
+  local server to talk to. The settings page groups them under *No API key needed* and marks each
+  with a `no key` badge, and says plainly what each does with your prompts.
+- **Find models** — reads the model list from the server's own `/models` endpoint and offers it in
+  the Model field, so you never have to guess an id. On a local runtime the right answer is whatever
+  you downloaded, which no preset can know in advance.
+- **One-click presets, including free tiers** — the settings page also offers Groq, OpenRouter,
+  Mistral, Google Gemini and OpenAI, each filling in its base URL and a current model id. Every
+  preset states what that provider does with your prompts, because drafting sends unpublished text
+  to a third party: Groq says it does not retain inference data, Gemini's free tier is used to
+  improve Google products, and a local Ollama never lets your draft leave the machine. Azure OpenAI
+  is deliberately absent — it authenticates with an `api-key` header rather than a bearer token, so
+  this client would be rejected.
+- **Test connection** — one button probes the saved or in-progress settings with an eight-token
+  request and reports which model answered and how long the round trip took, so a wrong key, a
+  retired model id, a server that is not running or a host that blocks outbound requests is
+  diagnosed before you try to draft. It works with an empty key field, so a keyless server can be
+  tried without saving anything first.
 - **On by default, inert until configured** — the assistant ships switched on but refuses every
-  request until an API key and a model exist, so nothing is sent anywhere on a fresh install. The
-  switch is enforced server-side on every request rather than merely hiding the panel, and the whole
-  surface is administrator-only.
+  request until a model name exists and the provider answers, so nothing is sent anywhere on a fresh
+  install. A missing key only blocks when the base URL matches a preset that is known to need one,
+  which turns a silent failure into "Groq needs an API key". The switch is enforced server-side on
+  every request rather than merely hiding the panel, and the whole surface is administrator-only.
 
 ### Media
 

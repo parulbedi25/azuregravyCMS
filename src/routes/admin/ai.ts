@@ -5,8 +5,8 @@ import { loadSettings, saveSettings } from '../../lib/settings.js';
 import { logActivity } from '../../services/activity.js';
 import { str, bool } from '../helpers.js';
 import {
-  AI_MODES, AI_PROVIDERS, AiError, composeDraft, describeAiReadiness, loadAiConfig, maskApiKey,
-  probeProvider, type ComposeMode,
+  AI_MODES, AI_PROVIDERS, AiError, composeDraft, describeAiReadiness, listProviderModels, loadAiConfig,
+  maskApiKey, probeProvider, type ComposeMode,
 } from '../../services/ai.js';
 
 const router = Router();
@@ -159,6 +159,58 @@ router.post(
       res.redirect('/admin/ai');
     }),
   );
+
+  /* -------------------------------------------------------- model discovery */
+/**
+ * List the models a server is actually serving.
+ *
+ * Reads the base URL and key currently in the form, falling back to the saved
+ * ones — exactly like `/ai/test`, and for the same reason: the key field is
+ * blank whenever a key is already stored, so the fallback is what lets an admin
+ * look up models for a provider they have not committed to yet.
+ *
+ * This is the half of keyless setup that presets cannot solve. A local server
+ * has no documentation page listing model ids, and a wrong id answers 404 in a
+ * way that reads like a broken installation rather than a typo.
+ *
+ * Serves JSON to the fetch path and a flash + redirect to the no-JS path, where
+ * the button posts the whole settings form via `formaction`.
+ */
+router.post(
+  '/ai/discover',
+  requireRole('admin'),
+  asyncRoute(async (req, res) => {
+    const saved = loadAiConfig(await loadSettings(true));
+    const typedKey = str(req.body.ai_api_key).trim();
+
+    const config = {
+      ...saved,
+      baseUrl: (str(req.body.ai_base_url).trim().replace(/\/+$/, '') || saved.baseUrl),
+      model: str(req.body.ai_model).trim() || saved.model,
+      apiKey: typedKey || saved.apiKey,
+    };
+
+    const result = await listProviderModels(config);
+    await logActivity(
+      res.locals.currentUser.id,
+      'ai',
+      result.ok
+        ? `Listed ${result.models.length} AI model(s) from ${config.baseUrl}`
+        : `AI model discovery failed: ${result.message}`,
+    );
+
+    if (wantsJson(req)) return res.json(result);
+
+    setFlash(
+      req,
+      result.ok ? 'success' : 'error',
+      result.ok
+        ? `Models available: ${result.models.join(', ')}`.slice(0, 400)
+        : `${result.message} ${result.hint}`.trim(),
+    );
+    res.redirect('/admin/ai');
+  }),
+);
 
   /* ----------------------------------------------------------------- compose */
 /**

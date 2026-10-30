@@ -71,6 +71,18 @@ export interface AiProviderPreset {
   baseUrl: string;
   model: string;
   free: boolean;
+  /**
+   * Whether this provider refuses to answer without a key.
+   *
+   * Advisory — it drives the settings copy and nothing else. The runtime rule
+   * is narrower and deliberately provider-agnostic: a blank key means "send no
+   * Authorization header", so any OpenAI-compatible server works whether or not
+   * it appears in this list. A provider that genuinely needs a key answers 401
+   * and the administrator sees that, instead of the assistant refusing to try.
+   */
+  requiresKey: boolean;
+  /** `local` runs on the same machine as the CMS; `hosted` is a remote service. */
+  kind: 'local' | 'hosted';
   keyHint: string;
   privacy: string;
 }
@@ -78,32 +90,176 @@ export interface AiProviderPreset {
 /*
   Provider presets offered in the settings UI.
 
-  Only providers verified to accept the OpenAI chat-completions shape with an
-  `Authorization: Bearer` header are listed, because that is exactly what
-  `callChatCompletion` sends. Two deliberate omissions:
+  Ordered by what they cost the administrator to start with: no key at all
+  first, then free-with-a-key, then paid.
+
+  Two kinds of keyless provider, and the difference matters more than the price:
+
+    - `kind: 'local'` — a model server the administrator runs themselves
+      (Ollama, LM Studio, llama.cpp and the rest). Each speaks the OpenAI
+      chat-completions shape on localhost and none authenticates. These are the
+      only option where an unpublished draft never leaves the building, and the
+      only one that works with no internet access at all.
+
+      They are also the ones that will NOT work on shared hosting. A cPanel
+      account has no local model server to talk to, and cannot start one; on
+      that hosting a keyless setup needs the hosted option below.
+
+    - `kind: 'hosted'` with `requiresKey: false` — a public endpoint that
+      answers without credentials. Convenient, but it is somebody else's free
+      tier: it can rate-limit, change shape or vanish without notice, and every
+      prompt crosses the public internet. Each entry's `privacy` line says so.
+
+  Verification status, stated plainly because it should govern how much anyone
+  trusts this list:
+
+    - The keyless code path IS tested. With no key saved, no Authorization
+      header is sent and readiness does not demand one; a mock OpenAI-compatible
+      server on localhost exercises compose end to end.
+    - The ports and URL shapes below are each project's documented defaults.
+      Nothing checks them at build time and nothing can: the CMS never contacts
+      a provider until an administrator presses "Test connection".
+    - No hosted keyless endpoint was reachable from the environment where this
+      list was written, so its present availability is unconfirmed. Test it
+      before depending on it.
+
+  Model ids for a local server are whatever that administrator downloaded, so
+  the values here are examples rather than promises. "Find models" reads the
+  real list from the server's own `/models` endpoint, which is why it exists.
+
+  Two deliberate omissions, both of which still bite:
 
     - Azure OpenAI authenticates with an `api-key` header and requires an
       `api-version` query parameter, so it cannot work through this client.
     - GitHub Models was shut down on 30 July 2026, despite still being
       recommended across many tutorials.
-
-  Model ids rotate often — free tiers retire models with little notice — so
-  treat these as a starting point rather than a promise.
-
-  The privacy line matters more than the price. What this feature sends is
-  *unpublished drafting*, so a provider that trains on prompts is an editorial
-  decision the administrator should make knowingly, not a footnote they
-  discover later.
 */
 export const AI_PROVIDERS: AiProviderPreset[] = [
+  /* ------------------------------------------------ no key: your own machine */
+  {
+    id: 'ollama',
+    label: 'Ollama',
+    baseUrl: 'http://127.0.0.1:11434/v1',
+    model: 'llama3.2',
+    free: true,
+    requiresKey: false,
+    kind: 'local',
+    keyHint: 'No key and no account. The model id is whatever you pulled — `ollama list` shows them, or press "Find models" to read the list from the server.',
+    privacy: 'Nothing leaves the machine. The strongest privacy option for unpublished drafts, at the cost of your own hardware.',
+  },
+  {
+    id: 'lmstudio',
+    label: 'LM Studio',
+    baseUrl: 'http://127.0.0.1:1234/v1',
+    model: 'local-model',
+    free: true,
+    requiresKey: false,
+    kind: 'local',
+    keyHint: 'No key. Start the local server first (Developer tab → Start server). It accepts "local-model" for whichever model is currently loaded.',
+    privacy: 'Nothing leaves the machine.',
+  },
+  {
+    id: 'llamacpp',
+    label: 'llama.cpp',
+    baseUrl: 'http://127.0.0.1:8080/v1',
+    model: 'local-model',
+    free: true,
+    requiresKey: false,
+    kind: 'local',
+    keyHint: 'No key. Run its `server` binary; 8080 is the default port. The model is fixed by the -m flag the server started with.',
+    privacy: 'Nothing leaves the machine.',
+  },
+  {
+    id: 'jan',
+    label: 'Jan',
+    baseUrl: 'http://127.0.0.1:1337/v1',
+    model: 'llama3.2',
+    free: true,
+    requiresKey: false,
+    kind: 'local',
+    keyHint: 'No key. Turn on the local API server in Jan’s settings; it prints the port it chose.',
+    privacy: 'Nothing leaves the machine.',
+  },
+  {
+    id: 'gpt4all',
+    label: 'GPT4All',
+    baseUrl: 'http://127.0.0.1:4891/v1',
+    model: 'gpt4all',
+    free: true,
+    requiresKey: false,
+    kind: 'local',
+    keyHint: 'No key. Enable the local server under Settings → Application. 4891 is its default port.',
+    privacy: 'Nothing leaves the machine.',
+  },
+  {
+    id: 'koboldcpp',
+    label: 'KoboldCpp',
+    baseUrl: 'http://127.0.0.1:5001/v1',
+    model: 'local-model',
+    free: true,
+    requiresKey: false,
+    kind: 'local',
+    keyHint: 'No key. Its OpenAI-compatible endpoint is on by default; the model field is largely ignored because one model is loaded at startup.',
+    privacy: 'Nothing leaves the machine.',
+  },
+  {
+    id: 'vllm',
+    label: 'vLLM',
+    baseUrl: 'http://127.0.0.1:8000/v1',
+    model: 'meta-llama/Llama-3.2-1B-Instruct',
+    free: true,
+    requiresKey: false,
+    kind: 'local',
+    keyHint: 'No key by default. The model id must match the --served-model-name exactly — "Find models" will read it back rather than leaving you to guess.',
+    privacy: 'Nothing leaves the machine. Usually run on a GPU box you control.',
+  },
+  {
+    id: 'localai',
+    label: 'LocalAI',
+    baseUrl: 'http://127.0.0.1:8080/v1',
+    model: 'phi-2',
+    free: true,
+    requiresKey: false,
+    kind: 'local',
+    keyHint: 'No key. Shares port 8080 with llama.cpp, so only one of the two can run at a time unless you change a port.',
+    privacy: 'Nothing leaves the machine. Self-hosted, open source.',
+  },
+  {
+    id: 'textgenwebui',
+    label: 'text-generation-webui',
+    baseUrl: 'http://127.0.0.1:5000/v1',
+    model: 'local-model',
+    free: true,
+    requiresKey: false,
+    kind: 'local',
+    keyHint: 'No key. Start it with the --api flag, otherwise the OpenAI-compatible endpoint is not served at all.',
+    privacy: 'Nothing leaves the machine.',
+  },
+
+  /* --------------------------------------------------- no key: hosted, public */
+  {
+    id: 'pollinations',
+    label: 'Pollinations',
+    baseUrl: 'https://text.pollinations.ai/openai',
+    model: 'openai',
+    free: true,
+    requiresKey: false,
+    kind: 'hosted',
+    keyHint: 'No key and no account — the only keyless option that works on shared hosting, where there is no local server to talk to. Press "Test connection" first: a free public endpoint can rate-limit or change without notice.',
+    privacy: 'Public and unauthenticated. Assume every prompt is visible to a third party and may be logged or used for training — do not send unpublished work you need kept private.',
+  },
+
+  /* ------------------------------------------------------- free, needs a key */
   {
     id: 'groq',
     label: 'Groq',
     baseUrl: 'https://api.groq.com/openai/v1',
     model: 'openai/gpt-oss-120b',
     free: true,
+    requiresKey: true,
+    kind: 'hosted',
     keyHint: 'console.groq.com/keys — email only, no card. About 30 requests a minute and 1,000 a day.',
-    privacy: 'Groq states it does not retain inference data by default. The safest free option for unpublished drafts.',
+    privacy: 'Groq states it does not retain inference data by default. The safest keyed free option for unpublished drafts.',
   },
   {
     id: 'openrouter',
@@ -111,6 +267,8 @@ export const AI_PROVIDERS: AiProviderPreset[] = [
     baseUrl: 'https://openrouter.ai/api/v1',
     model: 'google/gemma-4-31b-it:free',
     free: true,
+    requiresKey: true,
+    kind: 'hosted',
     keyHint: 'openrouter.ai/keys — no card. Any model id ending in ":free" costs nothing; about 20 requests a minute and 50 a day.',
     privacy: 'The provider behind a free model may train on your prompts. OpenRouter has a privacy setting to refuse those — turn it on before drafting here.',
   },
@@ -120,6 +278,8 @@ export const AI_PROVIDERS: AiProviderPreset[] = [
     baseUrl: 'https://api.mistral.ai/v1',
     model: 'mistral-small-latest',
     free: true,
+    requiresKey: true,
+    kind: 'hosted',
     keyHint: 'console.mistral.ai/api-keys — no card. Free mode has monthly usage shown on your Limits page.',
     privacy: 'Free-mode prompts may be used for training unless you opt out in the console. European provider, open-weight models.',
   },
@@ -129,28 +289,46 @@ export const AI_PROVIDERS: AiProviderPreset[] = [
     baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai',
     model: 'gemini-2.5-flash',
     free: true,
+    requiresKey: true,
+    kind: 'hosted',
     keyHint: 'aistudio.google.com — no card for the free tier. Limits are per project and shown in AI Studio.',
     privacy: 'Free-tier content is used to improve Google products. Not recommended for unpublished work you need kept private.',
   },
-  {
-    id: 'ollama',
-    label: 'Ollama (local)',
-    baseUrl: 'http://127.0.0.1:11434/v1',
-    model: 'llama3.1',
-    free: true,
-    keyHint: 'No account and no key — enter any placeholder such as "ollama". The server must be reachable from wherever this CMS runs.',
-    privacy: 'Nothing leaves the machine. The strongest privacy option, at the cost of your own hardware.',
-  },
+
+  /* --------------------------------------------------------------------- paid */
   {
     id: 'openai',
     label: 'OpenAI (paid)',
     baseUrl: 'https://api.openai.com/v1',
     model: 'gpt-4o-mini',
     free: false,
+    requiresKey: true,
+    kind: 'hosted',
     keyHint: 'platform.openai.com/api-keys — requires billing. No free tier for chat models.',
     privacy: 'API traffic is not used for training by default. Check your organisation settings.',
   },
 ];
+
+/** Presets that need nothing but a running server: no account, no key. */
+export const KEYLESS_PROVIDERS = AI_PROVIDERS.filter((provider) => !provider.requiresKey);
+
+/** Normalise a base URL so a saved value can be matched against a preset. */
+function normaliseBaseUrl(value: string): string {
+  return (value ?? '').trim().replace(/\/+$/, '').toLowerCase();
+}
+
+/**
+ * The preset a saved base URL points at, if any.
+ *
+ * Used only to improve messages — "Groq needs a key" beats "not ready". An
+ * unknown URL returns null and is treated as possibly keyless, which is right:
+ * the administrator who typed it knows what they pointed at.
+ */
+export function providerForBaseUrl(baseUrl: string): AiProviderPreset | null {
+  const target = normaliseBaseUrl(baseUrl);
+  if (!target) return null;
+  return AI_PROVIDERS.find((provider) => normaliseBaseUrl(provider.baseUrl) === target) ?? null;
+}
 
 const DEFAULT_BASE_URL = 'https://api.openai.com/v1';
 
@@ -173,11 +351,48 @@ export function loadAiConfig(settings: SettingsMap): AiConfig {
  * Explain what is missing before an admin hits a confusing failure.
  * `ready` is what the editor panel and the sidebar badge both key off.
  */
-export function describeAiReadiness(config: AiConfig): { ready: boolean; reason: string } {
-  if (!config.enabled) return { ready: false, reason: 'The AI assistant is switched off.' };
-  if (!config.apiKey) return { ready: false, reason: 'No API key saved yet.' };
-  if (!config.model) return { ready: false, reason: 'No model name saved yet.' };
-  return { ready: true, reason: `Ready — ${config.model}` };
+export interface AiReadiness {
+  ready: boolean;
+  reason: string;
+  /** True when no key is saved, so requests go out unauthenticated. */
+  keyless: boolean;
+  /** The preset this base URL matches, or null when the admin typed their own. */
+  provider: AiProviderPreset | null;
+}
+
+/**
+ * Explain what is missing before an admin hits a confusing failure.
+ * `ready` is what the editor panel and the sidebar badge both key off.
+ *
+ * A missing key is NOT by itself a failure. Plenty of OpenAI-compatible servers
+ * — every local runtime, and a few public ones — do not authenticate at all, so
+ * demanding a key would break exactly the setups that need no account. The rule
+ * is narrower: a missing key only blocks when the base URL matches a preset that
+ * is known to require one, which turns "not ready" into "Groq needs an API key".
+ * An unrecognised URL is assumed to be the administrator's own business.
+ */
+export function describeAiReadiness(config: AiConfig): AiReadiness {
+  const provider = providerForBaseUrl(config.baseUrl);
+  const keyless = !config.apiKey;
+  const base = { keyless, provider };
+
+  if (!config.enabled) return { ...base, ready: false, reason: 'The AI assistant is switched off.' };
+  if (!config.baseUrl) return { ...base, ready: false, reason: 'No base URL saved yet.' };
+  if (!config.model) return { ...base, ready: false, reason: 'No model name saved yet.' };
+
+  if (keyless && provider?.requiresKey) {
+    return {
+      ...base,
+      ready: false,
+      reason: `${provider.label} needs an API key and none is saved. Add one, or pick a provider that works without a key.`,
+    };
+  }
+
+  return {
+    ...base,
+    ready: true,
+    reason: keyless ? `Ready — ${config.model}, no key needed` : `Ready — ${config.model}`,
+  };
 }
 
 /** Last four characters only, so the settings form can confirm a key without echoing it. */
@@ -266,24 +481,59 @@ interface ChatMessage {
   content: string;
 }
 
-export async function callChatCompletion(config: AiConfig, messages: ChatMessage[]): Promise<string> {
-  if (!config.apiKey) {
-    throw new AiError('No API key is saved for the AI assistant.', 'Add one under Studio → AI assistant.', 400);
+/**
+ * Reject anything that is not an http(s) URL before it reaches `fetch`.
+ *
+ * The base URL is administrator-supplied, so this is not a privilege boundary —
+ * an admin may already point the CMS at any host they like, and that is the
+ * feature. It exists so a typo such as `file:///etc/passwd` produces a sentence
+ * someone can act on instead of an opaque failure from the fetch layer.
+ */
+function assertHttpUrl(baseUrl: string): void {
+  let parsed: URL;
+  try {
+    parsed = new URL(baseUrl);
+  } catch {
+    throw new AiError(
+      'The AI base URL is not a usable URL.',
+      'It needs a scheme and a host, such as http://127.0.0.1:11434/v1.',
+      400,
+    );
   }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    throw new AiError(
+      `The AI base URL uses an unsupported scheme (${parsed.protocol.replace(':', '')}).`,
+      'Only http and https are supported.',
+      400,
+    );
+  }
+}
+
+export async function callChatCompletion(config: AiConfig, messages: ChatMessage[]): Promise<string> {
   if (!config.model) {
     throw new AiError('No model name is saved for the AI assistant.', 'Add one under Studio → AI assistant.', 400);
   }
+  assertHttpUrl(config.baseUrl);
 
   const url = `${config.baseUrl}/chat/completions`;
+
+  /*
+    No key means no Authorization header at all — not an empty `Bearer `.
+
+    A present-but-empty credential is worse than an absent one: several local
+    servers read it as a malformed key and answer 401, which would look exactly
+    like a rejected key and send the administrator hunting for one that was
+    never needed.
+  */
+  const headers: Record<string, string> = { 'content-type': 'application/json' };
+  if (config.apiKey) headers.authorization = `Bearer ${config.apiKey}`;
+
   let response: Response;
 
   try {
     response = await fetch(url, {
       method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        authorization: `Bearer ${config.apiKey}`,
-      },
+      headers,
       body: JSON.stringify({
         model: config.model,
         messages,
@@ -311,13 +561,18 @@ export async function callChatCompletion(config: AiConfig, messages: ChatMessage
       detail = body.slice(0, 200);
     }
     const status = response.status === 401 || response.status === 403
-      ? 'The provider rejected that API key.'
+      ? config.apiKey
+        ? 'The provider rejected that API key.'
+        : 'The provider requires an API key and none is saved.'
       : response.status === 404
         ? `The provider has no such model or endpoint (${config.model}).`
         : response.status === 429
           ? 'The provider rate-limited this request.'
           : `The provider returned ${response.status}.`;
-    throw new AiError(detail ? `${status} ${detail}`.trim() : status, '', response.status >= 500 ? 502 : 400);
+    const hint = !config.apiKey && (response.status === 401 || response.status === 403)
+      ? 'Add a key under Studio → AI assistant, or pick a provider that works without one.'
+      : '';
+    throw new AiError(detail ? `${status} ${detail}`.trim() : status, hint, response.status >= 500 ? 502 : 400);
   }
 
   let content = '';
@@ -486,6 +741,8 @@ export interface ProbeResult {
   model: string;
   baseUrl: string;
   latencyMs: number;
+  /** True when the probe went out with no credentials at all. */
+  keyless: boolean;
 }
 
 /**
@@ -507,20 +764,20 @@ export interface ProbeResult {
  */
 export async function probeProvider(config: AiConfig): Promise<ProbeResult> {
   const started = Date.now();
-  const base = { model: config.model, baseUrl: config.baseUrl };
+  const base = { model: config.model, baseUrl: config.baseUrl, keyless: !config.apiKey };
 
-  if (!config.apiKey) {
-    return {
-      ...base, ok: false, latencyMs: 0,
-      message: 'No API key is saved yet.',
-      hint: 'Enter a key below, or pick a free provider — Groq and Mistral need only an email address.',
-    };
-  }
+  /*
+    No key check here, deliberately. Probing is the only way an administrator
+    can find out whether a keyless server is actually listening, so refusing to
+    probe for want of a key would make the keyless providers untestable — the
+    one thing they are supposed to be is easy to try. If the endpoint does want
+    credentials it answers 401 and `callChatCompletion` says so in words.
+  */
   if (!config.model) {
     return {
       ...base, ok: false, latencyMs: 0,
       message: 'No model name is saved yet.',
-      hint: 'Pick a provider preset to fill in a current model id.',
+      hint: 'Pick a provider preset to fill in a current model id, or press "Find models" to read the ones this server offers.',
     };
   }
 
@@ -530,9 +787,12 @@ export async function probeProvider(config: AiConfig): Promise<ProbeResult> {
       [{ role: 'user', content: 'Reply with the single word: ready' }],
     );
     const trimmed = reply.trim().slice(0, 60);
+    const connected = base.keyless ? 'Connected with no API key' : 'Connected';
     return {
       ...base, ok: true, latencyMs: Date.now() - started,
-      message: trimmed ? `Connected — the model replied “${trimmed}”.` : 'Connected — the model replied.',
+      message: trimmed
+        ? `${connected} — the model replied “${trimmed}”.`
+        : `${connected} — the model replied.`,
       hint: '',
     };
   } catch (error) {
@@ -540,4 +800,127 @@ export async function probeProvider(config: AiConfig): Promise<ProbeResult> {
     const hint = error instanceof AiError ? error.hint : 'Check the base URL and that this server can make outbound requests.';
     return { ...base, ok: false, latencyMs: Date.now() - started, message, hint };
   }
+}
+
+/* ------------------------------------------------------------------ */
+/* model discovery                                                    */
+/* ------------------------------------------------------------------ */
+
+export interface ModelListResult {
+  ok: boolean;
+  models: string[];
+  baseUrl: string;
+  message: string;
+  hint: string;
+  keyless: boolean;
+}
+
+/** Shapes seen in the wild for `GET {baseUrl}/models`. */
+type RawModelList =
+  | { data?: Array<{ id?: string } | string> }
+  | { models?: Array<{ id?: string } | string> }
+  | Array<{ id?: string } | string>;
+
+function pluckModelIds(parsed: unknown): string[] {
+  const list = Array.isArray(parsed)
+    ? parsed
+    : Array.isArray((parsed as { data?: unknown })?.data)
+      ? ((parsed as { data: unknown[] }).data)
+      : Array.isArray((parsed as { models?: unknown })?.models)
+        ? ((parsed as { models: unknown[] }).models)
+        : null;
+  if (!list) return [];
+
+  const ids: string[] = [];
+  for (const entry of list) {
+    const id = typeof entry === 'string' ? entry : (entry as { id?: unknown })?.id;
+    if (typeof id === 'string' && id.trim()) ids.push(id.trim());
+  }
+  return [...new Set(ids)].sort((a, b) => a.localeCompare(b)).slice(0, 100);
+}
+
+/**
+ * Ask a provider which models it is actually serving.
+ *
+ * This exists because a keyless local server has no documentation page to look
+ * model ids up on, and a wrong id produces a 404 that reads like a broken
+ * installation. `/models` is part of the same OpenAI-compatible contract the
+ * chat endpoint is, so a server that can answer one can almost always answer
+ * the other — and it needs no key wherever the chat call needs none.
+ *
+ * A short timeout on purpose: this is a button press, and a local server that
+ * is not running should say so quickly rather than hanging for 90 seconds.
+ */
+export async function listProviderModels(config: AiConfig): Promise<ModelListResult> {
+  const base = { baseUrl: config.baseUrl, keyless: !config.apiKey };
+
+  try {
+    assertHttpUrl(config.baseUrl);
+  } catch (error) {
+    const message = error instanceof AiError ? error.message : 'The base URL is not usable.';
+    const hint = error instanceof AiError ? error.hint : '';
+    return { ...base, ok: false, models: [], message, hint };
+  }
+
+  const headers: Record<string, string> = { accept: 'application/json' };
+  if (config.apiKey) headers.authorization = `Bearer ${config.apiKey}`;
+
+  let response: Response;
+  try {
+    response = await fetch(`${config.baseUrl}/models`, {
+      method: 'GET',
+      headers,
+      signal: AbortSignal.timeout(15_000),
+    });
+  } catch (error) {
+    const reason = error instanceof Error && error.name === 'TimeoutError'
+      ? 'The server did not answer within 15 seconds.'
+      : `Could not reach ${config.baseUrl}.`;
+    return {
+      ...base, ok: false, models: [],
+      message: reason,
+      hint: 'A local server has to be running, and reachable from wherever this CMS runs — on shared hosting it will not be.',
+    };
+  }
+
+  const body = await response.text();
+
+  if (!response.ok) {
+    const message = response.status === 404
+      ? 'That server has no /models endpoint, so its model ids cannot be listed.'
+      : response.status === 401 || response.status === 403
+        ? config.apiKey
+          ? 'The provider rejected that API key.'
+          : 'The provider requires an API key and none is saved.'
+        : `The provider returned ${response.status}.`;
+    return {
+      ...base, ok: false, models: [], message,
+      hint: 'Type the model id by hand — discovery is a convenience, not a requirement.',
+    };
+  }
+
+  let models: string[] = [];
+  try {
+    models = pluckModelIds(JSON.parse(body) as RawModelList);
+  } catch {
+    return {
+      ...base, ok: false, models: [],
+      message: 'The server answered, but not with a model list.',
+      hint: 'Type the model id by hand.',
+    };
+  }
+
+  if (models.length === 0) {
+    return {
+      ...base, ok: false, models: [],
+      message: 'The server answered with an empty model list.',
+      hint: 'Download or load a model first, then try again.',
+    };
+  }
+
+  return {
+    ...base, ok: true, models,
+    message: `${models.length} model${models.length === 1 ? '' : 's'} available.`,
+    hint: '',
+  };
 }
