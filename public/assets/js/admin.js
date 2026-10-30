@@ -23,6 +23,12 @@
     messageEl.textContent = message;
     const close = document.createElement('button');
     close.className = 'toast__close';
+    /*
+      The delegated dismiss handler below matches [data-toast-close]. Without
+      this attribute the button rendered but did nothing — the class alone is
+      only styling. site.js and the server-rendered flash toasts both set it.
+    */
+    close.setAttribute('data-toast-close', '');
     close.setAttribute('aria-label', 'Dismiss');
     close.textContent = '✕';
     el.append(messageEl, close);
