@@ -303,6 +303,7 @@
               <span class="label">How much should it write?</span>
               <select class="input" id="aiMode">
                 <option value="full">The whole post</option>
+                <option value="article">The whole article + title ideas</option>
                 <option value="outline">An outline only</option>
                 <option value="continue">Continue from where I am</option>
                 <option value="selection">Rewrite my selection</option>
@@ -330,6 +331,19 @@
               <%- h.icon('sparkles', '', 14) %> <span data-ai-cta>Write it</span>
             </button>
             <p class="hint" id="aiStatus" role="status" aria-live="polite" style="margin:0;display:none"></p>
+
+            <%#
+              Headline picker for the "whole article + title ideas" mode. Filled
+              from the compose response by the script at the foot of this view,
+              and kept hidden until there is something to choose. Picking one
+              writes the editor's own Title field, which stays a normal input, so
+              the title can always be changed there afterwards.
+            %>
+            <div id="aiTitlePicker" hidden>
+              <span class="label">Choose a title</span>
+              <div class="ai-titles" id="aiTitleList" role="radiogroup" aria-label="Suggested titles"></div>
+              <p class="hint" style="margin:0">The one you pick fills the Title field at the top of the editor, where you can still change it.</p>
+            </div>
           <% } %>
         </div>
       </div>
@@ -533,6 +547,9 @@
     var textarea = document.getElementById('content');
     var csrfField = document.querySelector('#editorForm input[name="_csrf"]');
     var csrf = csrfField ? csrfField.value : '';
+    var picker = document.getElementById('aiTitlePicker');
+    var pickerList = document.getElementById('aiTitleList');
+    var postTitle = document.getElementById('title');
 
     function say(message, kind) {
       if (!status) return;
@@ -567,6 +584,52 @@
       textarea.focus();
     }
 
+    /*
+      Headline picker. Rebuilt from nothing on every generate, so a headline
+      chosen for an earlier draft can never be applied to a later one.
+    */
+    function clearTitles() {
+      if (!picker || !pickerList) return;
+      pickerList.innerHTML = '';
+      picker.hidden = true;
+    }
+
+    function renderTitles(suggestions) {
+      if (!picker || !pickerList) return;
+      pickerList.innerHTML = '';
+      if (!postTitle || !suggestions || !suggestions.length) { picker.hidden = true; return; }
+
+      suggestions.forEach(function (text) {
+        var option = document.createElement('button');
+        option.type = 'button';               /* never able to submit #editorForm */
+        option.className = 'ai-titles__item';
+        option.setAttribute('role', 'radio');
+        option.setAttribute('aria-checked', 'false');
+        option.textContent = text;            /* textContent: model output is never parsed as HTML */
+
+        option.addEventListener('click', function () {
+          var items = pickerList.querySelectorAll('.ai-titles__item');
+          for (var i = 0; i < items.length; i += 1) items[i].setAttribute('aria-checked', 'false');
+          option.setAttribute('aria-checked', 'true');
+
+          postTitle.value = text;
+          /*
+            admin.js listens for `input` on the title to regenerate a locked slug
+            and to track unsaved changes. Assigning .value fires neither, so
+            without this the slug would keep the old title's.
+          */
+          postTitle.dispatchEvent(new Event('input', { bubbles: true }));
+
+          say('Title set to “' + text + '”. Change it in the Title field any time.', 'ok');
+          if (window.GravyStudio) window.GravyStudio.toast('Title applied.', 'success');
+        });
+
+        pickerList.appendChild(option);
+      });
+
+      picker.hidden = false;
+    }
+
     async function generate() {
       if (button.disabled) return;
 
@@ -591,12 +654,17 @@
         say('There is nothing to continue from yet — write an opening, or choose “The whole post”.', 'error');
         return;
       }
-      if ((mode === 'full' || mode === 'outline') && textarea && textarea.value.trim()) {
+      if ((mode === 'full' || mode === 'article' || mode === 'outline') && textarea && textarea.value.trim()) {
         if (!window.confirm('Replace everything in the editor with the new draft?')) return;
       }
 
+      /* Retire the previous draft's headlines before asking for new ones. */
+      clearTitles();
+
       setBusy(true);
-      say('Writing… this can take half a minute.', 'info');
+      say(mode === 'article'
+        ? 'Writing the article and its headlines… this can take half a minute.'
+        : 'Writing… this can take half a minute.', 'info');
 
       try {
         var response = await fetch('/admin/ai/compose', {
@@ -622,6 +690,7 @@
         }
 
         insert(data.markdown, mode, selStart, selEnd);
+        renderTitles(data.titleSuggestions);
         setBusy(false);
 
         var note = 'Draft inserted.';
@@ -630,6 +699,12 @@
         }
         if (data.diagramsSkipped) {
           note += ' Skipped ' + data.diagramsSkipped + ' that did not parse.';
+        }
+        if (mode === 'article') {
+          var offered = (data.titleSuggestions || []).length;
+          note += offered
+            ? ' ' + offered + ' headline' + (offered === 1 ? '' : 's') + ' offered below — pick one, or keep your own.'
+            : ' The model returned no headlines this time, so the Title field is unchanged.';
         }
         say(note, 'ok');
         if (window.GravyStudio) window.GravyStudio.toast('AI draft ready.', 'success');
@@ -642,6 +717,13 @@
     }
 
     button.addEventListener('click', generate);
+
+    /* The picker only means something in `article` mode. */
+    if (modeSelect) {
+      modeSelect.addEventListener('change', function () {
+        if (modeSelect.value !== 'article') clearTitles();
+      });
+    }
 
     /*
       Enter in the title field would otherwise submit #editorForm, silently

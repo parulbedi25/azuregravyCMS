@@ -1141,6 +1141,42 @@ label.field > span { color: var(--admin-ink-2); }
 .side-card--ai #aiStatus { line-height: 1.5; }
 .side-card--ai #aiGenerate[disabled] { opacity: 0.65; cursor: progress; }
 
+/*
+  Headline suggestions offered by the AI card's "whole article + title" mode.
+
+  Buttons rather than radio inputs on purpose: the AI card lives inside
+  #editorForm and must not contribute a named control to it, which is the same
+  reason the card is not a <form>. role="radiogroup"/"radio" carries the
+  semantics that the missing inputs would have.
+
+  Admin tokens only, so the light/dark switch needs no second rule set.
+*/
+.ai-titles { display: flex; flex-direction: column; gap: 6px; margin: 6px 0 8px; }
+.ai-titles__item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 8px 10px;
+  border: 1px solid var(--admin-line);
+  border-radius: 8px;
+  background: var(--admin-panel);
+  color: var(--admin-ink-2);
+  font: inherit;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  cursor: pointer;
+  transition: border-color 120ms ease, background 120ms ease, color 120ms ease;
+}
+.ai-titles__item:hover { border-color: var(--admin-accent); color: var(--admin-ink); }
+.ai-titles__item[aria-checked='true'] {
+  border-color: var(--admin-accent);
+  background: var(--admin-accent-soft);
+  color: var(--admin-ink);
+  font-weight: 500;
+}
+.ai-titles__item:focus-visible { outline: 2px solid var(--admin-accent); outline-offset: 1px; }
+#aiTitlePicker[hidden] { display: none; }
+
 /* --------------------------------------------------------- permalinks */
 /*
   Structure picker for Admin → Permalinks.
