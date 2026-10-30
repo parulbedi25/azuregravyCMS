@@ -140,7 +140,7 @@ router.post(
       return res.redirect('/admin/users');
     }
     await deleteUser(id);
-    setFlash(req, 'success', 'Account removed. Their stories were removed with it.');
+    setFlash(req, 'success', 'Account removed. Their posts were removed with it.');
     res.redirect('/admin/users');
   }),
 );

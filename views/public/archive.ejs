@@ -5,9 +5,9 @@
       <div>
         <span class="kicker">Everything, in order</span>
         <h1 style="margin-top:10px">The archive.</h1>
-        <p>Every story we have published, grouped by month. A good place to get lost for an afternoon.</p>
+        <p>Every post we have published, grouped by month. A good place to get lost for an afternoon.</p>
       </div>
-      <span class="chip chip--accent"><%= months.reduce(function (sum, month) { return sum + Number(month.total); }, 0) %> stories</span>
+      <span class="chip chip--accent"><%= months.reduce(function (sum, month) { return sum + Number(month.total); }, 0) %> posts</span>
     </div>
   </div>
 </section>
@@ -17,8 +17,8 @@
     <div class="empty">
       <%- h.icon('book', 'empty__icon', 44) %>
       <h3>The archive is empty</h3>
-      <p>The first story will appear here as soon as it is published.</p>
-      <a class="btn btn--ghost" href="/stories">Browse stories</a>
+      <p>The first post will appear here as soon as it is published.</p>
+      <a class="btn btn--ghost" href="<%= h.postListUrl %>">Browse posts</a>
     </div>
   <% } else { %>
     <div class="archive-grid">
@@ -40,7 +40,7 @@
             <% }); %>
           </ul>
           <% if (Number(month.total) > month.posts.length) { %>
-            <a class="section-head__link" href="/stories?month=<%= month.ym %>">All <%= month.total %> from <%= month.label %> <%- h.icon('arrow-right', '', 13) %></a>
+            <a class="section-head__link" href="<%= h.postListUrl %>?month=<%= month.ym %>">All <%= month.total %> from <%= month.label %> <%- h.icon('arrow-right', '', 13) %></a>
           <% } %>
         </div>
       <% }); %>

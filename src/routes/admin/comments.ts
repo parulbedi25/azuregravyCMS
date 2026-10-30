@@ -25,7 +25,7 @@ router.get(
       layout: 'layouts/admin',
       title: 'Comments',
       adminTitle: 'Comments',
-      adminDescription: 'Moderate the conversation around your stories.',
+      adminDescription: 'Moderate the conversation around your posts.',
       page: 'comments',
       comments,
       counts,

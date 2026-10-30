@@ -44,7 +44,7 @@
             <p><%= comment.content %></p>
             <div class="moderation-item__meta">
               <span><%= h.timeAgo(comment.created_at) %></span>
-              <span>on <a href="/stories/<%= comment.post_slug %>#comment-<%= comment.id %>" target="_blank" rel="noopener"><%= comment.post_title %></a></span>
+              <span>on <a href="<%= h.postUrl({ slug: comment.post_slug }) %>#comment-<%= comment.id %>" target="_blank" rel="noopener"><%= comment.post_title %></a></span>
               <% if (comment.ip_address) { %><span class="mono"><%= comment.ip_address %></span><% } %>
             </div>
           </div>

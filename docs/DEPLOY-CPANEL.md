@@ -152,10 +152,10 @@ Nothing is written on failure and the app keeps running, so you can correct and 
 you need. On success the 19 tables and default settings are created and you move to step 2.
 
 **Step 2 — Administrator.** Publication name, your name, e-mail, password. That creates the super
-admin, the starter pages (About, Contact, Privacy, Terms), the menus and one welcome story — and signs
+admin, the starter pages (About, Contact, Privacy, Terms), the menus and one welcome post — and signs
 you in. The installer then closes itself: `/admin/setup` redirects to the normal sign-in page.
 
-**Then delete or edit the welcome story**, and replace the About/Privacy/Terms text.
+**Then delete or edit the welcome post**, and replace the About/Privacy/Terms text.
 
 ### If the database settings ever break
 

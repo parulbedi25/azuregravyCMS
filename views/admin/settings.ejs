@@ -58,7 +58,7 @@
 
       <% if (active === 'appearance') { %>
         <div class="form-grid form-grid--2">
-          <label class="field"><span>Stories per page</span><input class="input" type="number" name="posts_per_page" value="<%= settings.posts_per_page || '9' %>" min="3" max="36"></label>
+          <label class="field"><span>Posts per page</span><input class="input" type="number" name="posts_per_page" value="<%= settings.posts_per_page || '9' %>" min="3" max="36"></label>
           <label class="field"><span>Homepage layout</span>
             <select class="select" name="homepage_layout">
               <option value="editorial" <%= settings.homepage_layout === 'editorial' ? 'selected' : '' %>>Editorial (feature + list)</option>
@@ -66,14 +66,14 @@
             </select>
           </label>
         </div>
-        <label class="field"><span>Featured stories on the home page</span><input class="input" type="number" name="homepage_featured_count" value="<%= settings.homepage_featured_count || '1' %>" min="1" max="3"></label>
+        <label class="field"><span>Featured posts on the home page</span><input class="input" type="number" name="homepage_featured_count" value="<%= settings.homepage_featured_count || '1' %>" min="1" max="3"></label>
         <div class="form-section">
-          <h3>Story furniture</h3>
+          <h3>Post furniture</h3>
           <p>Small pieces shown around each article.</p>
           <div class="grid" style="gap:4px">
             <label class="switch"><input type="checkbox" name="show_reading_time" <%= settings.show_reading_time !== '0' ? 'checked' : '' %>><span class="switch__track"></span><span class="switch__text"><b>Reading time</b><span>Show the estimated read time.</span></span></label>
-            <label class="switch"><input type="checkbox" name="show_author_box" <%= settings.show_author_box !== '0' ? 'checked' : '' %>><span class="switch__track"></span><span class="switch__text"><b>Author box</b><span>A short bio under each story.</span></span></label>
-            <label class="switch"><input type="checkbox" name="show_related_posts" <%= settings.show_related_posts !== '0' ? 'checked' : '' %>><span class="switch__track"></span><span class="switch__text"><b>Related stories</b><span>Suggest three more pieces at the end.</span></span></label>
+            <label class="switch"><input type="checkbox" name="show_author_box" <%= settings.show_author_box !== '0' ? 'checked' : '' %>><span class="switch__track"></span><span class="switch__text"><b>Author box</b><span>A short bio under each post.</span></span></label>
+            <label class="switch"><input type="checkbox" name="show_related_posts" <%= settings.show_related_posts !== '0' ? 'checked' : '' %>><span class="switch__track"></span><span class="switch__text"><b>Related posts</b><span>Suggest three more pieces at the end.</span></span></label>
             <label class="switch"><input type="checkbox" name="show_toc" <%= settings.show_toc !== '0' ? 'checked' : '' %>><span class="switch__track"></span><span class="switch__text"><b>Table of contents</b><span>Sticky outline on long articles.</span></span></label>
           </div>
         </div>
@@ -92,7 +92,7 @@
       <% } %>
 
       <% if (active === 'seo') { %>
-        <label class="field"><span>Default social image</span><input class="input" name="seo_default_image" value="<%= settings.seo_default_image || '' %>" placeholder="/assets/seed/misc/og-default.webp"><span class="hint">Used when a story has no featured image.</span></label>
+        <label class="field"><span>Default social image</span><input class="input" name="seo_default_image" value="<%= settings.seo_default_image || '' %>" placeholder="/assets/seed/misc/og-default.webp"><span class="hint">Used when a post has no featured image.</span></label>
         <label class="field"><span>Analytics snippet</span><textarea class="textarea mono" name="analytics_snippet" rows="4" placeholder="&lt;script&gt;…&lt;/script&gt;"><%= settings.analytics_snippet || '' %></textarea><span class="hint">Injected into the public layout. Keep it small and privacy-friendly.</span></label>
         <div class="alert alert--info"><span class="text-sm">Sitemap: <b>/sitemap.xml</b> · RSS: <b>/feed.xml</b> · robots: <b>/robots.txt</b></span></div>
       <% } %>

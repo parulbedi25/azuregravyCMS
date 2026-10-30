@@ -61,7 +61,7 @@
           <input class="input input-sm" name="alt_text" value="<%= item.alt_text || '' %>" placeholder="Alt text" style="font-size:.74rem;padding:5px 8px">
           <button class="row-action" type="submit" title="Save alt text"><%- h.icon('check', '', 13) %></button>
         </form>
-        <form method="post" action="/admin/media/<%= item.id %>/delete" style="position:absolute;bottom:0;right:0" data-confirm="Delete this image? Stories using it will lose the image.">
+        <form method="post" action="/admin/media/<%= item.id %>/delete" style="position:absolute;bottom:0;right:0" data-confirm="Delete this image? Posts using it will lose the image.">
           <input type="hidden" name="_csrf" value="<%= csrfToken %>">
           <input type="hidden" name="redirect" value="/admin/media">
           <button class="row-action row-action--danger" type="submit" title="Delete" style="margin:6px"><%- h.icon('trash', '', 13) %></button>

@@ -7,8 +7,8 @@ import { DEFAULT_MENU } from './schema.js';
  * First-run provisioning.
  *
  * Booting against an empty database should leave a *working* site rather than an
- * empty shell: tables, settings, menus, a few starter pages, a welcome story and
- * a super admin account. Demo content (18 stories, 6 writers…) stays opt-in via
+ * empty shell: tables, settings, menus, a few starter pages, a welcome post and
+ * a super admin account. Demo content (18 posts, 6 writers…) stays opt-in via
  * SEED_DEMO=1 so a real installation starts clean.
  */
 
@@ -323,7 +323,7 @@ const STARTER_CATEGORIES = [
 ];
 
 /**
- * Menus, starter pages, a starter category and one welcome story.
+ * Menus, starter pages, a starter category and one welcome post.
  * Idempotent: each block only runs when that kind of content is completely absent,
  * so it never fights with real content on later boots.
  */
@@ -372,15 +372,15 @@ export async function ensureStarterContent(adminId: number, client?: DbClient): 
       const rows = await db.query<{ id: number }>('SELECT id FROM categories ORDER BY sort_order, id LIMIT 1');
       categoryId = rows[0] ? Number(rows[0].id) : null;
     }
-    const title = 'Welcome — this is your first story';
+    const title = 'Welcome — this is your first post';
     const slug = 'welcome';
     const excerpt = 'A first post, ready to edit. Delete it and write something better.';
     const content = [
-      'This is your first story. It exists so the home page is not empty on day one — edit it, publish it, or delete it.',
+      'This is your first post. It exists so the home page is not empty on day one — edit it, publish it, or delete it.',
       '',
       '## How publishing works',
       '',
-      '- Write in **Studio → Stories** with the Markdown editor and a live preview.',
+      '- Write in **Studio → Posts** with the Markdown editor and a live preview.',
       '- Set a status: draft, scheduled, published or private.',
       '- Add categories, tags, a featured image and an excerpt.',
       '- Rename the slug and an old-link redirect is created for you.',

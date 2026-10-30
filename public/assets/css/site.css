@@ -503,18 +503,7 @@
 .rank-list a:hover { color: var(--accent); }
 .rank-list small { display: block; margin-top: 4px; font-size: 0.72rem; color: var(--ink-3); }
 
-.tag-cloud { display: flex; flex-wrap: wrap; gap: 7px; }
-.tag-cloud a {
-  padding: 5px 11px;
-  border-radius: var(--radius-pill);
-  background: var(--surface-2);
-  border: 1px solid transparent;
-  font-size: 0.78rem;
-  color: var(--ink-2);
-  transition: all 0.2s var(--ease);
-}
-.tag-cloud a:hover { background: var(--accent-soft); color: var(--accent-ink); }
-.tag-cloud a span { color: var(--ink-3); font-size: 0.72rem; margin-left: 4px; }
+/* Tag cloud styles live in base.css — the admin editor uses them too. */
 
 .author-spotlight {
   display: grid;
@@ -845,23 +834,7 @@
 .search-result:hover { background: var(--surface-2); }
 .search-result img { width: 54px; height: 42px; border-radius: 8px; object-fit: cover; }
 
-/* --------------------------------------------------------------- toast */
-.toast-stack { position: fixed; right: 20px; bottom: 20px; z-index: 150; display: grid; gap: 10px; max-width: min(380px, calc(100vw - 40px)); }
-.toast {
-  display: flex; align-items: flex-start; gap: 10px;
-  padding: 12px 16px;
-  border-radius: var(--radius-sm);
-  background: var(--surface);
-  border: 1px solid var(--line);
-  box-shadow: var(--shadow-lg);
-  font-size: 0.88rem;
-  animation: toast-in 0.3s var(--ease);
-}
-.toast--success { border-left: 3px solid var(--success); }
-.toast--error { border-left: 3px solid var(--danger); }
-.toast--info { border-left: 3px solid var(--accent); }
-.toast__close { margin-left: auto; color: var(--ink-3); }
-@keyframes toast-in { from { opacity: 0; transform: translateY(10px); } }
+/* Toast styles live in base.css so the Studio gets them too — see the note there. */
 
 /* ---------------------------------------------------------- empty state */
 .empty {
@@ -892,11 +865,7 @@
 .contact-list a, .contact-list span { font-size: 0.98rem; }
 .contact-list a:hover { color: var(--accent); }
 
-/* -------------------------------------------------------- 404 / status */
-.status-page { display: grid; place-items: center; text-align: center; padding-block: clamp(60px, 12vw, 140px); gap: 16px; }
-.status-page__code { font-family: var(--font-display); font-weight: 680; font-size: clamp(4.4rem, 14vw, 9.5rem); line-height: 0.85; letter-spacing: -0.04em; color: var(--accent); }
-.status-page h1 { font-size: clamp(1.6rem, 3vw, 2.4rem); }
-.status-page p { color: var(--ink-3); max-width: 46ch; margin-inline: auto; }
+/* 404 / status styles live in base.css — the admin error page uses them too. */
 
 /* ------------------------------------------------------- extra surfaces */
 .post-card__placeholder {

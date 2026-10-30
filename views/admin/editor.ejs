@@ -1,6 +1,15 @@
 <%
   const isPage = type === 'page';
-  const base = isPage ? '/' : '/stories/';
+  /*
+    URL chrome around the slug, taken from the permalink structure in force.
+    Pages always sit at the root. For a post both halves can move: the prefix
+    carries any base or date segments, and the suffix exists because a
+    structure is allowed to put segments *after* the slug. An unsaved post has
+    no publish date yet, so the date tokens preview against today.
+  */
+  const affixes = h.permalinkAffixes(post ? post : { slug: '', type: type });
+  const base = affixes.prefix;
+  const baseSuffix = affixes.suffix;
   const selectedCategoryIds = (post && post.categories ? post.categories.map(function (c) { return c.id; }) : []);
   const tagValue = post && post.tags ? post.tags.map(function (t) { return t.name; }).join(', ') : '';
   const status = post ? post.status : 'draft';
@@ -18,7 +27,7 @@
   <div class="admin-page-head">
     <div>
       <div class="row" style="gap:8px;margin-bottom:4px">
-        <a class="text-xs text-muted" href="/admin/posts?type=<%= type %>">← All <%= isPage ? 'pages' : 'stories' %></a>
+        <a class="text-xs text-muted" href="/admin/posts?type=<%= type %>">← All <%= isPage ? 'pages' : 'posts' %></a>
         <% if (post && post.id) { %>
           <% if (post.status === 'published') { %>
             <span class="text-xs text-muted">·</span>
@@ -28,7 +37,7 @@
           <a class="text-xs text-muted" href="/admin/posts/<%= post.id %>/revisions"><%= revisions.length %> revision<%= revisions.length === 1 ? "" : "s" %></a>
         <% } %>
       </div>
-      <h1><%= post && post.id ? 'Edit ' + (isPage ? 'page' : 'story') : 'New ' + (isPage ? 'page' : 'story') %></h1>
+      <h1><%= post && post.id ? 'Edit ' + (isPage ? 'page' : 'post') : 'New ' + (isPage ? 'page' : 'post') %></h1>
       <p><span id="saveState"><%= post && post.updated_at ? 'Last edited ' + h.timeAgo(post.updated_at) : 'Not saved yet' %></span></p>
     </div>
     <div class="admin-page-head__actions">
@@ -43,7 +52,7 @@
     <div class="editor-main">
       <div class="panel">
         <input class="editor-title" id="title" name="title" type="text" required
-               placeholder="<%= isPage ? 'Page title' : 'Story title…' %>" value="<%= post ? post.title : '' %>" autocomplete="off">
+               placeholder="<%= isPage ? 'Page title' : 'Post title…' %>" value="<%= post ? post.title : '' %>" autocomplete="off">
         <% if (post && post.id && post.status !== 'trash') { %>
           <%
             // Mirrors the server-side rule in the /preview/:ref route: the author
@@ -54,7 +63,7 @@
           <div class="editor-titlelink">
             <% if (post.status === 'published') { %>
               <a href="<%= h.postUrl(post) %>" target="_blank" rel="noopener noreferrer">
-                <%- h.icon('external', '', 12) %> View live <%= isPage ? 'page' : 'story' %>
+                <%- h.icon('external', '', 12) %> View live <%= isPage ? 'page' : 'post' %>
               </a>
               <code class="editor-titlelink__url"><%= h.postUrl(post) %></code>
             <% } else if (canPreview) { %>
@@ -71,6 +80,7 @@
           <%- h.icon('link', '', 13) %>
           <span><%= base %></span>
           <input class="input" id="slug" name="slug" type="text" value="<%= post ? post.slug : '' %>" placeholder="auto-generated-from-title" style="max-width: 320px">
+          <% if (baseSuffix) { %><span><%= baseSuffix %></span><% } %>
           <label class="checkbox text-xs" style="margin-left:6px">
             <input type="checkbox" id="slugLocked" checked> Auto
           </label>
@@ -126,7 +136,7 @@
 
       <div class="panel">
         <div class="panel__head">
-          <div><h2>Excerpt &amp; SEO</h2><p>How this <%= isPage ? 'page' : 'story' %> appears in search and social.</p></div>
+          <div><h2>Excerpt &amp; SEO</h2><p>How this <%= isPage ? 'page' : 'post' %> appears in search and social.</p></div>
         </div>
         <div class="panel__body">
           <div class="form-grid">
@@ -139,7 +149,7 @@
               <label class="field">
                 <span class="label-row"><span>SEO title</span><span class="counter" id="seoTitleCount"></span></span>
                 <input class="input" type="text" name="seo_title" value="<%= post && post.seo_title ? post.seo_title : '' %>"
-                       placeholder="Defaults to the story title" data-counter="seoTitleCount" data-ideal="30" data-max="60">
+                       placeholder="Defaults to the post title" data-counter="seoTitleCount" data-ideal="30" data-max="60">
               </label>
               <label class="field">
                 <span>Social image</span>
@@ -158,9 +168,9 @@
             </label>
 
             <div class="seo-preview">
-              <span><%= settings.site_url || 'https://your-domain.com' %><%= base %><span id="seoSlug"><%= post ? post.slug : 'your-story' %></span></span>
-              <b><%= post && post.seo_title ? post.seo_title : (post ? post.title : 'Your story title') %></b>
-              <p><%= post && post.seo_description ? post.seo_description : 'A short description of the story, shown under the title in search results.' %></p>
+              <span><%= settings.site_url || 'https://your-domain.com' %><%= base %><span id="seoSlug"><%= post ? post.slug : 'your-post' %></span><%= baseSuffix %></span>
+              <b><%= post && post.seo_title ? post.seo_title : (post ? post.title : 'Your post title') %></b>
+              <p><%= post && post.seo_description ? post.seo_description : 'A short description of the post, shown under the title in search results.' %></p>
             </div>
           </div>
         </div>
@@ -218,7 +228,7 @@
 
           <div class="publish-actions" style="margin-top:4px">
             <button class="btn btn--accent btn--block btn--sm" type="submit" data-intent="publish">
-              <%- h.icon('send', '', 14) %> <%= post && post.status === 'published' ? 'Update story' : 'Publish' %>
+              <%- h.icon('send', '', 14) %> <%= post && post.status === 'published' ? 'Update post' : 'Publish' %>
             </button>
             <button class="btn btn--ghost btn--block btn--sm" type="submit" data-intent="save">Save draft</button>
           </div>
@@ -234,16 +244,16 @@
             <% if (post.status === 'trash') { %>
               <button class="btn btn--ghost btn--sm btn--block" type="submit" form="restorePostForm"
                       style="margin-top:6px"
-                      data-confirm="Restore this <%= isPage ? 'page' : 'story' %> out of the trash?"><%- h.icon('refresh', '', 13) %> Restore from trash</button>
+                      data-confirm="Restore this <%= isPage ? 'page' : 'post' %> out of the trash?"><%- h.icon('refresh', '', 13) %> Restore from trash</button>
               <% if (canDelete) { %>
                 <button class="btn btn--ghost btn--sm btn--block" type="submit" form="purgePostForm"
                         style="margin-top:6px;color:#c0392b"
-                        data-confirm="Delete this <%= isPage ? 'page' : 'story' %> permanently? This cannot be undone."><%- h.icon('x-circle', '', 13) %> Delete permanently</button>
+                        data-confirm="Delete this <%= isPage ? 'page' : 'post' %> permanently? This cannot be undone."><%- h.icon('x-circle', '', 13) %> Delete permanently</button>
               <% } %>
             <% } else { %>
               <button class="btn btn--ghost btn--sm btn--block" type="submit" form="deletePostForm"
                       style="margin-top:6px;color:#c0392b"
-                      data-confirm="Move this <%= isPage ? 'page' : 'story' %> to trash?"><%- h.icon('trash', '', 13) %> Move to trash</button>
+                      data-confirm="Move this <%= isPage ? 'page' : 'post' %> to trash?"><%- h.icon('trash', '', 13) %> Move to trash</button>
             <% } %>
           <% } %>
         </div>
@@ -256,9 +266,9 @@
           Deliberately not a <form>, and deliberately no name= attributes: this
           card lives inside #editorForm, so a nested form would be invalid HTML
           (browser recovery then duplicates _csrf, which is what caused the
-          publish-419 bug) and any named input would be posted with the story.
+          publish-419 bug) and any named input would be posted with the post.
           Everything is read by id and sent with fetch. Buttons are
-          type="button" so they can never submit the story form.
+          type="button" so they can never submit the post form.
         */
         const aiOn = settings.ai_enabled === '1';
         const aiReady = aiOn && !!settings.ai_api_key && !!settings.ai_model;
@@ -279,13 +289,13 @@
           <% } else { %>
             <label class="field">
               <span class="label">Title</span>
-              <input class="input" type="text" id="aiTitle" value="<%= aiSeedTitle %>" placeholder="What is the story about?" autocomplete="off">
+              <input class="input" type="text" id="aiTitle" value="<%= aiSeedTitle %>" placeholder="What is the post about?" autocomplete="off">
             </label>
 
             <label class="field">
               <span class="label">How much should it write?</span>
               <select class="input" id="aiMode">
-                <option value="full">The whole story</option>
+                <option value="full">The whole post</option>
                 <option value="outline">An outline only</option>
                 <option value="continue">Continue from where I am</option>
                 <option value="selection">Rewrite my selection</option>
@@ -361,7 +371,7 @@
               visible, keyed off .has-image on the wrapper. The previous markup
               branched server-side and gave the empty state an inline
               style="display:none" that admin.js never cleared — so choosing an
-              image on an unsaved story updated src but left it invisible until
+              image on an unsaved post updated src but left it invisible until
               the page reloaded.
             */
             const quickPicks = media.filter(function (m) { return /^image\//.test(m.mime_type || ''); }).slice(0, 4);
@@ -438,13 +448,13 @@
     #editorForm early, which meant
 
       1. every field after it — categories, tags, featured_image_id — sat outside
-         the form and was silently discarded when saving an existing story, and
+         the form and was silently discarded when saving an existing post, and
       2. the absorbed hidden _csrf input gave #editorForm two fields of that name.
          A duplicate key parses to an array, verifyCsrf() requires a string, and
          the submit failed with a misleading "419 Session expired".
 
     Only the existing-post path rendered those nested forms, which is why creating
-    a story worked while publishing or updating one did not.
+    a post worked while publishing or updating one did not.
   */
 %>
 <% if (post && post.id) { %>
@@ -500,7 +510,7 @@
 
     Talks to /admin/ai/compose over fetch with the x-csrf-token header, the same
     contract admin.js already uses. Nothing here is a form control with a name,
-    so none of it can be submitted with the story, and the generate button is
+    so none of it can be submitted with the post, and the generate button is
     type="button" so it can never trigger the editor form.
   */
   (function () {
@@ -571,7 +581,7 @@
         return;
       }
       if (mode === 'continue' && textarea && !textarea.value.trim()) {
-        say('There is nothing to continue from yet — write an opening, or choose “The whole story”.', 'error');
+        say('There is nothing to continue from yet — write an opening, or choose “The whole post”.', 'error');
         return;
       }
       if ((mode === 'full' || mode === 'outline') && textarea && textarea.value.trim()) {
@@ -628,7 +638,7 @@
 
     /*
       Enter in the title field would otherwise submit #editorForm, silently
-      saving a half-written story instead of drafting one.
+      saving a half-written post instead of drafting one.
     */
     if (titleInput) {
       titleInput.addEventListener('keydown', function (event) {

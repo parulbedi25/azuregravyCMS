@@ -31,7 +31,7 @@
           <input class="input" type="password" name="password" <%= user ? '' : 'required' %> placeholder="<%= user ? 'Leave blank to keep current' : 'At least 8 characters' %>" autocomplete="new-password">
         </label>
       </div>
-      <label class="field"><span>Bio</span><textarea class="textarea" name="bio" rows="4" placeholder="Shown on the author page and under stories."><%= user && user.bio ? user.bio : '' %></textarea></label>
+      <label class="field"><span>Bio</span><textarea class="textarea" name="bio" rows="4" placeholder="Shown on the author page and under posts."><%= user && user.bio ? user.bio : '' %></textarea></label>
       <div class="form-grid form-grid--2">
         <label class="field"><span>Website</span><input class="input" name="website" value="<%= user && user.website ? user.website : '' %>" placeholder="https://"></label>
         <label class="field"><span>Twitter / X</span><input class="input" name="twitter" value="<%= user && user.twitter ? user.twitter : '' %>" placeholder="handle"></label>
@@ -73,8 +73,8 @@
       <div class="panel">
         <div class="panel__head"><h2>Roles, briefly</h2></div>
         <div class="panel__body stack-10">
-          <p class="text-sm text-muted" style="margin:0"><span class="pill pill--role">Author</span> — writes and manages their own stories.</p>
-          <p class="text-sm text-muted" style="margin:0"><span class="pill pill--role">Editor</span> — everything an author can do, plus all stories, media and moderation.</p>
+          <p class="text-sm text-muted" style="margin:0"><span class="pill pill--role">Author</span> — writes and manages their own posts.</p>
+          <p class="text-sm text-muted" style="margin:0"><span class="pill pill--role">Editor</span> — everything an author can do, plus all posts, media and moderation.</p>
           <p class="text-sm text-muted" style="margin:0"><span class="pill pill--role">Admin</span> — full control including settings, users and tools.</p>
         </div>
       </div>

@@ -1,12 +1,12 @@
 <%
-  const noun = type === 'page' ? 'page' : 'story';
-  const plural = type === 'page' ? 'pages' : 'stories';
+  const noun = type === 'page' ? 'page' : 'post';
+  const plural = type === 'page' ? 'pages' : 'posts';
   const basePath = type === 'page' ? '/admin/posts' : '/admin/posts';
 %>
 
 <div class="admin-page-head">
   <div>
-    <h1><%= type === 'page' ? 'Pages' : 'Stories' %></h1>
+    <h1><%= type === 'page' ? 'Pages' : 'Posts' %></h1>
     <p><%= total %> <%= plural %><%= activeStatus !== 'all' ? ' · ' + activeStatus : '' %></p>
   </div>
   <div class="admin-page-head__actions">
@@ -113,7 +113,7 @@
                     %>
                     <% if (post.status === 'published') { %>
                       <a class="cell-link" href="<%= h.postUrl(post) %>" target="_blank" rel="noopener noreferrer"
-                         title="Open the live <%= post.type === 'page' ? 'page' : 'story' %> in a new tab">
+                         title="Open the live <%= post.type === 'page' ? 'page' : 'post' %> in a new tab">
                         <%- h.icon('external', '', 11) %>
                         <span class="cell-link__url"><%= h.postUrl(post) %></span>
                       </a>

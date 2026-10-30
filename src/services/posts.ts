@@ -1,6 +1,8 @@
 import { getDb, formatDateTime } from '../db/index.js';
 import { makeExcerpt, readingTime, slugify } from '../lib/text.js';
 import { renderMarkdown } from '../lib/markdown.js';
+import { loadSettings } from '../lib/settings.js';
+import { buildPostPath, structureFrom } from '../lib/permalink.js';
 import type { Category, Post, PostStatus, PostType, Tag } from '../types.js';
 
 export type PostSort = 'newest' | 'oldest' | 'popular' | 'updated' | 'title';
@@ -368,12 +370,18 @@ export async function updatePost(id: number, input: PostInput): Promise<{ previo
   await saveRevision(id, { title: input.title, content: input.content, excerpt }, input.author_id);
 
   if (existing.slug !== slug && existing.status === 'published') {
-    const prefix = existing.type === 'page' ? '/' : '/stories/';
+    /*
+      Both ends are built from the permalink structure instead of concatenated.
+      Under a date- or category-based structure the old prefix approach produced
+      a `from_path` that no longer matched anything real, so the redirect row was
+      dead weight and the old URL 404'd.
+    */
+    const structure = structureFrom(await loadSettings());
     await db.execute(
       `INSERT INTO redirects (from_path, to_path, status_code)
        VALUES (?, ?, 301)
        ON DUPLICATE KEY UPDATE to_path = VALUES(to_path), status_code = 301`,
-      [`${prefix}${existing.slug}`, `${prefix}${slug}`],
+      [buildPostPath(existing, structure), buildPostPath({ ...existing, slug }, structure)],
     );
   }
   return { previousSlug: existing.slug };
@@ -442,8 +450,8 @@ export async function permanentlyDeletePost(id: number): Promise<void> {
   const post = await getPostById(id);
   await db.execute('DELETE FROM posts WHERE id = ?', [id]);
   if (post?.slug) {
-    const prefix = post.type === 'page' ? '/' : '/stories/';
-    await db.execute('DELETE FROM redirects WHERE from_path = ?', [`${prefix}${post.slug}`]);
+    const structure = structureFrom(await loadSettings());
+    await db.execute('DELETE FROM redirects WHERE from_path = ?', [buildPostPath(post, structure)]);
   }
 }
 
@@ -505,7 +513,7 @@ export async function trashPost(id: number): Promise<void> {
  * status was never one we could restore to. Never restores to 'trash'.
  *
  * Note this is deliberately *not* derived from `published_at`: setPostStatus
- * preserves that column, so a story someone intentionally demoted
+ * preserves that column, so a post someone intentionally demoted
  * published → draft → trash would otherwise come back publicly live.
  */
 export async function restorePost(id: number): Promise<PostStatus> {

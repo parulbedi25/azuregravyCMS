@@ -45,7 +45,7 @@ async function loadEditorPage(
 
   res.render('admin/editor', {
     layout: 'layouts/admin',
-    title: post ? `Edit: ${post.title}` : type === 'page' ? 'New page' : 'New story',
+    title: post ? `Edit: ${post.title}` : type === 'page' ? 'New page' : 'New post',
     adminTitle: post ? 'Edit' : 'Create',
     page: 'posts',
     post,
@@ -78,7 +78,7 @@ router.get(
     const { posts, total } = await listPosts({
       type,
       // "All" means every *active* status. Trashed content is deliberately
-      // excluded here so a deleted story disappears from the list it was in
+      // excluded here so a deleted post disappears from the list it was in
       // and can only be reached through the Trash tab.
       statuses: tab.statuses ?? ['published', 'draft', 'scheduled', 'private'],
       search: search || undefined,
@@ -108,8 +108,8 @@ router.get(
 
     res.render('admin/posts', {
       layout: 'layouts/admin',
-      title: type === 'page' ? 'Pages' : 'Stories',
-      adminTitle: type === 'page' ? 'Pages' : 'Stories',
+      title: type === 'page' ? 'Pages' : 'Posts',
+      adminTitle: type === 'page' ? 'Pages' : 'Posts',
       page: type === 'page' ? 'pages' : 'posts',
       type,
       posts: visible,
@@ -188,7 +188,7 @@ router.post(
       tags,
     });
 
-    await logActivity(user.id, 'created', `${type === 'page' ? 'Page' : 'Story'}: ${title}`);
+    await logActivity(user.id, 'created', `${type === 'page' ? 'Page' : 'Post'}: ${title}`);
     setFlash(req, 'success', status === 'published' ? 'Published. Nicely done.' : `Saved as ${status}.`);
     res.redirect(`/admin/posts/${id}/edit`);
   }),
@@ -200,7 +200,7 @@ router.get(
     const post = await getPostById(Number(req.params.id));
     if (!post) return next();
     if (!canEditPost(res.locals.currentUser, post)) {
-      setFlash(req, 'error', 'You can only edit your own stories.');
+      setFlash(req, 'error', 'You can only edit your own posts.');
       return res.redirect('/admin/posts');
     }
     await loadEditorPage(req, res, post, post.type);
@@ -213,7 +213,7 @@ router.post(
     const existing = await getPostById(Number(req.params.id));
     if (!existing) return next();
     if (!canEditPost(res.locals.currentUser, existing)) {
-      setFlash(req, 'error', 'You can only edit your own stories.');
+      setFlash(req, 'error', 'You can only edit your own posts.');
       return res.redirect('/admin/posts');
     }
     const intent = str(req.body.intent, 'save');
@@ -241,7 +241,7 @@ router.post(
     });
 
     await logActivity(res.locals.currentUser.id, 'updated', existing.title);
-    setFlash(req, 'success', status === 'published' ? 'Story published.' : 'Changes saved.');
+    setFlash(req, 'success', status === 'published' ? 'Post published.' : 'Changes saved.');
     res.redirect(`/admin/posts/${existing.id}/edit`);
   }),
 );
@@ -252,7 +252,7 @@ router.post(
     const post = await getPostById(Number(req.params.id));
     if (!post) return res.redirect('/admin/posts');
     if (!canEditPost(res.locals.currentUser, post)) {
-      setFlash(req, 'error', 'You cannot change that story.');
+      setFlash(req, 'error', 'You cannot change that post.');
       return res.redirect('/admin/posts');
     }
     const status = normaliseStatus(str(req.body.status, 'draft'));
@@ -269,7 +269,7 @@ router.post(
     const ids = parseIds(req.body.ids);
     const action = str(req.body.action);
     if (!ids.length || !action) {
-      setFlash(req, 'error', 'Select at least one story.');
+      setFlash(req, 'error', 'Select at least one post.');
       return res.redirect('/admin/posts');
     }
     const db = await getDb();
@@ -307,7 +307,7 @@ router.post(
           break;
       }
     }
-    await logActivity(user.id, `bulk:${action}`, `${affected} stories`);
+    await logActivity(user.id, `bulk:${action}`, `${affected} posts`);
     setFlash(req, 'success', `${affected} stor${affected === 1 ? 'y' : 'ies'} updated.`);
     res.redirect(str(req.body.redirect, '/admin/posts'));
   }),
@@ -319,7 +319,7 @@ router.post(
     const post = await getPostById(Number(req.params.id));
     if (!post) return res.redirect('/admin/posts');
     if (!canEditPost(res.locals.currentUser, post)) {
-      setFlash(req, 'error', 'You cannot delete that story.');
+      setFlash(req, 'error', 'You cannot delete that post.');
       return res.redirect('/admin/posts');
     }
     if (str(req.body.mode) === 'permanent') {
@@ -331,7 +331,7 @@ router.post(
       await logActivity(res.locals.currentUser.id, 'deleted', post.title);
       setFlash(req, 'success', `“${post.title}” was deleted permanently.`);
       // Stay on the trash for the right content type — a page must not bounce
-      // back to the stories list.
+      // back to the posts list.
       return res.redirect(
         str(req.body.redirect, `/admin/posts?type=${post.type === 'page' ? 'page' : 'post'}&status=trash`),
       );
@@ -350,7 +350,7 @@ router.post(
     const post = await getPostById(Number(req.params.id));
     if (!post) return res.redirect('/admin/posts');
     if (!canEditPost(res.locals.currentUser, post)) {
-      setFlash(req, 'error', 'You cannot restore that story.');
+      setFlash(req, 'error', 'You cannot restore that post.');
       return res.redirect('/admin/posts?status=trash');
     }
     const status = await restorePost(post.id);
@@ -397,7 +397,7 @@ router.post(
     const post = await getPostById(Number(req.params.id));
     if (!post) return next();
     if (!canEditPost(res.locals.currentUser, post)) {
-      setFlash(req, 'error', 'You cannot edit that story.');
+      setFlash(req, 'error', 'You cannot edit that post.');
       return res.redirect('/admin/posts');
     }
     const db = await getDb();

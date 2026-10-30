@@ -59,7 +59,7 @@ export class AiError extends Error {
 }
 
 export const AI_MODES: Array<{ id: ComposeMode; label: string; help: string }> = [
-  { id: 'full', label: 'Write the whole story', help: 'Replaces the body with a complete draft built from your title.' },
+  { id: 'full', label: 'Write the whole post', help: 'Replaces the body with a complete draft built from your title.' },
   { id: 'outline', label: 'Outline only', help: 'Headings and one-line beats, so you can fill in the detail yourself.' },
   { id: 'continue', label: 'Continue from here', help: 'Keeps what you have written and carries on from the end of it.' },
   { id: 'selection', label: 'Rewrite the selection', help: 'Expands or improves only the text you have highlighted.' },
@@ -251,7 +251,7 @@ function userPrompt(request: ComposeRequest): string {
     parts.push('Rewrite only the highlighted passage below. Keep its meaning and any facts intact, improve clarity and rhythm, and return just the replacement text with no surrounding commentary.');
     parts.push('', '--- SELECTION ---', (request.selection ?? '').trim().slice(0, 8_000), '--- END ---');
   } else {
-    parts.push('Write the complete story body for that title.');
+    parts.push('Write the complete post body for that title.');
   }
 
   return parts.join('\n');
@@ -446,7 +446,7 @@ export async function composeDraft(
     throw new AiError('Give the assistant a title of at least three characters.', '', 400);
   }
   if (request.mode === 'continue' && !(request.existing ?? '').trim()) {
-    throw new AiError('There is nothing to continue from yet.', 'Write an opening first, or choose "Write the whole story".', 400);
+    throw new AiError('There is nothing to continue from yet.', 'Write an opening first, or choose "Write the whole post".', 400);
   }
   if (request.mode === 'selection' && !(request.selection ?? '').trim()) {
     throw new AiError('Select some text in the editor first.', '', 400);

@@ -4,12 +4,20 @@ import {
   makeExcerpt, pluralize, readingTime, slugify, timeAgo, truncate, toLocalInput, fromLocalInput, safeUrl,
 } from './text.js';
 import { previewPath } from './preview.js';
+import { buildPostPath, postListPath, splitAroundSlug, structureFrom } from './permalink.js';
+import type { PermalinkSource } from './permalink.js';
 import type { SettingsMap } from '../types.js';
 
-export const postUrl = (post: { slug: string; type?: string }) =>
-  post.type === 'page' ? `/${post.slug}` : `/stories/${post.slug}`;
+/**
+ * Canonical URL for a post or page.
+ *
+ * Posts honour the `permalink_structure` setting; pages have always lived at
+ * the root and are deliberately unaffected by it. `structure` is optional so
+ * callers outside a request (seeding, CLI scripts) still get the default shape.
+ */
+export const postUrl = (post: PermalinkSource, structure?: string) => buildPostPath(post, structure);
 
-/** Signed preview link for a story that is not public yet. See lib/preview.ts. */
+/** Signed preview link for a post that is not public yet. See lib/preview.ts. */
 export const previewUrl = (post: { id: number }) => previewPath(post);
 
 export const categoryUrl = (slug: string) => `/category/${slug}`;
@@ -39,6 +47,11 @@ export function settingOf(settings: SettingsMap, key: string, fallback = ''): st
 }
 
 export function buildHelpers(settings: SettingsMap) {
+  /*
+    Resolved once per render rather than per link: every card on a listing page
+    calls postUrl, and re-parsing the structure each time would be pure waste.
+  */
+  const structure = structureFrom(settings);
   return {
     icon,
     formatDate: (value: string | null | undefined, style?: 'long' | 'medium' | 'short') =>
@@ -57,7 +70,13 @@ export function buildHelpers(settings: SettingsMap) {
     toLocalInput,
     fromLocalInput,
     colorFromSeed,
-    postUrl,
+    postUrl: (post: PermalinkSource) => buildPostPath(post, structure),
+    /** Archive index for posts, derived from the permalink structure. */
+    postListUrl: postListPath(structure),
+    /** The structure in force, for admin UIs that render live URL previews. */
+    permalinkStructure: structure,
+    /** Path split around the slug, so the editor can preview a URL live. */
+    permalinkAffixes: (post: PermalinkSource) => splitAroundSlug(post, structure),
     previewUrl,
     categoryUrl,
     tagUrl,

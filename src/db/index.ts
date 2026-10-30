@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import mysql from 'mysql2/promise';
 import { applyDbConfig, config, type DbConfigInput } from '../config.js';
 import { SCHEMA_STATEMENTS, SCHEMA_VERSION, DEFAULT_SETTINGS } from './schema.js';
+import { postListPath, structureFrom } from '../lib/permalink.js';
 
 export type SqlParam = string | number | boolean | null | Date | undefined;
 
@@ -643,6 +644,38 @@ export async function migrate(client?: DbClient): Promise<{ tables: number }> {
       [key, value],
     );
   }
+
+  /*
+    Repoint navigation left behind by the Stories -> Posts rename.
+
+    DEFAULT_MENU only ever reaches a *new* database: the settings and menu
+    seeding above is deliberately non-destructive, so an existing install keeps
+    the rows it was seeded with. Without this, an upgrade leaves the primary and
+    footer menus reading "Stories" and pointing at /stories, which now answers
+    with a 301 — the rename would never reach the site's own navigation, and
+    every click would cost a redirect hop.
+
+    Both statements are idempotent and match nothing once applied. Order matters:
+    the label update runs first, while the url still identifies the seeded rows.
+
+    The label update requires *both* halves of the seeded default (label
+    'Stories' AND url '/stories'), so a menu item an editor renamed by hand is
+    never rewritten on every subsequent boot. The url update is deliberately
+    broader — anything still pointing at /stories now costs a 301 on every
+    click, so it is repointed whatever its label, and follows the list path the
+    current permalink structure implies.
+  */
+  await database.execute(
+    `UPDATE menu_items SET label = 'Posts' WHERE label = 'Stories' AND url = '/stories'`,
+  );
+  const structureRows = await database.query<{ setting_value: string | null }>(
+    'SELECT setting_value FROM settings WHERE setting_key = ? LIMIT 1',
+    ['permalink_structure'],
+  );
+  const menuListPath = postListPath(
+    structureFrom({ permalink_structure: structureRows[0]?.setting_value ?? '' }),
+  );
+  await database.execute('UPDATE menu_items SET url = ? WHERE url = ?', [menuListPath, '/stories']);
   const rows = await database.query<{ total: number }>(
     `SELECT COUNT(*) AS total FROM information_schema.tables
       WHERE table_schema = DATABASE() AND table_type = 'BASE TABLE'`,

@@ -8,7 +8,7 @@
       <% if (ticker) { %>
         <span class="topbar__ticker">
           <b>Fresh</b>
-          <a href="/stories/<%= ticker.slug %>"><%= ticker.title %></a>
+          <a href="<%= h.postUrl(ticker) %>"><%= ticker.title %></a>
         </span>
       <% } %>
       <span class="topbar__socials">
@@ -48,12 +48,12 @@
                   <% } %>
                   <span class="mega__body">
                     <b><%= category.name %></b>
-                    <span><%= category.description || (category.post_count || 0) + ' stories' %></span>
+                    <span><%= category.description || (category.post_count || 0) + ' posts' %></span>
                   </span>
                 </a>
               <% }); %>
               <div class="mega__foot">
-                <span><%= navCategories.length %> topics, <%= navCategories.reduce(function (sum, item) { return sum + (item.post_count || 0); }, 0) %> stories</span>
+                <span><%= navCategories.length %> topics, <%= navCategories.reduce(function (sum, item) { return sum + (item.post_count || 0); }, 0) %> posts</span>
                 <a class="section-head__link" href="/categories">All topics <%- h.icon('arrow-right', '', 13) %></a>
               </div>
             </div>
@@ -63,7 +63,7 @@
     </nav>
 
     <div class="nav-actions">
-      <button class="icon-btn" type="button" data-open-search aria-label="Search stories" title="Search (press /)">
+      <button class="icon-btn" type="button" data-open-search aria-label="Search posts" title="Search (press /)">
         <%- h.icon('search', '', 18) %>
       </button>
       <button class="icon-btn theme-toggle" type="button" data-theme-toggle aria-label="Toggle dark mode" title="Toggle theme">

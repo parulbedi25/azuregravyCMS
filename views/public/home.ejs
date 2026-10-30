@@ -7,7 +7,7 @@
     <div>
       <p><%= h.setting('site_description') %></p>
       <div class="home-intro__meta">
-        <span><%= stats.posts %> stories</span>
+        <span><%= stats.posts %> posts</span>
         <span class="dot"></span>
         <span><%= stats.categories %> topics</span>
         <span class="dot"></span>
@@ -53,7 +53,7 @@
           <a class="latest-item" href="<%= h.postUrl(post) %>">
             <span class="latest-item__index"><%= String(index + 1).padStart(2, '0') %></span>
             <span class="latest-item__body">
-              <span class="latest-item__cat"><%= post.category_name || 'Story' %></span>
+              <span class="latest-item__cat"><%= post.category_name || 'Post' %></span>
               <h3><%= post.title %></h3>
               <span class="latest-item__meta">
                 <time datetime="<%= h.isoDate(post.published_at) %>"><%= h.formatDate(post.published_at, 'medium') %></time>
@@ -64,7 +64,7 @@
           </a>
         <% }); %>
         <% if (latestRest.length === 0) { %>
-          <p class="muted small">New stories are on the way.</p>
+          <p class="muted small">New posts are on the way.</p>
         <% } %>
       </aside>
     </div>
@@ -126,7 +126,7 @@
           </div>
           <h3><a href="<%= h.postUrl(spotlightPosts[0]) %>"><%= spotlightPosts[0].title %></a></h3>
           <p><%= h.excerptOf(spotlightPosts[0], 190) %></p>
-          <a class="section-head__link" href="<%= h.postUrl(spotlightPosts[0]) %>">Read the story <%- h.icon('arrow-right', '', 13) %></a>
+          <a class="section-head__link" href="<%= h.postUrl(spotlightPosts[0]) %>">Read the post <%- h.icon('arrow-right', '', 13) %></a>
         </article>
 
         <div class="spotlight__rows">
@@ -144,7 +144,7 @@
             </a>
           <% }); %>
           <% if (spotlightPosts.length < 2) { %>
-            <p class="muted small">More stories are being filed under this topic.</p>
+            <p class="muted small">More posts are being filed under this topic.</p>
           <% } %>
         </div>
       </div>
@@ -160,7 +160,7 @@
         <h2 style="margin-top:8px">Worth your coffee break</h2>
         <p>Three pieces we keep coming back to.</p>
       </div>
-      <a class="section-head__link" href="/stories">All stories <%- h.icon('arrow-right', '', 14) %></a>
+      <a class="section-head__link" href="<%= h.postListUrl %>">All posts <%- h.icon('arrow-right', '', 14) %></a>
     </div>
 
     <div class="editorial">
@@ -188,7 +188,7 @@
               <li>
                 <div>
                   <a href="<%= h.postUrl(post) %>"><%= post.title %></a>
-                  <small><%= h.formatNumber(post.views) %> views · <%= post.category_name || 'Story' %></small>
+                  <small><%= h.formatNumber(post.views) %> views · <%= post.category_name || 'Post' %></small>
                 </div>
               </li>
             <% }); %>
@@ -254,7 +254,7 @@
         <span class="kicker">Fresh off the press</span>
         <h2 style="margin-top:8px">More from the journal</h2>
       </div>
-      <a class="section-head__link" href="/stories">View all stories <%- h.icon('arrow-right', '', 14) %></a>
+      <a class="section-head__link" href="<%= h.postListUrl %>">View all posts <%- h.icon('arrow-right', '', 14) %></a>
     </div>
     <div class="grid grid--3">
       <% grid.forEach(function (post, index) { %>
