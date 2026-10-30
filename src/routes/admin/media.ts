@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import { imageSize } from 'image-size';
 import { asyncRoute, pageParam, paginate, setFlash, verifyCsrf } from '../../lib/http.js';
 import { requireRole } from '../../lib/auth.js';
-import { describeUpload, upload } from '../../lib/upload.js';
+import { describeUpload, MAX_UPLOAD_FILES, UPLOAD_FIELD, upload } from '../../lib/upload.js';
 import { str } from '../helpers.js';
 import { createMedia, deleteMedia, listMedia, mediaStats, updateMedia, getMedia } from '../../services/media.js';
 import { logActivity } from '../../services/activity.js';
@@ -66,7 +66,7 @@ router.get(
 
 router.post(
   '/media',
-  upload.array('files', 12),
+  upload.array(UPLOAD_FIELD, MAX_UPLOAD_FILES),
   asyncRoute(async (req, res) => {
     if (!verifyCsrf(req)) {
       setFlash(req, 'error', 'Your session expired. Please try again.');
@@ -88,7 +88,7 @@ router.post(
 
 router.post(
   '/api/media/upload',
-  upload.array('files', 12),
+  upload.array(UPLOAD_FIELD, MAX_UPLOAD_FILES),
   asyncRoute(async (req, res) => {
     if (!verifyCsrf(req)) return res.status(419).json({ error: 'Session expired' });
     const files = (req.files as Express.Multer.File[] | undefined) ?? [];

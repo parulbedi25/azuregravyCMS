@@ -14,6 +14,7 @@ import {
 } from '../services/posts.js';
 import { parsePreviewRef } from '../lib/preview.js';
 import { getUser, listUsers } from '../services/users.js';
+import { safeNext } from '../lib/auth.js';
 import { errorPage } from './helpers.js';
 
 const router = Router();
@@ -395,7 +396,14 @@ router.get(
 router.post(
   '/newsletter',
   asyncRoute(async (req, res) => {
-    const back = typeof req.body.redirect === 'string' && req.body.redirect.startsWith('/') ? req.body.redirect : '/';
+    /*
+      `redirect` is visitor-supplied, so it goes through the same guard as the
+      login `next` field. A bare `startsWith('/')` still admits the
+      protocol-relative `//evil.example` and the backslash form `/\evil.example`
+      that browsers normalise into an off-site redirect — both confirmed
+      reachable here before this change.
+    */
+    const back = safeNext(req.body.redirect, '/');
     if (!verifyCsrf(req)) {
       setFlash(req, 'error', 'Your session expired. Please try again.');
       return res.redirect(`${back}#newsletter`);

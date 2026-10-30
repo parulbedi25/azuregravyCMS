@@ -295,7 +295,18 @@ export const DEFAULT_SETTINGS: Record<string, string> = {
     /chat/completions endpoint, so OpenAI, Azure OpenAI, Groq, OpenRouter and a
     local Ollama all work without a code change.
   */
-  ai_enabled: '0',
+  /*
+    Enabled by default, but that is not the same as live: `describeAiReadiness`
+    refuses every request until an API key and a model are saved, so nothing is
+    sent anywhere on a fresh install. What this changes is the first-run
+    experience — the administrator sees "add a key" and a row of free-provider
+    presets instead of a feature that looks absent and has to be discovered.
+
+    Seeding is non-destructive (ON DUPLICATE KEY UPDATE setting_value =
+    setting_value), so an existing install that switched the assistant off keeps
+    it off.
+  */
+  ai_enabled: '1',
   ai_base_url: 'https://api.openai.com/v1',
   ai_api_key: '',
   ai_model: 'gpt-4o-mini',

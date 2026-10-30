@@ -5,8 +5,8 @@ import { loadSettings, saveSettings } from '../../lib/settings.js';
 import { logActivity } from '../../services/activity.js';
 import { str, bool } from '../helpers.js';
 import {
-  AI_MODES, AiError, composeDraft, describeAiReadiness, loadAiConfig, maskApiKey,
-  type ComposeMode,
+  AI_MODES, AI_PROVIDERS, AiError, composeDraft, describeAiReadiness, loadAiConfig, maskApiKey,
+  probeProvider, type ComposeMode,
 } from '../../services/ai.js';
 
 const router = Router();
@@ -48,6 +48,7 @@ router.get(
       readiness: describeAiReadiness(config),
       maskedKey: maskApiKey(config.apiKey),
       modes: AI_MODES,
+      providers: AI_PROVIDERS,
     });
   }),
 );
@@ -117,7 +118,49 @@ router.post(
   }),
 );
 
-/* ----------------------------------------------------------------- compose */
+  /* ------------------------------------------------------- test connection */
+  /**
+   * Prove the provider actually works before an admin relies on it.
+   *
+   * Tests the values currently in the form, falling back to the saved ones —
+   * so a new provider can be tried without committing to it. The key field is
+   * blank whenever a key is already stored (it is never echoed back), which is
+   * why the fallback matters rather than being a convenience.
+   *
+   * Serves JSON to the fetch path and a flash + redirect to the no-JS path,
+   * where the button posts the whole settings form via `formaction`.
+   */
+  router.post(
+    '/ai/test',
+    requireRole('admin'),
+    asyncRoute(async (req, res) => {
+      const saved = loadAiConfig(await loadSettings(true));
+      const typedKey = str(req.body.ai_api_key).trim();
+
+      const config = {
+        ...saved,
+        baseUrl: (str(req.body.ai_base_url).trim().replace(/\/+$/, '') || saved.baseUrl),
+        model: str(req.body.ai_model).trim() || saved.model,
+        apiKey: typedKey || saved.apiKey,
+      };
+
+      const result = await probeProvider(config);
+      await logActivity(
+        res.locals.currentUser.id,
+        'ai',
+        result.ok ? `AI connection test passed (${config.model})` : `AI connection test failed: ${result.message}`,
+      );
+
+      // `ProbeResult` already carries `ok`; spreading it again would be a
+      // duplicate key, and a failed probe is still a successful test request.
+      if (wantsJson(req)) return res.json(result);
+
+      setFlash(req, result.ok ? 'success' : 'error', result.ok ? result.message : `${result.message} ${result.hint}`.trim());
+      res.redirect('/admin/ai');
+    }),
+  );
+
+  /* ----------------------------------------------------------------- compose */
 /**
  * Turn a title into Markdown for the editor textarea.
  *
