@@ -51,10 +51,10 @@
               </label>
             </div>
             <div class="row" style="gap:4px;align-self:end">
-              <span class="pill pill--plain"><%= category.post_count || 0 %> stories</span>
+              <span class="pill pill--plain"><%= category.post_count || 0 %> posts</span>
               <button class="row-action" type="submit" title="Save"><%- h.icon('check', '', 14) %></button>
               <button class="row-action row-action--danger" type="submit" formaction="/admin/categories/<%= category.id %>/delete"
-                      title="Delete" data-confirm="Delete “<%= category.name %>”? Stories will be kept but uncategorised."><%- h.icon('trash', '', 14) %></button>
+                      title="Delete" data-confirm="Delete “<%= category.name %>”? Posts will be kept but uncategorised."><%- h.icon('trash', '', 14) %></button>
             </div>
           </form>
         <% }); %>

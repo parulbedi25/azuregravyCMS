@@ -344,8 +344,8 @@ export async function runSeed(
   /* ----------------------------------------------------------- redirects */
   await db.execute(
     `INSERT INTO redirects (from_path, to_path, status_code, hits) VALUES
-      ('/stories/deep-work-field-guide', '/stories/field-guide-to-deep-work', 301, 12),
-      ('/blog', '/stories', 301, 84)`,
+      ('/posts/deep-work-field-guide', '/posts/field-guide-to-deep-work', 301, 12),
+      ('/blog', '/posts', 301, 84)`,
   );
 
   /* ------------------------------------------------------------ activity */

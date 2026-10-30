@@ -65,7 +65,7 @@ Open `http://localhost:3000` and the two-step installer takes over:
 | Step | What you enter | What happens |
 | --- | --- | --- |
 | **1 · Database** | host, port, database name, user, password — or "built-in MariaDB" for a zero-setup trial | The connection is **tested in the page**. If it fails you get a plain-English reason (`ER_ACCESS_DENIED_ERROR`, `ECONNREFUSED`, unknown database…) with the cPanel fix, and nothing is written. If it succeeds the database is created when needed and all 19 tables plus the default settings are built. |
-| **2 · Administrator** | publication name, your name, e-mail, password | The super admin is created and you are signed straight into the Studio. Starter pages (About, Contact, Privacy, Terms), menus, three categories and one welcome story are added so the site is not empty. |
+| **2 · Administrator** | publication name, your name, e-mail, password | The super admin is created and you are signed straight into the Studio. Starter pages (About, Contact, Privacy, Terms), menus, three categories and one welcome post are added so the site is not empty. |
 
 The database details are remembered in `data/install.json` (permissions `0600`), so later boots
 connect on their own. Until an administrator exists, every URL leads back to the installer.
@@ -115,7 +115,7 @@ The account is created on the first request (or by `npm run db:setup`), and the 
 ### Optional: load the demo publication
 
 ```bash
-SEED_DEMO=1 npm start      # 18 stories, 4 pages, 8 categories, 42 images, 6 writers
+SEED_DEMO=1 npm start      # 18 posts, 4 pages, 8 categories, 42 images, 6 writers
 ```
 
 Demo accounts all use the password `gravy123`; the admin is `admin@azuregravy.local`.
@@ -145,15 +145,23 @@ Node and keeps its files under `./data` (optional dependency: `lite4mariadb`, in
   description, Open Graph image and a no-index toggle.
 - **Revisions** — each save snapshots the previous body; the editor lists the eight most recent and
   the revisions page keeps the last 40, any of which can be restored.
-- **Bulk actions** — publish, draft, trash and restore from the story list, plus a scheduled queue
+- **Bulk actions** — publish, draft, trash and restore from the post list, plus a scheduled queue
   that publishes on the first request after the publish time.
 - **Pages** — the same editor with its own templates, including a working contact page.
 - **Taxonomies** — categories and tags with descriptions, colours and editable slugs; author pages.
 - **Automatic 301s** — renaming a slug keeps old links alive and records the redirect.
+- **Permalink control** — Studio → Permalinks chooses the shape of every post URL: a base plus
+  slug (default `/posts/%slug%`), the shortest possible `/%slug%`, date-based
+  `/posts/%year%/%month%/%slug%`, category-based, numeric, or a custom template built from the
+  tokens `%slug% %post_id% %year% %month% %day% %category%`. Segments can be added or removed
+  freely. Saving writes a 301 for every published post, collapses redirect chains to a single
+  hop, and moves the archive menu item with it; requests that identify a post but are not its
+  canonical URL (a stale date, a trailing slash, an old `/stories/…` link) are redirected rather
+  than served as duplicate content. Pages are unaffected and stay at the root.
 
 ### AI drafting assistant
 
-- **Title to draft** — administrators can turn a title into a complete story body, an outline, a
+- **Title to draft** — administrators can turn a title into a complete post body, an outline, a
   continuation of what is already written, or a rewrite of just the highlighted passage. The result
   lands directly in the editor textarea, ready to edit and save.
 - **Embedded diagrams** — the model returns a small JSON flow spec and the app draws it as a
@@ -200,16 +208,16 @@ Node and keeps its files under `./data` (optional dependency: `lite4mariadb`, in
 
 ### Front end
 
-- Magazine home: lead story, editor's picks, category grid, **topic spotlight**, latest stream,
+- Magazine home: lead post, editor's picks, category grid, **topic spotlight**, latest stream,
   newsletter band and a "more from the journal" grid.
-- Story page: table of contents, reading progress bar, sticky share rail, author card, tags,
-  previous/next story, related reading and threaded comments.
-- **Up next**: reaching the end of a story pulls the next piece inline with its full rendered body.
-- **Before you go** bar: a dismissible next-story prompt past the halfway point, remembered per story.
+- Post page: table of contents, reading progress bar, sticky share rail, author card, tags,
+  previous/next post, related reading and threaded comments.
+- **Up next**: reaching the end of a post pulls the next piece inline with its full rendered body.
+- **Before you go** bar: a dismissible next-post prompt past the halfway point, remembered per post.
 - **Newsletter popup**: opens from every Subscribe button, after 18 seconds or 55 % scroll — once per
   browser, closes on ESC or backdrop.
-- **Topics mega menu**: image, description and story count for each category, straight from the database.
-- Story lists for archive, category, tag, author and search, with `/page/2` style pagination.
+- **Topics mega menu**: image, description and post count for each category, straight from the database.
+- Post lists for archive, category, tag, author and search, with `/page/2` style pagination.
 - Full-text search across titles, excerpts, bodies and tags, plus a keyboard overlay (`/` or ⌘K).
 - Light / dark / system themes, remembered per browser and applied before first paint.
 - Responsive from 360 px to ultrawide, with an off-canvas studio sidebar on phones.
@@ -246,7 +254,7 @@ capability checks.
 | Studio section | Route | What it manages |
 | --- | --- | --- |
 | **Dashboard** | `/admin` | Counts, view chart, drafts, pending comments, recent activity, quick actions |
-| **Stories** | `/admin/posts` | Create, edit, trash, restore, bulk publish; filters by status, author, category |
+| **Posts** | `/admin/posts` | Create, edit, trash, restore, bulk publish; filters by status, author, category |
 | **Pages** | `/admin/posts?type=page` | Static pages and templates |
 | **Categories / Tags** | `/admin/categories`, `/admin/tags` | Names, slugs, descriptions, colours, counts |
 | **Media** | `/admin/media` | Upload, browse, edit metadata, copy URLs, delete |
@@ -256,6 +264,7 @@ capability checks.
 | **Appearance** | `/admin/appearance` | Wordmark, accent colour, theme, homepage layout, reading options, live preview |
 | **Navigation** | `/admin/menus` | Header, footer and legal menus — add, reorder, toggle, delete |
 | **Redirects** | `/admin/redirects` | Review and remove the 301s created by slug changes |
+| **Permalinks** | `/admin/permalinks` | Post URL structure — presets, custom templates, live URL preview, reserved-slug warnings |
 | **Settings** | `/admin/settings` | General, Reading, Discussion, Newsletter, SEO, Footer & social |
 | **People** | `/admin/users` | Users, roles, profiles, password changes |
 | **System** | `/admin/tools` | Database health, rebuild rendered HTML, generate redirects, prune sessions, JSON export, activity log |
@@ -275,14 +284,15 @@ Everything below is editable from the dashboard with no code changes.
 | **Accent / theme colour** | Appearance | Colour picker plus six presets (`#206BEA`, ink, sky, forest, plum, rose). Drives links, chips, focus rings **and buttons**, expanded server-side into readable light and dark tints. |
 | **Light or dark default** | Appearance | `light`, `dark`; readers can still toggle, remembered per browser |
 | **Wordmark** | Appearance | Logo text used in the header, footer and studio sidebar |
-| **Homepage** | Appearance | Editorial or grid layout, featured slots (1–3), stories per page, topic spotlight category |
-| **Reading** | Appearance | Reading time, author box, related stories, table of contents — each on/off |
-| **Story engagement** | Appearance | Auto-load "Up next", "Before you go" bar |
+| **Homepage** | Appearance | Editorial or grid layout, featured slots (1–3), posts per page, topic spotlight category |
+| **Reading** | Appearance | Reading time, author box, related posts, table of contents — each on/off |
+| **Post engagement** | Appearance | Auto-load "Up next", "Before you go" bar |
 | **Header** | Navigation + Settings → Footer & social | Primary menu items, order, visibility; social icons; publication title, tagline, description |
 | **Footer** | Settings → Footer & social + Navigation | Footer and legal menus, about text, copyright line (`{year}` token), social links |
 | **Newsletter** | Settings → Newsletter | Enable/disable, heading and body copy |
 | **Comments** | Settings → Discussion | Allow comments, pre-moderation, notification email |
-| **SEO** | Settings → SEO | Default social image, analytics snippet, per-story overrides |
+| **Permalinks** | Permalinks | Post URL structure: presets, custom token templates, automatic 301s on change |
+| **SEO** | Settings → SEO | Default social image, analytics snippet, per-post overrides |
 | **General** | Settings → General | Site title, tagline, description, URL, contact email, timezone, date format |
 
 ### Not customisable in the UI (yet)
@@ -362,7 +372,7 @@ or redeploying is always safe:
 | Migrate | Once per process | `CREATE TABLE IF NOT EXISTS` for all 19 tables, then records the schema version. |
 | Settings | Once per process | Inserts any missing setting keys; never overwrites values you have changed. |
 | Super admin | Installer step 2, or `ADMIN_EMAIL` / `ADMIN_PASSWORD` | The installer closes itself as soon as an administrator exists. |
-| Starter content | With the super admin | Menus, About / Contact / Privacy / Terms pages, three categories, one welcome story. |
+| Starter content | With the super admin | Menus, About / Contact / Privacy / Terms pages, three categories, one welcome post. |
 | Demo content | Only when `SEED_DEMO=1` | And only on a completely empty database. |
 
 A failed connection never stops the process. Depending on where it fails you get:
@@ -480,7 +490,7 @@ src/
   lib/                   markdown, auth, settings, sessions, uploads, http helpers, icons, views
   services/              posts, comments, media, users, stats, activity, navigation
   routes/
-    public.ts            home, story, page, archive, category, tag, author, search, feed, sitemap
+    public.ts            home, post, page, archive, category, tag, author, search, feed, sitemap
     admin/*.ts           dashboard, setup wizard, auth, posts, taxonomy, media, comments, people, settings
 views/
   layouts/               public, admin, auth, plain (standalone error pages)
@@ -542,8 +552,8 @@ icons and JavaScript here are original to this project.
 | Public site | Studio |
 | --- | --- |
 | ![Home](docs/screenshots/home.png) | ![Dashboard](docs/screenshots/admin.png) |
-| ![Story](docs/screenshots/article.png) | ![Editor](docs/screenshots/editor.png) |
-| ![Stories archive](docs/screenshots/stories.png) | ![Appearance](docs/screenshots/appearance.png) |
+| ![Post](docs/screenshots/article.png) | ![Editor](docs/screenshots/editor.png) |
+| ![Posts archive](docs/screenshots/stories.png) | ![Appearance](docs/screenshots/appearance.png) |
 | ![Topics](docs/screenshots/categories.png) | ![Settings](docs/screenshots/settings.png) |
 | ![Archive](docs/screenshots/archive.png) | ![Media library](docs/screenshots/media.png) |
 | ![Search](docs/screenshots/search.png) | ![Comments](docs/screenshots/comments.png) |

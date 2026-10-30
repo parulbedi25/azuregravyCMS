@@ -35,16 +35,36 @@ export function invalidateNavigation(): void {
   categoryCache = null;
 }
 
-let tickerCache: CacheEntry<{ title: string; slug: string; category: string | null } | null> | null = null;
+interface TickerItem {
+  id: number;
+  title: string;
+  slug: string;
+  category: string | null;
+  category_slug: string | null;
+  published_at: string | null;
+  created_at: string;
+}
 
-/** A single headline for the header ticker, cached briefly. */
-export async function getTicker(): Promise<{ title: string; slug: string; category: string | null } | null> {
+let tickerCache: CacheEntry<TickerItem | null> | null = null;
+
+/**
+ * A single headline for the header ticker, cached briefly.
+ *
+ * Carries everything buildPostPath needs — id, publish date and category slug —
+ * not just the display fields. The header renders `h.postUrl(ticker)`, so under
+ * a `%year%` or `%category%` structure a row without those columns would build
+ * a URL from today's date and no category: still resolvable, but only via a
+ * 301 hop on the site's most prominent link.
+ */
+export async function getTicker(): Promise<TickerItem | null> {
   if (!tickerCache || Date.now() - tickerCache.at > 60_000) {
     const db = await getDb();
-    const rows = await db.query<{ title: string; slug: string; category: string | null }>(
-      `SELECT p.title, p.slug,
+    const rows = await db.query<TickerItem>(
+      `SELECT p.id, p.title, p.slug, p.published_at, p.created_at,
               (SELECT c.name FROM categories c JOIN post_categories pc ON pc.category_id = c.id
-                WHERE pc.post_id = p.id ORDER BY c.sort_order LIMIT 1) AS category
+                WHERE pc.post_id = p.id ORDER BY c.sort_order LIMIT 1) AS category,
+              (SELECT c.slug FROM categories c JOIN post_categories pc ON pc.category_id = c.id
+                WHERE pc.post_id = p.id ORDER BY c.sort_order LIMIT 1) AS category_slug
          FROM posts p WHERE p.type = 'post' AND p.status = 'published'
          ORDER BY p.published_at DESC LIMIT 1`,
     );

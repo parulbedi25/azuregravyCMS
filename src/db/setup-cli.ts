@@ -38,13 +38,13 @@ async function main() {
 
   console.log(`  ✔ ${report.tables} tables ready`);
   if (report.demoSeeded) console.log('  ✔ demo publication seeded (SEED_DEMO=1)');
-  if (report.createdContent) console.log('  ✔ starter pages, menu and welcome story created');
+  if (report.createdContent) console.log('  ✔ starter pages, menu and welcome post created');
   if (report.createdAdmin) console.log(`  ✔ super admin created: ${report.createdAdmin}`);
 
   if (state.ready) {
     await recordInstalled().catch(() => undefined);
     const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
-    console.log(`\n  The site is installed: ${plural(state.admins, 'admin account')}, ${plural(state.posts, 'story', 'stories')}, ${plural(state.pages, 'page')}.`);
+    console.log(`\n  The site is installed: ${plural(state.admins, 'admin account')}, ${plural(state.posts, 'post', 'posts')}, ${plural(state.pages, 'page')}.`);
     console.log('  Start it with `npm start` and sign in at /admin.\n');
   } else {
     console.log('\n  Tables and starter content are ready, but there is no administrator yet.');

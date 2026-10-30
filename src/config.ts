@@ -215,7 +215,7 @@ export const config = {
     createDatabase: bool(initialDb.createDatabase, true),
   },
   setup: {
-    /** Seed the full demo publication (18 stories) on an empty database. */
+    /** Seed the full demo publication (18 posts) on an empty database. */
     seedDemo: bool(process.env.SEED_DEMO, false),
     /** Optional super admin. Leave blank to create it in the browser installer. */
     adminName: (process.env.ADMIN_NAME ?? 'Site Administrator').trim(),

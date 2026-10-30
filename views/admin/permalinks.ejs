@@ -1,0 +1,147 @@
+<%
+  /*
+    Everything on this page is server-rendered from the same buildPostPath()
+    that the router uses, so the examples cannot drift from real behaviour.
+    There is deliberately no client-side URL construction: a second
+    implementation in the browser would eventually disagree with the first.
+  */
+  const customSelected = !isPreset;
+%>
+<div class="admin-page-head">
+  <div>
+    <h1>Permalinks</h1>
+    <p>Choose the shape of every post URL. Old links are redirected automatically when you change it.</p>
+  </div>
+</div>
+
+<div class="admin-grid-side">
+  <div class="panel">
+    <div class="panel__head">
+      <h2>URL structure</h2>
+      <span class="text-xs text-muted">Currently <span class="mono"><%= structure %></span></span>
+    </div>
+
+    <form class="panel__body" method="post" action="/admin/permalinks">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+
+      <div class="permalink-list">
+        <% presets.forEach(function (preset) { %>
+          <label class="permalink-option <%= preset.structure === structure ? 'is-selected' : '' %>">
+            <input type="radio" name="permalink_structure" value="<%= preset.structure %>"
+                   <%= preset.structure === structure ? 'checked' : '' %>>
+            <span class="permalink-option__body">
+              <span class="permalink-option__title"><%= preset.label %></span>
+              <span class="permalink-option__url mono"><%= preset.example %></span>
+              <span class="permalink-option__note"><%= preset.note %></span>
+            </span>
+          </label>
+        <% }); %>
+
+        <label class="permalink-option <%= customSelected ? 'is-selected' : '' %>">
+          <input type="radio" name="permalink_structure" value="custom" <%= customSelected ? 'checked' : '' %>>
+          <span class="permalink-option__body">
+            <span class="permalink-option__title">Custom</span>
+            <input class="input mono permalink-option__input" name="custom_structure"
+                   value="<%= customSelected ? structure : '' %>" placeholder="/posts/%year%/%slug%"
+                   autocomplete="off" spellcheck="false">
+            <span class="permalink-option__note">
+              Build your own from the tokens below. Drop a segment to shorten the URL, add one to extend it.
+            </span>
+          </span>
+        </label>
+      </div>
+
+      <div class="permalink-actions">
+        <button class="btn btn--accent" type="submit">Save structure</button>
+        <% if (structure !== defaultStructure) { %>
+          <button class="btn" type="submit" name="permalink_structure" value="<%= defaultStructure %>">
+            Restore default
+          </button>
+        <% } %>
+      </div>
+    </form>
+  </div>
+
+  <div class="panel" style="position:sticky;top:calc(var(--admin-topbar) + 16px)">
+    <div class="panel__head"><h2>What your URLs look like</h2></div>
+    <div class="panel__body">
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th>Post</th><th>URL</th></tr></thead>
+          <tbody>
+            <% preview.forEach(function (item) { %>
+              <tr>
+                <td class="text-sm"><%= item.title %></td>
+                <td class="mono text-xs"><%= item.url %><% if (item.reserved) { %> <span class="pill pill--plain">unreachable</span><% } %></td>
+              </tr>
+            <% }); %>
+            <tr>
+              <td class="text-sm text-muted">Archive index</td>
+              <td class="mono text-xs text-muted"><%= listPath %></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="hint">
+        <% if (postCount) { %>
+          Showing your <%= postCount %> most recent published posts.
+        <% } else { %>
+          No published posts yet, so this is a placeholder example.
+        <% } %>
+        Pages are not affected — they stay at the root, like <span class="mono">/about</span>.
+      </p>
+    </div>
+  </div>
+</div>
+
+<div class="admin-grid-side">
+  <div class="panel">
+    <div class="panel__head"><h2>Tokens</h2><span class="text-xs text-muted">Swap these into any structure</span></div>
+    <div class="panel__body">
+      <div class="table-wrap">
+        <table class="table">
+          <tbody>
+            <tr><td class="mono text-xs">%slug%</td><td class="text-sm">The post slug — the readable part of the URL.</td></tr>
+            <tr><td class="mono text-xs">%post_id%</td><td class="text-sm">The numeric id. Never changes, even if the slug is renamed.</td></tr>
+            <tr><td class="mono text-xs">%year%</td><td class="text-sm">Publish year, e.g. <span class="mono">2026</span>.</td></tr>
+            <tr><td class="mono text-xs">%month%</td><td class="text-sm">Publish month, zero-padded, e.g. <span class="mono">10</span>.</td></tr>
+            <tr><td class="mono text-xs">%day%</td><td class="text-sm">Publish day, zero-padded, e.g. <span class="mono">05</span>.</td></tr>
+            <tr><td class="mono text-xs">%category%</td><td class="text-sm">The first category slug. Cannot open a structure — a category named “tag” would collide with a built-in route.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="hint">
+        A structure must contain <span class="mono">%slug%</span> or <span class="mono">%post_id%</span>, otherwise a URL
+        cannot be resolved back to its post. Anything else is rejected and the previous structure is kept.
+      </p>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel__head"><h2>Before you shorten</h2></div>
+    <div class="panel__body">
+      <% if (isShort) { %>
+        <div class="alert alert--warning">
+          <b>This structure puts posts at the root.</b>
+          <p class="text-sm" style="margin:6px 0 0">
+            Posts now share <span class="mono">/{slug}</span> with pages, and a post slug that matches a built-in route
+            can never be reached. The archive stays at <span class="mono"><%= listPath %></span>.
+          </p>
+        </div>
+      <% } else { %>
+        <p class="text-sm text-muted" style="margin:0">
+          Your current structure keeps posts under <span class="mono"><%= listPath %>/</span>, so no post slug can
+          collide with a built-in route. Shortening to <span class="mono">/%slug%</span> removes that protection.
+        </p>
+      <% } %>
+      <p class="hint" style="margin-top:12px">
+        Reserved words: <span class="mono"><%= reservedSlugs.join(', ') %></span>.
+      </p>
+      <p class="hint">
+        Changing the structure writes a 301 redirect for every published post, so existing links and search rankings
+        carry over. Renaming a single post's slug does the same. Both are visible under
+        <a href="/admin/redirects">Redirects</a>.
+      </p>
+    </div>
+  </div>
+</div>

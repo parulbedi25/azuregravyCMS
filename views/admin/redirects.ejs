@@ -7,7 +7,7 @@
 
 <div class="admin-grid-side">
   <div class="panel">
-    <div class="panel__head"><h2>Active rules</h2><span class="text-xs text-muted">Automatic rules are created when you rename a published story</span></div>
+    <div class="panel__head"><h2>Active rules</h2><span class="text-xs text-muted">Automatic rules are created when you rename a published post</span></div>
     <% if (redirects.length === 0) { %>
       <div class="empty-state"><%- h.icon('corner-down-right') %><h3>No redirects yet</h3><p>Add one on the right, or let the CMS create them for you when slugs change.</p></div>
     <% } else { %>
@@ -39,8 +39,8 @@
     <div class="panel__head"><h2>Add a redirect</h2></div>
     <form class="panel__body form-grid" method="post" action="/admin/redirects">
       <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-      <label class="field"><span>Old path</span><input class="input" name="from_path" placeholder="/stories/old-slug" required></label>
-      <label class="field"><span>New path</span><input class="input" name="to_path" placeholder="/stories/new-slug" required></label>
+      <label class="field"><span>Old path</span><input class="input" name="from_path" placeholder="/posts/old-slug" required></label>
+      <label class="field"><span>New path</span><input class="input" name="to_path" placeholder="/posts/new-slug" required></label>
       <label class="field">
         <span>Type</span>
         <select class="select" name="status_code">

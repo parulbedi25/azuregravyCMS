@@ -1140,3 +1140,56 @@ label.field > span { color: var(--admin-ink-2); }
 .side-card--ai .side-card__head h3 svg { color: var(--admin-accent); }
 .side-card--ai #aiStatus { line-height: 1.5; }
 .side-card--ai #aiGenerate[disabled] { opacity: 0.65; cursor: progress; }
+
+/* --------------------------------------------------------- permalinks */
+/*
+  Structure picker for Admin → Permalinks.
+
+  Built on the admin tokens only, so it follows the light/dark switch without a
+  second rule set. The radios are styled here rather than reusing `.segmented`
+  because each option is a multi-line card (label, example URL, note) and the
+  segmented control hides its inputs and lays them out in a single row.
+*/
+.permalink-list { display: grid; gap: 10px; }
+.permalink-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  padding: 13px 14px;
+  border: 1px solid var(--admin-line);
+  border-radius: 10px;
+  background: var(--admin-panel);
+  cursor: pointer;
+  transition: border-color 0.15s var(--ease), background 0.15s var(--ease);
+}
+.permalink-option:hover { border-color: color-mix(in srgb, var(--admin-accent) 45%, var(--admin-line)); }
+.permalink-option.is-selected {
+  border-color: var(--admin-accent);
+  background: var(--admin-accent-soft);
+}
+.permalink-option input[type='radio'] {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin: 2px 0 0;
+  accent-color: var(--admin-accent);
+  cursor: pointer;
+}
+.permalink-option__body { display: grid; gap: 4px; min-width: 0; }
+.permalink-option__title { font-size: 0.86rem; font-weight: 560; color: var(--admin-ink); }
+.permalink-option__url {
+  font-size: 0.78rem;
+  color: var(--admin-accent);
+  word-break: break-all;
+}
+.permalink-option__note { font-size: 0.75rem; line-height: 1.5; color: var(--admin-ink-3); }
+.permalink-option__input { margin-top: 2px; max-width: 380px; }
+.permalink-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--admin-line);
+}

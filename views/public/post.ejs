@@ -1,6 +1,6 @@
 <%
   const isPreview = typeof previewMode !== 'undefined' && !!previewMode;
-  const shareUrl = encodeURIComponent((settings.site_url || '') + '/stories/' + post.slug);
+  const shareUrl = encodeURIComponent((settings.site_url || '') + h.postUrl(post));
   const shareTitle = encodeURIComponent(post.title);
   const author = { name: post.author_name || 'Azure Gravy', avatar: post.author_avatar, bio: post.author_bio };
 %>
@@ -84,22 +84,22 @@
             <h3><%= author.name %></h3>
             <p><%= author.bio || 'Part of the ' + siteName + ' writing team.' %></p>
             <div class="author-box__links">
-              <a href="/author/<%= post.author_id %>">All stories <%- h.icon('arrow-right', '', 13) %></a>
+              <a href="/author/<%= post.author_id %>">All posts <%- h.icon('arrow-right', '', 13) %></a>
               <% if (post.author_avatar) { %><a href="/author/<%= post.author_id %>">Profile</a><% } %>
             </div>
           </div>
         </div>
       <% } %>
 
-      <nav class="post-nav" aria-label="More stories">
+      <nav class="post-nav" aria-label="More posts">
         <% if (adjacent.previous) { %>
-          <a href="/stories/<%= adjacent.previous.slug %>">
+          <a href="<%= h.postUrl(adjacent.previous) %>">
             <span>← Previous</span>
             <b><%= adjacent.previous.title %></b>
           </a>
         <% } else { %><span></span><% } %>
         <% if (adjacent.next) { %>
-          <a href="/stories/<%= adjacent.next.slug %>">
+          <a href="<%= h.postUrl(adjacent.next) %>">
             <span>Next →</span>
             <b><%= adjacent.next.title %></b>
           </a>
@@ -107,16 +107,16 @@
       </nav>
 
       <% if (adjacent.next && settings.auto_load_next !== '0') { %>
-        <section class="up-next" data-up-next data-next-url="/stories/<%= post.slug %>/next">
+        <section class="up-next" data-up-next data-next-url="<%= h.postUrl(post) %>/next">
           <div class="up-next__card">
-            <a class="up-next__media" href="/stories/<%= adjacent.next.slug %>" tabindex="-1" aria-hidden="true">
+            <a class="up-next__media" href="<%= h.postUrl(adjacent.next) %>" tabindex="-1" aria-hidden="true">
               <% if (adjacent.next.featured_image) { %>
                 <img src="<%= h.mediaUrl(adjacent.next.featured_image) %>" alt="" loading="lazy">
               <% } %>
             </a>
             <div class="up-next__body">
               <span class="kicker">Up next</span>
-              <h3><a href="/stories/<%= adjacent.next.slug %>"><%= adjacent.next.title %></a></h3>
+              <h3><a href="<%= h.postUrl(adjacent.next) %>"><%= adjacent.next.title %></a></h3>
               <div class="up-next__meta">
                 <% if (adjacent.next.category_name) { %>
                   <a href="/category/<%= adjacent.next.category_slug %>"><%= adjacent.next.category_name %></a>
@@ -132,7 +132,7 @@
               </div>
               <div class="up-next__actions">
                 <button class="btn btn--accent btn--sm" type="button" data-load-next>Keep reading</button>
-                <a class="btn btn--ghost btn--sm" href="/stories/<%= adjacent.next.slug %>">Open story</a>
+                <a class="btn btn--ghost btn--sm" href="<%= h.postUrl(adjacent.next) %>">Open post</a>
               </div>
             </div>
           </div>
@@ -158,7 +158,7 @@
         <% } %>
 
         <% if (allowComments) { %>
-          <form class="comment-form" method="post" action="/stories/<%= post.slug %>/comments" id="commentForm">
+          <form class="comment-form" method="post" action="<%= h.postUrl(post) %>/comments" id="commentForm">
             <h3>Leave a comment</h3>
             <input type="hidden" name="_csrf" value="<%= csrfToken %>">
             <input type="hidden" name="parent_id" id="commentParent" value="">
@@ -185,7 +185,7 @@
             </div>
           </form>
         <% } else { %>
-          <div class="alert">Comments are closed on this story.</div>
+          <div class="alert">Comments are closed on this post.</div>
         <% } %>
       </section>
       <% } %>
@@ -205,7 +205,7 @@
 
       <% if (!isPreview) { %>
       <div class="aside-card">
-        <h4>Share this story</h4>
+        <h4>Share this post</h4>
         <div class="aside-share">
           <a class="icon-btn" href="https://twitter.com/intent/tweet?url=<%= shareUrl %>&text=<%= shareTitle %>" target="_blank" rel="noopener" aria-label="Twitter"><%- h.icon('twitter', '', 16) %></a>
           <a class="icon-btn" href="https://www.linkedin.com/sharing/share-offsite/?url=<%= shareUrl %>" target="_blank" rel="noopener" aria-label="LinkedIn"><%- h.icon('linkedin', '', 16) %></a>
@@ -220,7 +220,7 @@
         <p>The best of the week, in one letter. Free, and easy to leave.</p>
         <form method="post" action="/newsletter" class="stack" style="--stack: 8px; margin-top: 12px">
           <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-          <input type="hidden" name="redirect" value="/stories/<%= post.slug %>">
+          <input type="hidden" name="redirect" value="<%= h.postUrl(post) %>">
           <input class="input" type="email" name="email" placeholder="you@example.com" required aria-label="Email address">
           <button class="btn btn--accent btn--cta btn--block btn--sm" type="submit">Subscribe</button>
         </form>
@@ -244,8 +244,8 @@
   <section class="section">
     <div class="container">
       <div class="section-head">
-        <div><span class="kicker">Keep reading</span><h2 style="margin-top:8px">Related stories</h2></div>
-        <a class="section-head__link" href="/stories">All stories <%- h.icon('arrow-right', '', 14) %></a>
+        <div><span class="kicker">Keep reading</span><h2 style="margin-top:8px">Related posts</h2></div>
+        <a class="section-head__link" href="<%= h.postListUrl %>">All posts <%- h.icon('arrow-right', '', 14) %></a>
       </div>
       <div class="grid grid--3">
         <% related.forEach(function (item, index) { %>
@@ -260,7 +260,7 @@
   <div class="bye-bar" id="byeBar" hidden data-bye-key="bye:<%= post.slug %>">
     <div class="bye-bar__inner">
       <span class="bye-bar__label">Before you go</span>
-      <a class="bye-bar__post" href="/stories/<%= adjacent.next.slug %>">
+      <a class="bye-bar__post" href="<%= h.postUrl(adjacent.next) %>">
         <% if (adjacent.next.featured_image) { %>
           <img src="<%= h.mediaUrl(adjacent.next.featured_image) %>" alt="" loading="lazy">
         <% } else { %>
@@ -271,7 +271,7 @@
           <span><%= adjacent.next.reading_time %> min read<% if (adjacent.next.category_name) { %> · <%= adjacent.next.category_name %><% } %></span>
         </span>
       </a>
-      <a class="btn btn--accent btn--sm" href="/stories/<%= adjacent.next.slug %>">Read next</a>
+      <a class="btn btn--accent btn--sm" href="<%= h.postUrl(adjacent.next) %>">Read next</a>
       <button class="icon-btn" type="button" data-dismiss-bye aria-label="Dismiss this suggestion">
         <%- h.icon('close', '', 15) %>
       </button>

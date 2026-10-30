@@ -28,7 +28,7 @@
       <% }); %>
       <form class="sort-form" method="get" action="<%= basePath %>">
         <% if (search) { %><input type="hidden" name="q" value="<%= search %>"><% } %>
-        <label class="visually-hidden" for="sort">Sort stories</label>
+        <label class="visually-hidden" for="sort">Sort posts</label>
         <select class="select" name="sort" id="sort" onchange="this.form.submit()">
           <option value="newest" <%= sort === 'newest' ? 'selected' : '' %>>Newest first</option>
           <option value="oldest" <%= sort === 'oldest' ? 'selected' : '' %>>Oldest first</option>
@@ -41,11 +41,11 @@
   <% if (posts.length === 0) { %>
     <div class="empty">
       <%- h.icon('search', 'empty__icon', 44) %>
-      <h3><%= search ? 'No stories matched “' + search + '”' : 'Nothing here yet' %></h3>
+      <h3><%= search ? 'No posts matched “' + search + '”' : 'Nothing here yet' %></h3>
       <p><%= search ? 'Try a shorter phrase, or start from a topic below.' : 'This corner of the journal is still being written.' %></p>
       <div class="empty__suggest">
         <form class="sort-form" method="get" action="/search" role="search">
-          <input class="input" type="search" name="q" value="<%= search %>" placeholder="Search the archive…" aria-label="Search stories">
+          <input class="input" type="search" name="q" value="<%= search %>" placeholder="Search the archive…" aria-label="Search posts">
           <button class="btn btn--accent btn--sm" type="submit">Search</button>
         </form>
         <% if (categories.length) { %>
@@ -55,7 +55,7 @@
             <% }); %>
           </div>
         <% } %>
-        <a class="btn btn--ghost mt-8" href="/stories">Browse all stories</a>
+        <a class="btn btn--ghost mt-8" href="<%= h.postListUrl %>">Browse all posts</a>
       </div>
     </div>
   <% } else { %>

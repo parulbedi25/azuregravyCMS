@@ -1,5 +1,10 @@
 import { Router } from 'express';
+import type { Request, Response } from 'express';
 import { siteBase } from '../lib/url.js';
+import { postUrl } from '../lib/view.js';
+import { buildPostPath, matchPostPath, postListPath, structureFrom } from '../lib/permalink.js';
+import type { PermalinkMatch } from '../lib/permalink.js';
+import type { Post } from '../types.js';
 import { getDb } from '../db/index.js';
 import { asyncRoute, clientIp, pageParam, paginate, setFlash, verifyCsrf } from '../lib/http.js';
 import { renderMarkdown } from '../lib/markdown.js';
@@ -23,6 +28,12 @@ const pageSize = (settings: Record<string, string>) => {
   const value = Number.parseInt(settings.posts_per_page ?? '9', 10);
   return Number.isFinite(value) && value > 0 ? Math.min(value, 36) : 9;
 };
+
+/** The permalink structure in force for this request. */
+const structureOf = (res: Response) => structureFrom(res.locals.settings as Record<string, string>);
+
+/** Archive index for posts, derived from the structure (e.g. `/posts`). */
+const listPathOf = (res: Response) => postListPath(structureOf(res));
 
 async function renderPostList(
   req: Parameters<Parameters<typeof router.get>[1]>[0],
@@ -158,33 +169,36 @@ router.get(
   }),
 );
 
-/* --------------------------------------------------------------- stories */
-router.get(
-  '/stories',
-  asyncRoute(async (req, res) => renderPostList(req, res, { heading: 'Stories', subheading: 'Everything we have published, newest first.', basePath: '/stories' })),
-);
-
+/*
+  The post archive and the single-post routes are not declared here. Their paths
+  come from the `permalink_structure` setting, so they are resolved by
+  `resolvePostRoute` further down — registered after every fixed route and
+  before the page catch-all. `/search` stays fixed because its path never moves.
+*/
 router.get(
   '/search',
   asyncRoute(async (req, res) => {
     const q = typeof req.query.q === 'string' ? req.query.q.trim() : '';
-    if (!q) return res.redirect('/stories');
+    if (!q) return res.redirect(listPathOf(res));
     await renderPostList(req, res, {
       heading: q ? `Search: “${q}”` : 'Search',
-      subheading: 'Matching stories from the archive.',
+      subheading: 'Matching posts from the archive.',
       basePath: '/search',
     });
   }),
 );
 
 /* -------------------------------------------------------------- article */
-router.get(
-  '/stories/:slug',
-  asyncRoute(async (req, res, next) => {
-    const post = await getPostBySlug(req.params.slug, { type: 'post' });
-    if (!post) return next();
-    if (post.status === 'private' && !res.locals.currentUser) return next();
 
+/**
+ * Render a single post.
+ *
+ * Deliberately free of routing logic: the caller has already resolved the post
+ * and decided it may be seen. That lets the permalink resolver, the legacy
+ * `/stories/*` redirects and the signed preview route all share one renderer
+ * instead of three copies that drift apart.
+ */
+async function renderPost(req: Request, res: Response, post: Post) {
     const db = await getDb();
     const viewed = req.session.viewedPosts ?? [];
     if (!viewed.includes(post.id)) {
@@ -231,18 +245,14 @@ router.get(
       commentOk: req.query.comment === '1',
       extraHead: articleJsonLd(post, {
         siteName: res.locals.siteName,
-        url: `${siteBase()}/stories/${post.slug}`,
+        url: `${siteBase()}${postUrl(post, structureOf(res))}`,
         logo: res.locals.settings.logo_image || undefined,
       }),
     });
-  }),
-);
+}
 
-router.get(
-  '/stories/:slug/next',
-  asyncRoute(async (req, res) => {
-    const post = await getPostBySlug(req.params.slug, { type: 'post' });
-    if (!post) return res.status(404).json({ error: 'not_found' });
+/** JSON payload for the "up next" auto-advance used by the reading view. */
+async function renderNextPost(res: Response, post: Post) {
     const { next } = await getAdjacentPosts(post);
     if (!next) return res.status(404).json({ error: 'no_next' });
 
@@ -256,19 +266,21 @@ router.get(
       `${full.reading_time} min read`,
     ].filter(Boolean).join(' <span class="dot"></span> ');
 
-    res.json({ title: full.title, url: `/stories/${full.slug}`, html, meta });
-  }),
-);
+    res.json({ title: full.title, url: postUrl(full, structureOf(res)), html, meta });
+}
 
-router.post(
-  '/stories/:slug/comments',
-  asyncRoute(async (req, res) => {
-    const post = await getPostBySlug(req.params.slug, { type: 'post' });
-    if (!post) return res.redirect('/stories');
+/** Validate and store a comment, then bounce the visitor back to the post. */
+async function submitComment(req: Request, res: Response, post: Post) {
+    /*
+      One canonical return target, built from the structure in force. Every
+      branch below used to hardcode `/stories/<slug>#comments`, which is exactly
+      the kind of duplicate that silently breaks when a setting changes.
+    */
+    const back = `${postUrl(post, structureOf(res))}#comments`;
 
     if (!verifyCsrf(req)) {
       setFlash(req, 'error', 'Your session expired. Please submit the comment again.');
-      return res.redirect(`/stories/${post.slug}#comments`);
+      return res.redirect(back);
     }
 
     const name = String(req.body.name ?? '').trim();
@@ -278,10 +290,10 @@ router.post(
 
     const fail = (message: string) => {
       setFlash(req, 'error', message);
-      res.redirect(`/stories/${post.slug}#comments`);
+      res.redirect(back);
     };
 
-    if (honeypot) return res.redirect(`/stories/${post.slug}#comments`);
+    if (honeypot) return res.redirect(back);
     if (name.length < 2) return fail('Please add your name before commenting.');
     if (content.length < 4) return fail('Your comment is a little too short.');
     if (content.length > 4000) return fail('Comments are limited to 4000 characters.');
@@ -309,9 +321,8 @@ router.post(
       'success',
       needsModeration ? 'Thanks — your comment is waiting for moderation.' : 'Your comment is live. Thanks for joining in.',
     );
-    res.redirect(`/stories/${post.slug}#comments`);
-  }),
-);
+    res.redirect(back);
+}
 
 /* ------------------------------------------------------------- taxonomy */
 router.get(
@@ -321,7 +332,7 @@ router.get(
     if (!category) return next();
     await renderPostList(req, res, {
       heading: category.name,
-      subheading: category.description ?? `All stories filed under ${category.name}.`,
+      subheading: category.description ?? `All posts filed under ${category.name}.`,
       category,
       basePath: `/category/${category.slug}`,
     });
@@ -335,7 +346,7 @@ router.get(
     if (!tag) return next();
     await renderPostList(req, res, {
       heading: `#${tag.name}`,
-      subheading: tag.description ?? `Stories tagged “${tag.name}”.`,
+      subheading: tag.description ?? `Posts tagged “${tag.name}”.`,
       tag,
       basePath: `/tag/${tag.slug}`,
     });
@@ -349,7 +360,7 @@ router.get(
     if (!author) return next();
     await renderPostList(req, res, {
       heading: author.name,
-      subheading: author.bio ?? `Stories written by ${author.name}.`,
+      subheading: author.bio ?? `Posts written by ${author.name}.`,
       author,
       basePath: `/author/${author.id}`,
     });
@@ -386,7 +397,7 @@ router.get(
       layout: 'layouts/public',
       title: 'Archive',
       pageTitle: 'The archive',
-      metaDescription: 'Browse every story by month.',
+      metaDescription: 'Browse every post by month.',
       months: perMonth,
     });
   }),
@@ -461,7 +472,7 @@ router.get(
       value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     const items = posts
       .map((post) => {
-        const link = `${base}/stories/${post.slug}`;
+        const link = `${base}${postUrl(post, structureOf(res))}`;
         const date = new Date(`${(post.published_at ?? post.created_at).replace(' ', 'T')}Z`).toUTCString();
         return `    <item>
       <title>${escape(post.title)}</title>
@@ -494,18 +505,37 @@ router.get(
     const settings = res.locals.settings as Record<string, string>;
     const base = (settings.site_url || siteBase()).replace(/\/$/, '');
     const db = await getDb();
-    const posts = await db.query<{ slug: string; updated_at: string; type: string }>(
-      `SELECT slug, updated_at, type FROM posts WHERE status = 'published'`,
+    /*
+      Selected through the same GROUP_CONCAT shape POST_COLUMNS uses, then split
+      on '||' exactly as decorate() does. The permalink structure may contain
+      %year% or %category%, so buildPostPath needs the real publish date and the
+      same first-category slug the article route resolves — a subtly different
+      ordering here would emit sitemap URLs that immediately 301.
+    */
+    const posts = await db.query<{
+      id: number; slug: string; updated_at: string; type: string;
+      published_at: string | null; created_at: string; category_slugs: string | null;
+    }>(
+      `SELECT p.id, p.slug, p.updated_at, p.type, p.published_at, p.created_at,
+              (SELECT GROUP_CONCAT(c.slug ORDER BY c.sort_order SEPARATOR '||')
+                 FROM categories c JOIN post_categories pc ON pc.category_id = c.id
+                WHERE pc.post_id = p.id) AS category_slugs
+         FROM posts p
+        WHERE p.status = 'published'`,
     );
+    const structure = structureOf(res);
     const categories = await listCategories({ withCounts: true });
     const tags = await listTags(false);
     const urls = [
       { loc: '/', priority: '1.0' },
-      { loc: '/stories', priority: '0.9' },
+      { loc: postListPath(structure), priority: '0.9' },
       { loc: '/categories', priority: '0.7' },
       { loc: '/archive', priority: '0.6' },
       ...posts.map((post) => ({
-        loc: post.type === 'page' ? `/${post.slug}` : `/stories/${post.slug}`,
+        loc: buildPostPath(
+          { ...post, category_slug: String(post.category_slugs ?? '').split('||')[0] || null },
+          structure,
+        ),
         lastmod: new Date(`${post.updated_at.replace(' ', 'T')}Z`).toISOString(),
         priority: post.type === 'page' ? '0.6' : '0.8',
       })),
@@ -540,7 +570,7 @@ router.get(
     res.json({
       results: posts.map((post) => ({
         title: post.title,
-        url: `/stories/${post.slug}`,
+        url: postUrl(post, structureOf(res)),
         excerpt: h_excerpt(post.excerpt ?? ''),
         image: post.featured_image ?? null,
         category: post.category_name ?? null,
@@ -555,14 +585,14 @@ function h_excerpt(value: string): string {
 
 /* ------------------------------------------------------- staff-only preview */
 /**
- * Render a story that is not public yet, for its author or a super admin.
+ * Render a post that is not public yet, for its author or a super admin.
  *
  * Registered above the `/:slug` catch-all on purpose: `/preview` is a single
  * path segment and would otherwise be matched as a page slug.
  *
  * Deliberate differences from the public article route:
  *  - no view counting, so an author refreshing a draft does not inflate analytics;
- *  - no comments, related stories or share affordances, which would all point at
+ *  - no comments, related posts or share affordances, which would all point at
  *    a URL visitors cannot reach;
  *  - `noindex` plus `X-Robots-Tag` and `no-store`, so a preview can never be
  *    indexed or cached;
@@ -587,10 +617,10 @@ router.get(
 
     const post = await getPostById(id);
     if (!post || post.status === 'trash') {
-      return errorPage(res, 404, 'Preview not found', 'This story no longer exists.');
+      return errorPage(res, 404, 'Preview not found', 'This post no longer exists.');
     }
     if (post.author_id !== user.id && user.role !== 'admin') {
-      return errorPage(res, 404, 'Preview not found', 'You can only preview your own stories.');
+      return errorPage(res, 404, 'Preview not found', 'You can only preview your own posts.');
     }
 
     const { html, toc } = renderMarkdown(post.content);
@@ -600,7 +630,7 @@ router.get(
 
     const noindex = '<meta name="robots" content="noindex, nofollow">';
 
-    // Pages have their own templates; rendering one through the story view would
+    // Pages have their own templates; rendering one through the post view would
     // silently drop the page layout (and the contact template's form).
     if (post.type === 'page') {
       return res.render(post.template === 'contact' ? 'public/page-contact' : 'public/page', {
@@ -651,6 +681,146 @@ router.get(
   }),
 );
 
+/* ------------------------------------------------- permalink-driven posts */
+
+/**
+ * Load the post a matched permalink refers to.
+ *
+ * The two lookups are not interchangeable and the difference matters:
+ *
+ *  - `getPostBySlug` defaults to published posts of the requested type, so it
+ *    is already safe to call with untrusted input;
+ *  - `getPostById` applies *no* status and *no* type filter — it is the admin
+ *    lookup. Used raw behind a numeric permalink it would happily serve a
+ *    draft, a trashed post, or a page to an anonymous visitor.
+ *
+ * So the id path is filtered here, explicitly, rather than trusting the caller.
+ * Slug is tried first: when a structure carries both tokens and the slug is
+ * stale, the id still resolves the post and the canonical redirect repairs the
+ * URL.
+ */
+async function resolvePost(match: PermalinkMatch): Promise<Post | null> {
+  if (match.slug) {
+    const bySlug = await getPostBySlug(match.slug, { type: 'post' });
+    if (bySlug) return bySlug;
+  }
+  if (match.postId) {
+    const byId = await getPostById(match.postId);
+    if (byId && byId.type === 'post' && byId.status === 'published') return byId;
+  }
+  return null;
+}
+
+/**
+ * Resolve an incoming path to a post under the permalink structure in force.
+ *
+ * Registered *after* every fixed route and *before* the page catch-all, so the
+ * precedence is deliberate and worth stating:
+ *
+ *   1. fixed routes (/search, /category/:slug, /archive, /feed.xml, …) always
+ *      win — they are declared earlier, and Express matches in order;
+ *   2. the archive index implied by the structure (e.g. /posts);
+ *   3. legacy /stories URLs, which 301 to their canonical replacement;
+ *   4. a path shaped by the structure, resolved to a post;
+ *   5. otherwise next(), so pages and the 404 handler still see the request.
+ *
+ * Under the short structure (/%slug%) posts and pages share the root. Posts are
+ * looked up first and the request falls through to the page route when no post
+ * matches, which is why RESERVED_SLUGS exists: it stops an author creating a
+ * post whose slug would sit on top of /archive or /categories and never resolve.
+ */
+router.get(
+  '*',
+  asyncRoute(async (req, res, next) => {
+    const structure = structureOf(res);
+    const listPath = postListPath(structure);
+    const path = req.path;
+    const query = req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : '';
+
+    /* 2. archive index */
+    if (path === listPath || path === `${listPath}/`) {
+      return renderPostList(req, res, {
+        heading: 'Posts',
+        subheading: 'Everything we have published, newest first.',
+        basePath: listPath,
+      });
+    }
+
+    /* 3. legacy /stories archive */
+    if (path === '/stories' || path === '/stories/') {
+      return res.redirect(301, `${listPath}${query}`);
+    }
+
+    /* 4. structure-driven, with an optional /next suffix */
+    const wantsNext = path.endsWith('/next');
+    const candidate = wantsNext ? path.slice(0, -'/next'.length) : path;
+
+    let match = matchPostPath(candidate, structure);
+    let legacy = false;
+    if (!match) {
+      /*
+        Matched against `candidate`, not `path`, so a legacy `/stories/x/next`
+        still resolves: the suffix has already been stripped. Matching the full
+        path here would drop those through to the 404 handler.
+      */
+      const old = /^\/stories\/([^/]+)\/?$/.exec(candidate);
+      if (old) {
+        match = { slug: decodeURIComponent(old[1]), postId: null };
+        legacy = true;
+      }
+    }
+    if (!match) return next();
+
+    const post = await resolvePost(match);
+    if (!post) return next();
+    if (post.status === 'private' && !res.locals.currentUser) return next();
+
+    const canonical = buildPostPath(post, structure);
+
+    /*
+      Anything that identifies the post but is not its canonical URL gets a 301.
+      That covers legacy /stories/<slug>, a stale date segment left over from an
+      earlier structure, and a trailing slash — all of which would otherwise be
+      served as duplicate content.
+    */
+    if (legacy || candidate !== canonical) {
+      return res.redirect(301, `${canonical}${wantsNext ? '/next' : ''}${query}`);
+    }
+
+    if (wantsNext) return renderNextPost(res, post);
+    return renderPost(req, res, post);
+  }),
+);
+
+/**
+ * POST counterpart: a comment submission arrives at `<post path>/comments`.
+ * Legacy /stories/<slug>/comments is still accepted rather than redirected,
+ * because a 301 on a POST risks the browser replaying it as a GET.
+ */
+router.post(
+  '*',
+  asyncRoute(async (req, res, next) => {
+    const path = req.path;
+    if (!path.endsWith('/comments')) return next();
+
+    const structure = structureOf(res);
+    const candidate = path.slice(0, -'/comments'.length);
+    const match = matchPostPath(candidate, structure)
+      ?? (() => {
+        const old = /^\/stories\/([^/]+)\/?$/.exec(candidate);
+        return old ? { slug: decodeURIComponent(old[1]), postId: null } : null;
+      })();
+    if (!match) return next();
+
+    const post = await resolvePost(match);
+    if (!post) {
+      setFlash(req, 'error', 'That post no longer accepts comments.');
+      return res.redirect(postListPath(structure));
+    }
+    return submitComment(req, res, post);
+  }),
+);
+
 /* --------------------------------------------------------------- pages */
 router.get(
   '/:slug',
@@ -685,7 +855,7 @@ router.get(
       await db.execute('UPDATE redirects SET hits = hits + 1 WHERE from_path = ?', [req.path]);
       return res.redirect(rows[0].status_code, rows[0].to_path);
     }
-    return errorPage(res, 404, 'Page not found', 'The page you were looking for has moved, or never existed. Try the stories archive instead.');
+    return errorPage(res, 404, 'Page not found', 'The page you were looking for has moved, or never existed. Try the posts archive instead.');
   }),
 );
 

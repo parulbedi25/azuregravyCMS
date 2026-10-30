@@ -1,4 +1,5 @@
 import { absoluteUrl as absolute } from './url.js';
+import { buildPostPath } from './permalink.js';
 import type { Post } from '../types.js';
 
 /** Turn a MariaDB `DATETIME` string (or ISO string) into an ISO-8601 timestamp. */
@@ -18,14 +19,18 @@ export function jsonLd(data: Record<string, unknown>): string {
 }
 
 /**
- * `BlogPosting` + `BreadcrumbList` structured data for a story.
+ * `BlogPosting` + `BreadcrumbList` structured data for a post.
  * Empty values are dropped so the payload stays valid.
+ *
+ * `options.url` is the canonical post URL as the caller resolved it; `listUrl`
+ * is the archive index. Both are passed in rather than derived here because the
+ * permalink structure lives in settings, and this module stays settings-free.
  */
 export function articleJsonLd(
   post: Post,
-  options: { siteName: string; url: string; logo?: string | null },
+  options: { siteName: string; url: string; logo?: string | null; listUrl?: string | null },
 ): string {
-  const url = absoluteUrl(options.url) ?? absoluteUrl(`/stories/${post.slug}`)!;
+  const url = absoluteUrl(options.url) ?? absoluteUrl(buildPostPath(post))!;
   const description = post.seo_description || post.excerpt || undefined;
   const image = absoluteUrl(post.featured_image);
   const authorName = post.author_name || options.siteName;
@@ -53,7 +58,7 @@ export function articleJsonLd(
   };
 
   const trail: Array<{ name: string; item: string }> = [{ name: 'Home', item: absoluteUrl('/')! }];
-  trail.push({ name: 'Stories', item: absoluteUrl('/stories')! });
+  trail.push({ name: 'Posts', item: absoluteUrl(options.listUrl || '/posts')! });
   if (section && post.category_slug) {
     trail.push({ name: section, item: absoluteUrl(`/category/${post.category_slug}`)! });
   }

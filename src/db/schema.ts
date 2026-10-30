@@ -257,6 +257,14 @@ export const DEFAULT_SETTINGS: Record<string, string> = {
   accent_color: '#206bea',
   default_theme: 'light',
   posts_per_page: '9',
+  /*
+    Shape of every post URL. Tokens: %slug% %post_id% %year% %month% %day%
+    %category%. `/posts/%slug%` is the default; `/%slug%` is the shortest form
+    an administrator can ask for. Re-validated by normalizeStructure() on read
+    as well as on save, so a bad value can never make post URLs unbuildable —
+    it falls back to the default instead.
+  */
+  permalink_structure: '/posts/%slug%',
   homepage_layout: 'editorial',
   homepage_featured_count: '1',
   spotlight_category: '',
@@ -317,11 +325,11 @@ export const DEFAULT_SETTINGS: Record<string, string> = {
 /** Small, deliberate set of navigation defaults (editable in Admin → Menus). */
 export const DEFAULT_MENU: Array<{ location: 'primary' | 'footer' | 'legal'; label: string; url: string; sort_order: number }> = [
   { location: 'primary', label: 'Home', url: '/', sort_order: 0 },
-  { location: 'primary', label: 'Stories', url: '/stories', sort_order: 1 },
+  { location: 'primary', label: 'Posts', url: '/posts', sort_order: 1 },
   { location: 'primary', label: 'Categories', url: '/categories', sort_order: 2 },
   { location: 'primary', label: 'About', url: '/about', sort_order: 3 },
   { location: 'primary', label: 'Contact', url: '/contact', sort_order: 4 },
-  { location: 'footer', label: 'Stories', url: '/stories', sort_order: 0 },
+  { location: 'footer', label: 'Posts', url: '/posts', sort_order: 0 },
   { location: 'footer', label: 'Categories', url: '/categories', sort_order: 1 },
   { location: 'footer', label: 'Archive', url: '/archive', sort_order: 2 },
   { location: 'footer', label: 'About', url: '/about', sort_order: 3 },

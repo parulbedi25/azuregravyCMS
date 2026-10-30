@@ -7,6 +7,10 @@ import { listCategories } from '../../services/posts.js';
 import { getDb } from '../../db/index.js';
 import { renderMarkdown } from '../../lib/markdown.js';
 import { readingTime, slugify } from '../../lib/text.js';
+import {
+  DEFAULT_PERMALINK_STRUCTURE, PERMALINK_PRESETS, PERMALINK_TOKENS, RESERVED_SLUGS,
+  buildPostPath, isReservedSlug, normalizeStructure, postListPath, structureFrom,
+} from '../../lib/permalink.js';
 import { str } from '../helpers.js';
 import { config } from '../../config.js';
 import { recentActivity } from '../../services/activity.js';
@@ -211,7 +215,7 @@ router.get(
       layout: 'layouts/admin',
       title: 'Redirects',
       adminTitle: 'Redirects',
-      adminDescription: 'Keep old links working when a story moves.',
+      adminDescription: 'Keep old links working when a post moves.',
       page: 'redirects',
       redirects,
     });
@@ -245,6 +249,179 @@ router.post(
     await (await getDb()).execute('DELETE FROM redirects WHERE id = ?', [idParam(req.params.id)]);
     setFlash(req, 'success', 'Redirect deleted.');
     res.redirect('/admin/redirects');
+  }),
+);
+
+/* ----------------------------------------------------------- permalinks */
+
+/**
+ * Move every published post's old URL to its new one when the structure changes.
+ *
+ * Returns the number of redirects written plus any slugs that the new structure
+ * would make unreachable, so the caller can warn instead of silently stranding
+ * a post. Drafts are skipped: their old URL was never public, so there is
+ * nothing to preserve.
+ */
+async function migratePermalinks(previous: string, next: string) {
+  const db = await getDb();
+  const rows = await db.query<{
+    id: number; slug: string; type: string; published_at: string | null;
+    created_at: string; category_slugs: string | null;
+  }>(
+    `SELECT p.id, p.slug, p.type, p.published_at, p.created_at,
+            (SELECT GROUP_CONCAT(c.slug ORDER BY c.sort_order SEPARATOR '||')
+               FROM categories c JOIN post_categories pc ON pc.category_id = c.id
+              WHERE pc.post_id = p.id) AS category_slugs
+       FROM posts p
+      WHERE p.type = 'post' AND p.status = 'published'`,
+  );
+
+  const upsert = async (from: string, to: string) => {
+    await db.execute(
+      `INSERT INTO redirects (from_path, to_path, status_code) VALUES (?, ?, 301)
+       ON DUPLICATE KEY UPDATE to_path = VALUES(to_path), status_code = 301`,
+      [from, to],
+    );
+    /*
+      Collapse chains. An earlier migration may have left rows pointing *at* the
+      path we are now moving, so without this a visitor who bookmarked the
+      original URL follows one 301 per structure change, forever. Repointing
+      them keeps it at a single hop.
+
+      The `from_path <> ?` guard is load-bearing: without it a pre-existing row
+      shaped `to -> from` would be rewritten into `to -> to`, a self-redirect
+      that loops until the browser gives up.
+    */
+    await db.execute(
+      'UPDATE redirects SET to_path = ? WHERE to_path = ? AND from_path <> ?',
+      [to, from, to],
+    );
+  };
+
+  let created = 0;
+  const previousList = postListPath(previous);
+  const nextList = postListPath(next);
+  if (previousList !== nextList) {
+    await upsert(previousList, nextList);
+    created += 1;
+  }
+
+  const conflicts: string[] = [];
+  for (const row of rows) {
+    const post = { ...row, category_slug: String(row.category_slugs ?? '').split('||')[0] || null };
+    const from = buildPostPath(post, previous);
+    const to = buildPostPath(post, next);
+    if (isReservedSlug(post.slug, next)) conflicts.push(post.slug);
+    if (from === to) continue;
+    await upsert(from, to);
+    created += 1;
+  }
+
+  return { created, conflicts, total: rows.length };
+}
+
+router.get(
+  '/permalinks',
+  requireRole('admin'),
+  asyncRoute(async (_req, res) => {
+    const settings = await loadSettings(true);
+    const structure = structureFrom(settings);
+    const db = await getDb();
+    /*
+      Real posts rather than a made-up example: an administrator deciding
+      between structures should see what happens to the URLs they already have,
+      including a category segment or a publish date that a synthetic sample
+      would not exercise.
+    */
+    const samples = await db.query<{
+      id: number; slug: string; title: string; type: string; published_at: string | null;
+      created_at: string; category_slugs: string | null;
+    }>(
+      `SELECT p.id, p.slug, p.title, p.type, p.published_at, p.created_at,
+              (SELECT GROUP_CONCAT(c.slug ORDER BY c.sort_order SEPARATOR '||')
+                 FROM categories c JOIN post_categories pc ON pc.category_id = c.id
+                WHERE pc.post_id = p.id) AS category_slugs
+         FROM posts p
+        WHERE p.type = 'post' AND p.status = 'published'
+        ORDER BY p.published_at DESC LIMIT 5`,
+    );
+
+    const preview = samples.map((row) => {
+      const post = { ...row, category_slug: String(row.category_slugs ?? '').split('||')[0] || null };
+      return {
+        title: row.title,
+        url: buildPostPath(post, structure),
+        reserved: isReservedSlug(row.slug, structure),
+      };
+    });
+
+    res.render('admin/permalinks', {
+      layout: 'layouts/admin',
+      title: 'Permalinks',
+      adminTitle: 'Permalinks',
+      adminDescription: 'The shape of every post URL — shorten it, extend it, or write your own.',
+      page: 'permalinks',
+      structure,
+      defaultStructure: DEFAULT_PERMALINK_STRUCTURE,
+      presets: PERMALINK_PRESETS,
+      tokens: PERMALINK_TOKENS,
+      isPreset: PERMALINK_PRESETS.some((preset) => preset.structure === structure),
+      listPath: postListPath(structure),
+      isShort: structure.split('/').filter(Boolean).length === 1,
+      reservedSlugs: RESERVED_SLUGS,
+      preview: preview.length
+        ? preview
+        : [{ title: 'How we ship', url: buildPostPath({ slug: 'how-we-ship', type: 'post' }, structure), reserved: false }],
+      postCount: samples.length,
+    });
+  }),
+);
+
+router.post(
+  '/permalinks',
+  requireRole('admin'),
+  asyncRoute(async (req, res) => {
+    const previous = structureFrom(await loadSettings(true));
+    /*
+      The preset radios submit their structure directly. "Custom" submits the
+      literal word `custom` and the real template arrives in its own field, so
+      the page works with JavaScript disabled — there is no client-side copying
+      of one input into another to get out of sync.
+    */
+    const choice = typeof req.body.permalink_structure === 'string' ? req.body.permalink_structure.trim() : '';
+    const submitted = choice === 'custom' ? String(req.body.custom_structure ?? '') : choice;
+    const { structure, error } = normalizeStructure(submitted);
+
+    if (error) {
+      setFlash(req, 'error', error);
+      return res.redirect('/admin/permalinks');
+    }
+
+    if (structure === previous) {
+      setFlash(req, 'success', 'That structure was already in use — nothing changed.');
+      return res.redirect('/admin/permalinks');
+    }
+
+    await saveSettings({ permalink_structure: structure });
+    invalidateNavigation();
+    const migration = await migratePermalinks(previous, structure);
+
+    const user = res.locals.currentUser;
+    if (user) await logActivity(user.id, 'updated', `Permalink structure: ${structure}`);
+
+    setFlash(
+      req,
+      'success',
+      `URL structure saved as ${structure}. ${migration.created} redirect${migration.created === 1 ? '' : 's'} created so old links keep working.`,
+    );
+    if (migration.conflicts.length) {
+      setFlash(
+        req,
+        'error',
+        `${migration.conflicts.length} slug${migration.conflicts.length === 1 ? '' : 's'} now sit${migration.conflicts.length === 1 ? 's' : ''} on a built-in route and cannot be reached: ${migration.conflicts.slice(0, 6).join(', ')}. Rename ${migration.conflicts.length === 1 ? 'it' : 'them'}, or use a structure with a base segment.`,
+      );
+    }
+    res.redirect('/admin/permalinks');
   }),
 );
 
@@ -319,13 +496,30 @@ router.post(
   requireRole('admin'),
   asyncRoute(async (req, res) => {
     const db = await getDb();
-    const posts = await db.query<{ slug: string; title: string; type: string }>('SELECT slug, title, type FROM posts');
+    /*
+      Selects the fields buildPostPath needs, not just the slug: under a
+      date- or category-based structure the old and new URLs both carry those
+      segments, and a row without them would produce a `from_path` that never
+      matched a real request.
+    */
+    const structure = structureFrom(await loadSettings(true));
+    const posts = await db.query<{
+      id: number; slug: string; title: string; type: string;
+      published_at: string | null; created_at: string; category_slugs: string | null;
+    }>(
+      `SELECT p.id, p.slug, p.title, p.type, p.published_at, p.created_at,
+              (SELECT GROUP_CONCAT(c.slug ORDER BY c.sort_order SEPARATOR '||')
+                 FROM categories c JOIN post_categories pc ON pc.category_id = c.id
+                WHERE pc.post_id = p.id) AS category_slugs
+         FROM posts p`,
+    );
     let created = 0;
-    for (const post of posts) {
-      const desired = slugify(post.title);
-      if (desired && desired !== post.slug) {
-        const from = post.type === 'page' ? `/${post.slug}` : `/stories/${post.slug}`;
-        const to = post.type === 'page' ? `/${desired}` : `/stories/${desired}`;
+    for (const row of posts) {
+      const desired = slugify(row.title);
+      if (desired && desired !== row.slug) {
+        const post = { ...row, category_slug: String(row.category_slugs ?? '').split('||')[0] || null };
+        const from = buildPostPath(post, structure);
+        const to = buildPostPath({ ...post, slug: desired }, structure);
         const exists = await db.query<{ id: number }>('SELECT id FROM redirects WHERE from_path = ?', [from]);
         if (!exists.length) {
           await db.execute('INSERT INTO redirects (from_path, to_path, status_code) VALUES (?, ?, 301)', [from, to]);

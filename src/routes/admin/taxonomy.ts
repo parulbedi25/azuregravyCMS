@@ -21,7 +21,7 @@ router.get(
       layout: 'layouts/admin',
       title: 'Categories',
       adminTitle: 'Categories',
-      adminDescription: 'Organise stories into the sections readers browse.',
+      adminDescription: 'Organise posts into the sections readers browse.',
       page: 'categories',
       categories,
       options,
@@ -101,7 +101,7 @@ router.post(
     const db = await getDb();
     await db.execute('DELETE FROM categories WHERE id = ?', [idParam(req.params.id)]);
     invalidateNavigation();
-    setFlash(req, 'success', 'Category deleted. Stories were kept.');
+    setFlash(req, 'success', 'Category deleted. Posts were kept.');
     res.redirect('/admin/categories');
   }),
 );
@@ -115,7 +115,7 @@ router.get(
       layout: 'layouts/admin',
       title: 'Tags',
       adminTitle: 'Tags',
-      adminDescription: 'Loose threads that tie stories together.',
+      adminDescription: 'Loose threads that tie posts together.',
       page: 'tags',
       tags,
     });

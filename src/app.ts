@@ -213,7 +213,7 @@ export async function createApp() {
 
       let settings: Record<string, string>;
       if (state.connected) {
-        // Publish due stories at most once a minute rather than on every request.
+        // Publish due posts at most once a minute rather than on every request.
         if (Date.now() - lastPublishSweep > 60_000) {
           lastPublishSweep = Date.now();
           await publishDuePosts(await getDb());
@@ -307,7 +307,7 @@ export async function createApp() {
       layout: 'layouts/public',
       title: 'Page not found',
       status: 404,
-      message: 'The page you were looking for has moved, or never existed. Try the stories archive instead.',
+      message: 'The page you were looking for has moved, or never existed. Try the posts archive instead.',
     });
   });
 

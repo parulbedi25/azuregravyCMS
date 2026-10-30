@@ -2,12 +2,12 @@ import { createHmac, timingSafeEqual } from 'node:crypto';
 import { config } from '../config.js';
 
 /**
- * Signed references for previewing stories that are not public yet.
+ * Signed references for previewing posts that are not public yet.
  *
  * A preview link is a capability URL: `/preview/<id>.<signature>`. The signature
  * is an HMAC of the post id under SESSION_SECRET, so the id cannot be enumerated
  * by walking `/preview/1`, `/preview/2`, … and a leaked URL cannot be edited into
- * a different story. Rotating SESSION_SECRET invalidates every preview link at
+ * a different post. Rotating SESSION_SECRET invalidates every preview link at
  * once, which is what makes them "temporary" without needing a token table.
  *
  * The signature is deliberately *not* the access control. The route still

@@ -1,7 +1,7 @@
 <div class="admin-page-head">
   <div>
     <h1>People</h1>
-    <p><%= users.length %> accounts · admins manage everything, editors write and moderate, authors own their stories</p>
+    <p><%= users.length %> accounts · admins manage everything, editors write and moderate, authors own their posts</p>
   </div>
   <div class="admin-page-head__actions">
     <a class="btn btn--accent btn--sm" href="/admin/users/new"><%- h.icon('plus', '', 14) %> Invite a writer</a>
@@ -12,7 +12,7 @@
   <div class="table-wrap">
     <table class="table">
       <thead>
-        <tr><th>Person</th><th>Role</th><th>Stories</th><th>Published</th><th>Last sign-in</th><th>Joined</th><th style="width:90px"></th></tr>
+        <tr><th>Person</th><th>Role</th><th>Posts</th><th>Published</th><th>Last sign-in</th><th>Joined</th><th style="width:90px"></th></tr>
       </thead>
       <tbody>
         <% users.forEach(function (user) { %>
@@ -36,7 +36,7 @@
                 <a class="row-action" href="/author/<%= user.id %>" target="_blank" rel="noopener" title="Public profile"><%- h.icon('external', '', 14) %></a>
                 <a class="row-action" href="/admin/users/<%= user.id %>" title="Edit"><%- h.icon('pen', '', 14) %></a>
                 <% if (user.id !== currentUser.id) { %>
-                  <form method="post" action="/admin/users/<%= user.id %>/delete" data-confirm="Delete <%= user.name %>? Their stories will be deleted too.">
+                  <form method="post" action="/admin/users/<%= user.id %>/delete" data-confirm="Delete <%= user.name %>? Their posts will be deleted too.">
                     <input type="hidden" name="_csrf" value="<%= csrfToken %>">
                     <button class="row-action row-action--danger" type="submit" title="Delete"><%- h.icon('trash', '', 14) %></button>
                   </form>
@@ -54,7 +54,7 @@
   <div class="panel">
     <div class="panel__body">
       <span class="pill pill--role">Admin</span>
-      <p class="text-sm text-muted" style="margin:10px 0 0">Full access: settings, users, appearance, system tools and every story.</p>
+      <p class="text-sm text-muted" style="margin:10px 0 0">Full access: settings, users, appearance, system tools and every post.</p>
     </div>
   </div>
   <div class="panel">
@@ -66,7 +66,7 @@
   <div class="panel">
     <div class="panel__body">
       <span class="pill pill--role">Author</span>
-      <p class="text-sm text-muted" style="margin:10px 0 0">Writes and manages their own stories, uploads media and edits their profile.</p>
+      <p class="text-sm text-muted" style="margin:10px 0 0">Writes and manages their own posts, uploads media and edits their profile.</p>
     </div>
   </div>
 </div>

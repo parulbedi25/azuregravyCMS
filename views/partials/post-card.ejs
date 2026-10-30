@@ -2,7 +2,7 @@
   const _variant = typeof variant !== 'undefined' ? variant : 'default';
   const _showExcerpt = typeof showExcerpt !== 'undefined' ? showExcerpt : true;
   const _cover = h.coverUrl(post);
-  const _catName = post.category_name || 'Story';
+  const _catName = post.category_name || 'Post';
   const _catSlug = post.category_slug || null;
 %>
 <article class="post-card <%= _variant === 'feature' ? 'post-card--feature' : '' %> <%= _variant === 'row' ? 'post-card--row' : '' %> <%= _variant === 'mini' ? 'post-card--mini' : '' %>" <%- typeof reveal !== 'undefined' ? 'data-reveal style="--reveal-delay:' + (typeof delay !== 'undefined' ? delay : 0) + 'ms"' : '' %>>
