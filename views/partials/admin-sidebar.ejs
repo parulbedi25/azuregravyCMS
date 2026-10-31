@@ -36,11 +36,30 @@
     what the settings page said. Still no extra query — the helpers are built
     from the settings already loaded for this request.
 
-    Only the boolean and the model name reach the markup — never the key.
+    Two different people read this sidebar, and they get two different things:
+
+      - An administrator sees the site-wide provider and the switch that turns
+        the whole assistant on and off.
+      - A member sees only their own entitlement, read-only. They cannot switch
+        the assistant off for everyone else, and showing them a control that
+        would answer 403 when pressed is worse than showing nothing.
+
+    `aiAccess` is resolved once per admin request. `typeof` because EJS compiles
+    inside `with(locals)`, where an unpassed local is a ReferenceError.
+
+    Only booleans and a model name reach the markup — never a key.
   */
   const ai = h.aiStatus;
+  const access = typeof aiAccess !== 'undefined' && aiAccess ? aiAccess : null;
   const aiOn = ai.on;
   const aiStatus = !aiOn ? 'Off' : (ai.ready ? 'On · ' + ai.model : 'On · needs setup');
+
+  /* A member's own state, in words that describe what they can actually do. */
+  const memberAi = access && !access.isAdmin && access.canSee
+    ? (access.canCompose
+      ? 'On · ' + access.model + (access.source === 'own' ? ' · your key' : '')
+      : 'On · no model assigned yet')
+    : null;
 %>
 <aside class="sidebar" id="sidebar">
   <div class="sidebar__brand">
@@ -101,6 +120,26 @@
           </label>
           <button class="sidebar-ai__apply" type="submit">Apply</button>
         </form>
+      </div>
+    <% } %>
+
+    <%#
+      A member's own status, read-only. No switch here on purpose: turning the
+      assistant off is a site-wide decision that is not theirs to make, and a
+      control that answers 403 when pressed is worse than no control.
+    %>
+    <% if (memberAi) { %>
+      <div class="nav-group sidebar-ai">
+        <div class="nav-group__title"><span>AI assistant</span></div>
+        <div class="sidebar-ai__form">
+          <span class="sidebar-ai__static">
+            <b><%= access.canCompose ? 'Enabled' : 'Needs a model' %></b>
+            <span><%= memberAi %></span>
+          </span>
+          <% if (access.canSelfServe) { %>
+            <a class="sidebar-ai__apply sidebar-ai__link" href="/admin/profile">Manage your key</a>
+          <% } %>
+        </div>
       </div>
     <% } %>
   </div>

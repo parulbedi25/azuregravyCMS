@@ -1,10 +1,16 @@
 import { Router } from 'express';
 import { asyncRoute, idParam, pageParam, paginate, setFlash } from '../../lib/http.js';
 import { hashPassword, requireRole, verifyPassword } from '../../lib/auth.js';
-import { str } from '../helpers.js';
+import { str, bool } from '../helpers.js';
 import { getDb } from '../../db/index.js';
 import { createUser, deleteUser, getUser, getUserByEmail, listUsers, updateUser } from '../../services/users.js';
 import { logActivity } from '../../services/activity.js';
+import { loadSettings } from '../../lib/settings.js';
+import { AI_PROVIDERS, providerForBaseUrl } from '../../services/ai.js';
+import {
+  approvedMemberPresets, clearAiAssignment, getAiRow, isPresetApproved, saveAiRow,
+  type AiAccess, type AiRowPatch,
+} from '../../services/ai-access.js';
 
 const router = Router();
 
@@ -36,6 +42,21 @@ router.get(
       page: 'users',
       user: null,
       error: null,
+      /*
+        The same AI locals the edit route passes, even though this form renders no
+        assignment section. EJS compiles inside `with(locals)`, so a local the
+        template names but this route never passed is a ReferenceError rather than
+        undefined — passing them here is what keeps one shared template from
+        needing `typeof` guards scattered through it.
+
+        No row exists because nobody is entitled until an administrator says so,
+        which is exactly the required default: a new member of any role starts
+        with no access and no model assigned.
+      */
+      aiRow: null,
+      aiMaskedKey: '',
+      providers: AI_PROVIDERS,
+      approvedPresetIds: approvedMemberPresets(await loadSettings(true)).map((preset) => preset.id),
     });
   }),
 );
@@ -46,6 +67,14 @@ router.get(
   asyncRoute(async (req, res, next) => {
     const user = await getUser(Number(req.params.id));
     if (!user) return next();
+    /*
+      The member's entitlement, if any. `aiRow` is null for somebody who was
+      never granted access, which is the state every new member starts in — the
+      form has to be able to render that as "no access, nothing assigned" rather
+      than silently implying the site-wide provider is in use.
+    */
+    const settings = await loadSettings(true);
+    const aiRow = await getAiRow(user.id);
     res.render('admin/user-form', {
       layout: 'layouts/admin',
       title: `Edit ${user.name}`,
@@ -53,6 +82,10 @@ router.get(
       page: 'users',
       user,
       error: null,
+      aiRow,
+      aiMaskedKey: aiRow && aiRow.api_key.trim() ? `••••••••${aiRow.api_key.trim().slice(-4)}` : '',
+      providers: AI_PROVIDERS,
+      approvedPresetIds: approvedMemberPresets(settings).map((preset) => preset.id),
     });
   }),
 );
@@ -119,6 +152,62 @@ router.post(
       password_hash: password.length >= 8 ? await hashPassword(password) : undefined,
     });
     await logActivity(res.locals.currentUser.id, 'user:updated', name);
+
+    /*
+      The AI section posts alongside the account fields, but only when it is
+      rendered. An administrator's own record is never assigned — they always use
+      the site-wide configuration — so editing one submits no AI fields at all,
+      and this must not read that absence as "clear everything".
+    */
+    if (str(req.body.ai_assignment_form) === '1') {
+      const enabled = bool(req.body.ai_enabled);
+      const baseUrl = str(req.body.ai_base_url).slice(0, 300);
+
+      const patch: AiRowPatch = {
+        is_enabled: enabled,
+        base_url: baseUrl,
+        model: str(req.body.ai_model).slice(0, 120),
+        image_model: str(req.body.ai_image_model).slice(0, 120),
+        /* Recorded so the member's own picker can show which preset this is. */
+        preset_id: providerForBaseUrl(baseUrl)?.id ?? '',
+      };
+
+      /*
+        Same convention as the site-wide key: a blank field means "leave the saved
+        key alone", because a password input never round-trips its value and every
+        unrelated save would otherwise disarm the member.
+      */
+      const submittedKey = typeof req.body.ai_api_key === 'string' ? req.body.ai_api_key.trim() : '';
+      if (bool(req.body.ai_key_clear)) {
+        patch.api_key = '';
+        patch.key_owner = 'admin';
+      } else if (submittedKey) {
+        patch.api_key = submittedKey;
+        patch.key_owner = 'admin';
+      }
+      /* Otherwise the existing key and its owner are left untouched. */
+
+      if (str(req.body.ai_clear_assignment) === '1') {
+        /*
+          Keep the access decision, drop the credentials. Turning somebody off is
+          routine and reversible; deleting a saved key is not, and an
+          administrator who only meant to switch a member off should not have to
+          go and find the key again afterwards.
+        */
+        await saveAiRow(id, { is_enabled: enabled });
+        await clearAiAssignment(id);
+      } else {
+        await saveAiRow(id, patch);
+      }
+
+      await logActivity(
+        res.locals.currentUser.id,
+        'ai',
+        `Updated AI access for ${name}`,
+        { enabled, model: patch.model ?? '', assignedByAdmin: true },
+      );
+    }
+
     setFlash(req, 'success', 'Profile updated.');
     res.redirect(`/admin/users/${id}`);
   }),
@@ -156,6 +245,73 @@ router.get('/profile', (req, res) => {
     error: null,
   });
 });
+
+/**
+ * A member's own key.
+ *
+ * The base URL is never read from the form. A member picks one of the presets an
+ * administrator approved and this route looks the endpoint up server-side, so
+ * the credential is theirs but the destination is not. Without that, anybody
+ * granted access could point the CMS at an endpoint they control and read every
+ * draft routed through it — the key being "their own" would be no comfort.
+ *
+ * `is_enabled` is deliberately absent from the patch. Entitlement is the
+ * administrator's decision, and a member must not be able to grant themselves
+ * access by posting to their own profile.
+ */
+router.post(
+  '/profile/ai',
+  asyncRoute(async (req, res) => {
+    const user = res.locals.currentUser;
+    const access = res.locals.aiAccess as AiAccess;
+
+    if (access.isAdmin) {
+      setFlash(req, 'info', 'Administrators use the site-wide provider — change it under Studio → AI assistant.');
+      return res.redirect('/admin/ai');
+    }
+    if (!access.canSee) {
+      setFlash(req, 'error', 'The AI assistant has not been enabled for your account.');
+      return res.redirect('/admin/profile');
+    }
+    if (!access.canSelfServe) {
+      setFlash(
+        req,
+        'error',
+        access.approvedPresets.length
+          ? 'Your AI configuration is managed by an administrator.'
+          : 'No provider has been approved for members to use their own key with yet.',
+      );
+      return res.redirect('/admin/profile');
+    }
+
+    const settings = await loadSettings(true);
+    const presetId = str(req.body.ai_preset).trim().toLowerCase();
+    const preset = AI_PROVIDERS.find((candidate) => candidate.id === presetId);
+    /* Re-checked against the live setting, not against what the form offered. */
+    if (!preset || !isPresetApproved(preset.id, settings)) {
+      setFlash(req, 'error', 'Choose one of the approved providers.');
+      return res.redirect('/admin/profile');
+    }
+
+    const patch: AiRowPatch = {
+      base_url: preset.baseUrl,
+      /* The member may name a model on that provider; the preset's is the default. */
+      model: str(req.body.ai_model).trim().slice(0, 120) || preset.model,
+      preset_id: preset.id,
+      key_owner: 'member',
+    };
+
+    /* Blank means "leave the saved key alone" — a password input never round-trips. */
+    const submittedKey = typeof req.body.ai_api_key === 'string' ? req.body.ai_api_key.trim() : '';
+    if (bool(req.body.ai_key_clear)) patch.api_key = '';
+    else if (submittedKey) patch.api_key = submittedKey;
+
+    await saveAiRow(user.id, patch);
+    await logActivity(user.id, 'ai', `Set their own AI provider (${preset.label})`);
+    setFlash(req, 'success', `Your AI provider is now ${preset.label}.`);
+    res.redirect('/admin/profile');
+  }),
+);
 
 router.post(
   '/profile',

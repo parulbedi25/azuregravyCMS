@@ -45,6 +45,90 @@
       </form>
     </div>
 
+    <%#
+      A member's own AI key.
+
+      Rendered only for somebody an administrator granted access to, and never for
+      an administrator — they compose with the site-wide provider and configure it
+      under Studio → AI assistant, so a second control here would only contradict
+      the first.
+
+      There is deliberately no base URL input. The member picks a provider an
+      administrator approved and the route looks the endpoint up server-side, so
+      the credential is theirs but the destination is not. Without that, anybody
+      granted access could point the CMS at an endpoint they control and read
+      every draft routed through it.
+
+      `typeof` because EJS compiles inside `with(locals)`, where an unpassed local
+      is a ReferenceError rather than undefined.
+    %>
+    <% const ai = typeof aiAccess !== 'undefined' && aiAccess ? aiAccess : null; %>
+    <% if (ai && !ai.isAdmin && ai.canSee) { %>
+      <div class="panel">
+        <div class="panel__head">
+          <h2>AI assistant</h2>
+          <span class="pill <%= ai.canCompose ? 'pill--published' : 'pill--draft' %>">
+            <%= ai.canCompose ? 'ready' : 'needs a model' %>
+          </span>
+        </div>
+        <% if (ai.canSelfServe) { %>
+          <form class="panel__body form-grid" method="post" action="/admin/profile/ai">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <p class="text-sm text-muted" style="margin-top:0"><%= ai.reason %></p>
+
+            <label class="field">
+              <span>Provider</span>
+              <select class="select" name="ai_preset">
+                <% ai.approvedPresets.forEach(function (p) { %>
+                  <option value="<%= p.id %>" <%= ai.presetId === p.id ? 'selected' : '' %>>
+                    <%= p.label %> — <%= p.requiresKey ? (p.free ? 'free, key needed' : 'paid') : 'no key needed' %>
+                  </option>
+                <% }); %>
+              </select>
+              <span class="hint">Only providers an administrator approved. Your key travels from this server to that provider and nowhere else.</span>
+            </label>
+
+            <label class="field">
+              <span>Model</span>
+              <input class="input mono" type="text" name="ai_model" value="<%= ai.model %>" placeholder="Leave blank for the provider's default">
+            </label>
+
+            <label class="field">
+              <span>Your API key</span>
+              <input class="input mono" type="password" name="ai_api_key" autocomplete="new-password"
+                placeholder="<%= ai.maskedKey ? 'Saved ' + ai.maskedKey + ' — leave blank to keep it' : 'Paste your key' %>">
+              <span class="hint">Stored so this server can call the provider on your behalf. Never displayed again — the mask above is all that is ever shown.</span>
+            </label>
+
+            <% if (ai.hasKey) { %>
+              <label class="switch">
+                <input type="checkbox" name="ai_key_clear" value="1">
+                <span class="switch__track"></span>
+                <span class="switch__text">
+                  <b>Remove my saved key</b>
+                  <span>Switch on to stop sending a credential at all — useful when moving to a provider that needs no key.</span>
+                </span>
+              </label>
+            <% } %>
+
+            <button class="btn btn--accent btn--sm" type="submit"><%- h.icon('save', '', 14) %> Save my AI provider</button>
+          </form>
+        <% } else { %>
+          <div class="panel__body">
+            <p class="text-sm text-muted" style="margin:0"><%= ai.reason %></p>
+            <p class="text-sm text-muted" style="margin:10px 0 0">
+              <% if (ai.approvedPresets.length) { %>
+                An administrator manages your AI configuration, so there is nothing for you to change here.
+              <% } else { %>
+                No provider has been approved for members to bring their own key to yet. Ask an administrator either to
+                assign you a model, or to approve a provider under Studio → AI assistant.
+              <% } %>
+            </p>
+          </div>
+        <% } %>
+      </div>
+    <% } %>
+
     <div class="panel">
       <div class="panel__body" style="display:grid;gap:12px;justify-items:start">
         <%- include('../partials/avatar', { avatar: currentUser.avatar, name: currentUser.name, size: 'xl' }) %>

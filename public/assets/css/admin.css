@@ -1142,7 +1142,8 @@ label.field > span { color: var(--admin-ink-2); }
 .side-card--ai #aiGenerate[disabled] { opacity: 0.65; cursor: progress; }
 
 /*
-  Headline suggestions offered by the AI card's "whole article + title" mode.
+  Headline suggestions offered by the AI card's "Title" and
+  "Title + Post + Feature Image" modes.
 
   Buttons rather than radio inputs on purpose: the AI card lives inside
   #editorForm and must not contribute a named control to it, which is the same
@@ -1176,6 +1177,134 @@ label.field > span { color: var(--admin-ink-2); }
 }
 .ai-titles__item:focus-visible { outline: 2px solid var(--admin-accent); outline-offset: 1px; }
 #aiTitlePicker[hidden] { display: none; }
+
+/* ------------------------------------------------------ AI: who can use it */
+/*
+  The provider catalogue and the per-member entitlement list on
+  Admin → AI assistant, plus the assignment block on a person's own page.
+
+  Admin tokens only, so the light/dark switch needs no second rule set — the
+  same constraint the title picker above is built under.
+
+  The catalogue is a grid that collapses to one column rather than a fixed
+  number of columns: 15 providers in four groups is a lot of reading, and at a
+  narrow width the privacy line is the part most worth keeping on one piece,
+  since it is what tells an administrator where an unpublished draft goes.
+*/
+.provider-catalogue { display: grid; gap: 18px; }
+.provider-group { display: grid; gap: 8px; }
+.provider-group__head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.provider-group__head h3 {
+  margin: 0;
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--admin-ink);
+  letter-spacing: -0.01em;
+}
+.provider-group .hint { margin: 0; }
+
+.provider-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(258px, 1fr));
+  gap: 10px;
+}
+.provider-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  border: 1px solid var(--admin-line);
+  border-radius: 10px;
+  background: var(--admin-panel);
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+.provider-card:hover { border-color: var(--admin-accent); }
+.provider-card__head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.provider-card__name { font-size: 0.85rem; font-weight: 600; color: var(--admin-ink); letter-spacing: -0.01em; }
+.provider-card__badges { display: flex; gap: 4px; flex-wrap: wrap; }
+.provider-card__model { margin: 0; font-size: 0.72rem; color: var(--admin-ink-3); }
+.provider-card__text { margin: 0; font-size: 0.75rem; line-height: 1.5; color: var(--admin-ink-2); }
+.provider-card__privacy {
+  padding-top: 6px;
+  border-top: 1px solid var(--admin-line);
+  color: var(--admin-ink-3);
+}
+.provider-card__use { margin-top: auto; align-self: flex-start; }
+
+/* Approved-provider checkboxes for members' own keys. */
+.preset-picks { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 8px; }
+.preset-pick {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 9px 10px;
+  border: 1px solid var(--admin-line);
+  border-radius: 8px;
+  background: var(--admin-panel);
+  cursor: pointer;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+.preset-pick:hover { border-color: var(--admin-accent); }
+.preset-pick input { margin-top: 2px; flex: 0 0 auto; }
+.preset-pick b { display: block; font-size: 0.8rem; font-weight: 600; color: var(--admin-ink); }
+.preset-pick__meta { display: block; font-size: 0.71rem; color: var(--admin-ink-3); }
+.preset-pick:has(input:checked) { border-color: var(--admin-accent); background: var(--admin-accent-soft); }
+
+/* The member list. A label per row, so the whole row is the click target. */
+.member-list { display: grid; gap: 6px; }
+.member-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1.1fr) auto minmax(0, 1.4fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 11px;
+  border: 1px solid var(--admin-line);
+  border-radius: 8px;
+  background: var(--admin-panel);
+  cursor: pointer;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+.member-row:hover { border-color: var(--admin-accent); }
+.member-row:has(input:checked) { border-color: var(--admin-accent); background: var(--admin-accent-soft); }
+.member-row input { margin: 0; }
+/* An administrator's checkbox is disabled, so the row must not look clickable. */
+.member-row--fixed { cursor: default; opacity: 0.86; }
+.member-row--fixed:hover { border-color: var(--admin-line); }
+.member-row__who { display: flex; flex-direction: column; min-width: 0; }
+.member-row__who b { font-size: 0.81rem; font-weight: 600; color: var(--admin-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.member-row__email { font-size: 0.71rem; color: var(--admin-ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.member-row__role { text-transform: capitalize; }
+.member-row__state { font-size: 0.74rem; color: var(--admin-ink-2); line-height: 1.4; }
+.member-row__edit { white-space: nowrap; }
+
+/* Collapses to a readable stack well before the grid gets cramped. */
+@media (max-width: 900px) {
+  .member-row { grid-template-columns: auto minmax(0, 1fr); gap: 6px 10px; }
+  .member-row__role { grid-column: 2; justify-self: start; }
+  .member-row__state { grid-column: 2; }
+  .member-row__edit { grid-column: 2; justify-self: start; }
+}
+
+/* Assignment block on a person's own page. */
+.ai-assign {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--admin-line);
+  border-radius: 10px;
+  background: var(--admin-bg);
+}
+.ai-assign__head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ai-assign__head h3 { margin: 0; font-size: 0.86rem; font-weight: 600; color: var(--admin-ink); letter-spacing: -0.01em; }
+.ai-assign__foot { padding-top: 4px; border-top: 1px solid var(--admin-line); }
+
+/* Read-only member status in the sidebar: no switch, because switching the
+   assistant off site-wide is not a member's decision to make. */
+.sidebar-ai__static { display: flex; flex-direction: column; gap: 1px; padding: 6px 0; }
+.sidebar-ai__static b { color: #f2f4f8; font-size: 0.79rem; }
+.sidebar-ai__static span { color: var(--admin-side-ink); font-size: 0.71rem; }
+.sidebar-ai__link { display: block; text-align: center; text-decoration: none; }
+.sidebar-ai__link:hover { text-decoration: none; }
 
 /* --------------------------------------------------------- permalinks */
 /*
