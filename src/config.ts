@@ -19,6 +19,18 @@ export const UPLOADS_DIR = path.join(PUBLIC_DIR, 'uploads');
 export const DATA_DIR = path.join(ROOT_DIR, 'data');
 
 /**
+ * Base URL of the keyless feature-image fallback, normalised to end in exactly
+ * one slash so callers can append an encoded prompt directly.
+ *
+ * Overridable for two reasons. An install that would rather not send the subject
+ * of an unpublished draft to a public, unauthenticated service can point this at
+ * its own image server. And it is the only way to exercise the fallback path in
+ * a test, which otherwise needs outbound internet access.
+ */
+export const IMAGE_FALLBACK_URL =
+  (process.env.AI_IMAGE_FALLBACK_URL || 'https://image.pollinations.ai/prompt/').replace(/\/+$/, '') + '/';
+
+/**
  * Where the installer remembers the database it was given.
  *
  * The app never needs credentials to *start*: this file (or environment

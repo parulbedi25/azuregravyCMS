@@ -1,9 +1,10 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { randomBytes } from 'node:crypto';
-import { UPLOADS_DIR } from '../config.js';
+import { IMAGE_FALLBACK_URL, UPLOADS_DIR } from '../config.js';
 import { createMedia } from './media.js';
 import { parseDiagramSpec, renderDiagram, type DiagramSpec } from './diagram.js';
+import { imageSize } from 'image-size';
 import { slugify } from '../lib/text.js';
 import { truthy } from '../lib/settings.js';
 import type { SettingsMap } from '../types.js';
@@ -21,13 +22,29 @@ import type { SettingsMap } from '../types.js';
  * draws the SVG. See the header comment there for why that split matters.
  */
 
-export type ComposeMode = 'full' | 'article' | 'continue' | 'selection' | 'outline';
+export type ComposeMode =
+  | 'title'
+  | 'full'
+  | 'image'
+  | 'title_post_image'
+  | 'continue'
+  | 'selection'
+  | 'outline';
 
 export interface AiConfig {
   enabled: boolean;
   baseUrl: string;
   apiKey: string;
   model: string;
+  /**
+   * Model used for `{baseUrl}/images/generations`, which is a different
+   * capability from the chat model above — `gpt-4o-mini` cannot draw.
+   *
+   * Blank means "no image-capable provider is configured", so feature images go
+   * straight to the keyless fallback instead of paying a round trip for a
+   * rejection that is certain.
+   */
+  imageModel: string;
   maxTokens: number;
   diagrams: boolean;
   timeoutMs: number;
@@ -49,12 +66,29 @@ export interface ComposeResult {
   diagramsSkipped: number;
   model: string;
   /**
-   * Headlines offered by the `article` mode, in the order the model gave them.
+   * Headlines offered by the `title` and `title_post_image` modes, in the order
+   * the model gave them.
    *
    * Empty for every other mode, and empty rather than an error when the model
    * ignored the instruction — a draft with no headline choice is still a draft.
    */
   titleSuggestions: string[];
+  /**
+   * The generated feature image, for the `image` and `title_post_image` modes.
+   *
+   * Already saved to the media library, so `mediaId` is what the editor's
+   * `featured_image_id` field wants. Null in every other mode, and null rather
+   * than thrown when a combined mode could not get a picture — see `imageNote`.
+   */
+  image: GeneratedImage | null;
+  /**
+   * Why there is no image, in words an administrator can act on.
+   *
+   * Only ever set alongside a usable draft: losing the article because the
+   * picture failed would be the worse outcome, so the two are reported
+   * separately. Empty when an image succeeded or was not asked for.
+   */
+  imageNote: string;
 }
 
 /** An error with a message safe to show an administrator. */
@@ -65,12 +99,19 @@ export class AiError extends Error {
   }
 }
 
+/*
+  Order and wording match the editor's "How much should it write?" dropdown
+  exactly, because this array is also what Studio → AI assistant renders as the
+  list of things the assistant can do.
+*/
 export const AI_MODES: Array<{ id: ComposeMode; label: string; help: string }> = [
-  { id: 'full', label: 'Write the whole post', help: 'Replaces the body with a complete draft built from your title.' },
-  { id: 'article', label: 'Write the article and propose titles', help: 'Drafts the whole article from your subject, then offers five headlines to choose from. The one you pick fills the Title field and stays editable.' },
-  { id: 'outline', label: 'Outline only', help: 'Headings and one-line beats, so you can fill in the detail yourself.' },
-  { id: 'continue', label: 'Continue from here', help: 'Keeps what you have written and carries on from the end of it.' },
-  { id: 'selection', label: 'Rewrite the selection', help: 'Expands or improves only the text you have highlighted.' },
+  { id: 'title', label: 'Title', help: 'Proposes five headlines for your subject and changes nothing else. The one you pick fills the Title field, where it stays editable.' },
+  { id: 'full', label: 'Post', help: 'Replaces the body with a complete draft built from your title.' },
+  { id: 'image', label: 'Feature Image', help: 'Draws a cover image for your subject, saves it to the media library and sets it as the featured image. Leaves your text alone.' },
+  { id: 'title_post_image', label: 'Title + Post + Feature Image', help: 'The whole package in one go: five headlines to choose from, a complete draft in the editor, and a generated feature image.' },
+  { id: 'continue', label: 'Continue from where I am', help: 'Keeps what you have written and carries on from the end of it.' },
+  { id: 'selection', label: 'Rewrite my selection', help: 'Expands or improves only the text you have highlighted.' },
+  { id: 'outline', label: 'An outline only', help: 'Headings and one-line beats, so you can fill in the detail yourself.' },
 ];
 
 export interface AiProviderPreset {
@@ -349,6 +390,7 @@ export function loadAiConfig(settings: SettingsMap): AiConfig {
     baseUrl: rawBase || DEFAULT_BASE_URL,
     apiKey: (settings.ai_api_key ?? '').trim(),
     model: (settings.ai_model ?? '').trim(),
+    imageModel: (settings.ai_image_model ?? '').trim(),
     maxTokens: Number.isFinite(tokens) && tokens > 0 ? Math.min(8000, tokens) : 1400,
     diagrams: truthy(settings.ai_diagrams),
     timeoutMs: 90_000,
@@ -456,13 +498,35 @@ function systemPrompt(config: AiConfig, siteName: string): string {
   return lines.join('\n');
 }
 
+/*
+  Shared by the two headline modes, so "Title" and "Title + Post + Feature
+  Image" cannot drift apart in what they ask for.
+*/
+const TITLES_INSTRUCTION =
+  'ONE fenced block labelled titles, holding exactly five alternative headlines for an article ' +
+  'on that subject: one per line, plain text, no numbering, no quotation marks and no commentary ' +
+  'inside the fence. Each headline must be genuinely different from the others, under 90 ' +
+  'characters, and must not simply repeat the subject above.';
+
 function userPrompt(request: ComposeRequest): string {
   const title = request.title.trim();
   const length = request.length ?? 'medium';
-  const words = length === 'short' ? '350-500' : length === 'long' ? '1100-1500' : '650-900';
   const tone = (request.tone ?? '').trim();
 
-  const parts: string[] = [`Title: ${title}`, `Target length: ${words} words.`];
+  /*
+    A ceiling and a floor per setting, rather than one wide range. Handed
+    "350-500" a model lands anywhere in it, and Short used to be able to come
+    back longer than Medium began — the three settings overlapped.
+  */
+  const words = length === 'short'
+    ? 'about 500 words, and never more than 500'
+    : length === 'long'
+      ? '800 words or more'
+      : 'between 600 and 650 words';
+
+  const parts: string[] = [`Title: ${title}`];
+  // A headline-only request has no body to size, so a word target is just noise.
+  if (request.mode !== 'title') parts.push(`Target length: ${words}.`);
   if (tone) parts.push(`Tone: ${tone}`);
 
   if (request.mode === 'outline') {
@@ -473,22 +537,23 @@ function userPrompt(request: ComposeRequest): string {
   } else if (request.mode === 'selection') {
     parts.push('Rewrite only the highlighted passage below. Keep its meaning and any facts intact, improve clarity and rhythm, and return just the replacement text with no surrounding commentary.');
     parts.push('', '--- SELECTION ---', (request.selection ?? '').trim().slice(0, 8_000), '--- END ---');
-  } else if (request.mode === 'article') {
+  } else if (request.mode === 'title') {
     /*
-      In this mode the title above is a subject to write from, not a headline to
-      keep, so the wording says "subject" and the headlines are asked for
-      separately in a fence — the same trick the diagrams use, because a fence
-      is far more reliable to split out of free-form Markdown than a delimiter
-      the model might also use in the prose.
+      Nothing but the fence. The model is still told not to write the article,
+      because otherwise it volunteers a draft that composeDraft then has to
+      throw away — and a preamble it adds anyway is discarded there too.
+    */
+    parts.push('Do not write the article body.', `Reply with ${TITLES_INSTRUCTION}`);
+  } else if (request.mode === 'title_post_image') {
+    /*
+      The title above is a subject to write from, not a headline to keep, so the
+      wording says "subject" and the headlines are asked for in a fence — the
+      same trick the diagrams use, because a fence is far more reliable to split
+      out of free-form Markdown than a delimiter the model might also use in the
+      prose. The picture is drawn separately and never asked of a text model.
     */
     parts.push('Write the complete post body for that subject.');
-    parts.push(
-      '',
-      'Then end your reply with ONE fenced block labelled titles, holding exactly five alternative',
-      'headlines for this article: one per line, plain text, no numbering, no quotation marks and no',
-      'commentary inside the fence. Each headline must be genuinely different from the others, under',
-      '90 characters, and must not simply repeat the subject above.',
-    );
+    parts.push('', `Then end your reply with ${TITLES_INSTRUCTION}`);
   } else {
     parts.push('Write the complete post body for that title.');
   }
@@ -763,6 +828,235 @@ export function extractTitleSuggestions(markdown: string): { markdown: string; s
 }
 
 /* ------------------------------------------------------------------ */
+/* feature images                                                     */
+/* ------------------------------------------------------------------ */
+
+/** Where generated feature images live, under the uploads root. */
+const IMAGE_DIR = 'ai-images';
+
+/** Refuse anything larger, so a runaway response cannot fill the disk. */
+const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
+
+export interface GeneratedImage {
+  /** Media library row, ready to go straight into `featured_image_id`. */
+  mediaId: number;
+  url: string;
+  alt: string;
+  width: number;
+  height: number;
+  bytes: number;
+  /**
+   * Which backend produced it — it affects privacy, so it is not hidden.
+   * `provider` is the administrator's own configured server; `fallback` is the
+   * keyless service at IMAGE_FALLBACK_URL, which is public and unauthenticated.
+   */
+  source: 'provider' | 'fallback';
+}
+
+/**
+ * Identify an image from its bytes, never from a Content-Type header.
+ *
+ * The fallback is an unauthenticated public endpoint and a provider that errors
+ * may still answer 200 with an HTML or JSON body. Trusting a header would write
+ * that to /uploads and register it in the media library as an image.
+ *
+ * SVG is deliberately absent. It is the one image format that can carry script,
+ * and the upload path refuses it for the same reason.
+ */
+function sniffImage(bytes: Buffer): { ext: string; mime: string } | null {
+  if (bytes.length < 12) return null;
+  if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) {
+    return { ext: 'png', mime: 'image/png' };
+  }
+  if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return { ext: 'jpg', mime: 'image/jpeg' };
+  if (bytes.subarray(0, 4).toString('latin1') === 'RIFF' && bytes.subarray(8, 12).toString('latin1') === 'WEBP') {
+    return { ext: 'webp', mime: 'image/webp' };
+  }
+  const head = bytes.subarray(0, 6).toString('latin1');
+  if (head === 'GIF87a' || head === 'GIF89a') return { ext: 'gif', mime: 'image/gif' };
+  return null;
+}
+
+/** Short, safe wording for why one backend did not work. */
+function describeFailure(error: unknown): string {
+  if (error instanceof AiError) return error.message;
+  const message = error instanceof Error ? error.message : String(error);
+  return message.replace(/\s+/g, ' ').trim().slice(0, 160) || 'an unexpected error';
+}
+
+async function downloadImage(url: string, timeoutMs: number): Promise<Buffer> {
+  assertHttpUrl(url);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, { signal: controller.signal, redirect: 'follow' });
+    if (!response.ok) throw new Error(`answered ${response.status}`);
+    const bytes = Buffer.from(await response.arrayBuffer());
+    if (!bytes.length) throw new Error('returned an empty image');
+    if (bytes.byteLength > MAX_IMAGE_BYTES) throw new Error('was larger than the 8 MB limit');
+    return bytes;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** `POST {baseUrl}/images/generations` — the OpenAI-compatible image shape. */
+async function imageFromProvider(config: AiConfig, prompt: string): Promise<Buffer> {
+  const endpoint = `${config.baseUrl.replace(/\/+$/, '')}/images/generations`;
+  assertHttpUrl(endpoint);
+
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  // A blank key means send no Authorization header at all, exactly as chat does.
+  if (config.apiKey) headers.Authorization = `Bearer ${config.apiKey}`;
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), config.timeoutMs);
+  try {
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers,
+      signal: controller.signal,
+      body: JSON.stringify({ model: config.imageModel, prompt, n: 1, size: '1024x1024', response_format: 'b64_json' }),
+    });
+    if (!response.ok) throw new Error(`answered ${response.status}`);
+
+    const payload = (await response.json()) as { data?: Array<{ b64_json?: string; url?: string }> };
+    const first = Array.isArray(payload.data) ? payload.data[0] : undefined;
+    if (!first) throw new Error('returned no image data');
+    if (typeof first.b64_json === 'string' && first.b64_json) {
+      const bytes = Buffer.from(first.b64_json, 'base64');
+      if (!bytes.length) throw new Error('returned an empty image');
+      if (bytes.byteLength > MAX_IMAGE_BYTES) throw new Error('was larger than the 8 MB limit');
+      return bytes;
+    }
+    // Some servers answer with a URL instead, whichever response_format was asked for.
+    if (typeof first.url === 'string' && first.url) return downloadImage(first.url, config.timeoutMs);
+    throw new Error('returned neither b64_json nor a url');
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function imageFromFallback(prompt: string, timeoutMs: number): Promise<Buffer> {
+  /*
+    The keyless default takes the prompt in the path and the size in the query.
+    1200x675 is the 16:9 the theme's cards and hero expect. The seed varies per
+    attempt, so retrying cannot return the identical picture every time.
+  */
+  const seed = Math.floor(Math.random() * 1_000_000);
+  const url = `${IMAGE_FALLBACK_URL}${encodeURIComponent(prompt)}?width=1200&height=675&nologo=true&seed=${seed}`;
+  return downloadImage(url, timeoutMs);
+}
+
+/**
+ * Turn a subject into a picture prompt.
+ *
+ * Explicitly asks for no text: image models reliably render garbled words into
+ * covers, and a cover with a fake masthead looks broken rather than designed.
+ */
+export function featureImagePrompt(subject: string, tone?: string): string {
+  const parts = [
+    `Editorial magazine cover photograph for an article about: ${subject.trim()}.`,
+    'Evocative and concrete, natural light, shallow depth of field, a single clear subject.',
+    'No text, no words, no letters, no captions, no watermark, no logo.',
+  ];
+  const mood = (tone ?? '').trim();
+  if (mood) parts.push(`Mood: ${mood}.`);
+  return parts.join(' ');
+}
+
+/**
+ * Generate one feature image, save it to the media library, and return its row.
+ *
+ * Tries the configured provider first and falls back to the keyless service.
+ * The provider is only tried when an image model is actually named: a chat
+ * model id cannot draw, so without one the round trip is a guaranteed failure
+ * and the fallback is used directly.
+ */
+export async function generateFeatureImage(
+  config: AiConfig,
+  options: { subject: string; tone?: string; alt?: string; uploadedBy: number | null },
+): Promise<GeneratedImage> {
+  const subject = (options.subject ?? '').trim();
+  if (subject.length < 3) {
+    throw new AiError('Describe the article in a few words so there is something to draw.', '', 400);
+  }
+
+  const prompt = featureImagePrompt(subject, options.tone);
+  const tried: string[] = [];
+  let bytes: Buffer | null = null;
+  let source: GeneratedImage['source'] = 'fallback';
+
+  if (config.imageModel) {
+    try {
+      bytes = await imageFromProvider(config, prompt);
+      source = 'provider';
+    } catch (error) {
+      tried.push(`your image model (${describeFailure(error)})`);
+    }
+  }
+
+  if (!bytes) {
+    try {
+      bytes = await imageFromFallback(prompt, config.timeoutMs);
+      source = 'fallback';
+    } catch (error) {
+      tried.push(`the keyless image service (${describeFailure(error)})`);
+      throw new AiError(
+        'No feature image could be generated.',
+        `Tried ${tried.join(', then ')}. Check the image model under Studio → AI assistant, or that this server can make outbound requests.`,
+        502,
+      );
+    }
+  }
+
+  const kind = sniffImage(bytes);
+  if (!kind) {
+    throw new AiError(
+      'The image service did not return a usable picture.',
+      'It answered with something that is not a PNG, JPEG, WebP or GIF. Check the image model name under Studio → AI assistant.',
+      502,
+    );
+  }
+
+  /* Dimensions are cosmetic, so a failure to read them must not lose the image. */
+  let width = 0;
+  let height = 0;
+  try {
+    const size = imageSize(bytes);
+    width = size.width ?? 0;
+    height = size.height ?? 0;
+  } catch {
+    /* leave at 0 */
+  }
+
+  const dir = path.join(UPLOADS_DIR, IMAGE_DIR);
+  await fs.mkdir(dir, { recursive: true });
+  const base = slugify(subject).slice(0, 48) || 'feature';
+  const filename = `${base}-${randomBytes(4).toString('hex')}.${kind.ext}`;
+  await fs.writeFile(path.join(dir, filename), bytes);
+
+  const url = `/uploads/${IMAGE_DIR}/${filename}`;
+  const alt = (options.alt ?? '').trim() || subject;
+
+  const mediaId = await createMedia({
+    filename,
+    path: url,
+    original_name: filename,
+    mime_type: kind.mime,
+    size: bytes.byteLength,
+    width,
+    height,
+    alt_text: alt,
+    caption: 'Generated feature image',
+    title: alt,
+    uploaded_by: options.uploadedBy,
+  });
+
+  return { mediaId, url, alt, width, height, bytes: bytes.byteLength, source };
+}
+
+/* ------------------------------------------------------------------ */
 /* orchestration                                                      */
 /* ------------------------------------------------------------------ */
 
@@ -776,25 +1070,46 @@ export async function composeDraft(
   if (!readiness.ready) throw new AiError(readiness.reason, 'Configure the assistant under Studio → AI assistant.', 400);
 
   const title = (request.title ?? '').trim();
+  const mode = request.mode;
+  const wantsHeadlines = mode === 'title' || mode === 'title_post_image';
+  const wantsImage = mode === 'image' || mode === 'title_post_image';
   if (title.length < 3) {
     /*
-      `article` is the mode someone reaches for precisely because they have no
-      headline yet, so asking it for "a title" reads as though the feature does
-      not work. It still needs a subject to write from — just say so.
+      `title`, `image` and the combined mode are exactly what someone reaches
+      for when they have nothing yet, so demanding "a title" from them reads as
+      though the feature does not work. They still need a subject to work from —
+      it just has to say so.
     */
     throw new AiError(
-      request.mode === 'article'
-        ? 'Describe the article in a few words — the assistant will propose titles from it.'
+      wantsHeadlines || wantsImage
+        ? 'Describe the article in a few words — the assistant will work from that.'
         : 'Give the assistant a title of at least three characters.',
       '',
       400,
     );
   }
   if (request.mode === 'continue' && !(request.existing ?? '').trim()) {
-    throw new AiError('There is nothing to continue from yet.', 'Write an opening first, or choose "Write the whole post".', 400);
+    throw new AiError('There is nothing to continue from yet.', 'Write an opening first, or choose "Post".', 400);
   }
   if (request.mode === 'selection' && !(request.selection ?? '').trim()) {
     throw new AiError('Select some text in the editor first.', '', 400);
+  }
+
+  /*
+    `image` makes no chat call at all. The picture is drawn from the subject
+    directly, so paying a language model to paraphrase it first would only add
+    latency and a second thing that can fail.
+  */
+  if (mode === 'image') {
+    const image = await generateFeatureImage(config, {
+      subject: title,
+      tone: request.tone,
+      uploadedBy: options.uploadedBy,
+    });
+    return {
+      markdown: '', diagramsCreated: 0, diagramsSkipped: 0, model: config.model,
+      titleSuggestions: [], image, imageNote: '',
+    };
   }
 
   const raw = await callChatCompletion(config, [
@@ -808,26 +1123,53 @@ export async function composeDraft(
 
   /*
     Split the headline fence out before the diagrams are touched, so neither can
-    end up nested inside the other. Stripping happens in every mode; only
-    `article` hands the suggestions back, which leaves the other modes behaving
-    exactly as they did before this mode existed.
+    end up nested inside the other. Stripping happens in every mode; only the two
+    headline modes hand the suggestions back, which leaves the others behaving
+    exactly as they did before.
   */
   const { markdown: body, suggestions } = extractTitleSuggestions(unwrapped);
-  const titleSuggestions = request.mode === 'article' ? suggestions : [];
+  const titleSuggestions = wantsHeadlines ? suggestions : [];
 
-  if (!config.diagrams) {
-    const stripped = body.replace(DIAGRAM_FENCE, '').replace(/\n{3,}/g, '\n\n').trim();
-    return { markdown: stripped, diagramsCreated: 0, diagramsSkipped: 0, model: config.model, titleSuggestions };
+  /*
+    `title` must not touch the body. The model is told to reply with only the
+    fence, but one that adds a preamble anyway would otherwise overwrite the
+    editor with its commentary, so whatever survives the fence is dropped.
+  */
+  let markdown = '';
+  let diagramsCreated = 0;
+  let diagramsSkipped = 0;
+  if (mode !== 'title') {
+    if (!config.diagrams) {
+      markdown = body.replace(DIAGRAM_FENCE, '').replace(/\n{3,}/g, '\n\n').trim();
+    } else {
+      const inlined = await inlineDiagrams(body, { title, uploadedBy: options.uploadedBy });
+      markdown = inlined.markdown;
+      diagramsCreated = inlined.created;
+      diagramsSkipped = inlined.skipped;
+    }
   }
 
-  const inlined = await inlineDiagrams(body, { title, uploadedBy: options.uploadedBy });
-  return {
-    markdown: inlined.markdown,
-    diagramsCreated: inlined.created,
-    diagramsSkipped: inlined.skipped,
-    model: config.model,
-    titleSuggestions,
-  };
+  /*
+    In the combined mode a missing picture is not a lost article: the draft and
+    the headlines are already worth keeping, so the failure rides along beside
+    them instead of throwing the whole request away. `image` mode has nothing
+    else to return, so there the same failure is fatal and was thrown above.
+  */
+  let image: GeneratedImage | null = null;
+  let imageNote = '';
+  if (mode === 'title_post_image') {
+    try {
+      image = await generateFeatureImage(config, {
+        subject: title,
+        tone: request.tone,
+        uploadedBy: options.uploadedBy,
+      });
+    } catch (error) {
+      imageNote = error instanceof AiError ? error.message : 'The feature image could not be generated.';
+    }
+  }
+
+  return { markdown, diagramsCreated, diagramsSkipped, model: config.model, titleSuggestions, image, imageNote };
 }
 
 /* ------------------------------------------------------------------ */

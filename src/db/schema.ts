@@ -321,6 +321,13 @@ export const DEFAULT_SETTINGS: Record<string, string> = {
   ai_base_url: 'https://api.openai.com/v1',
   ai_api_key: '',
   ai_model: 'gpt-4o-mini',
+  /*
+    Feature images are a different capability from chat, so they get their own
+    model id. Blank means "no image-capable provider is configured", and the
+    keyless fallback draws the picture instead — which is also what happens on
+    shared hosting, where no local image server can run at all.
+  */
+  ai_image_model: '',
   ai_max_tokens: '1400',
   ai_diagrams: '1',
 };

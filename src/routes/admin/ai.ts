@@ -61,6 +61,7 @@ router.post(
       ai_enabled: bool(req.body.ai_enabled) ? '1' : '0',
       ai_diagrams: bool(req.body.ai_diagrams) ? '1' : '0',
       ai_model: str(req.body.ai_model).slice(0, 120),
+      ai_image_model: str(req.body.ai_image_model).slice(0, 120),
       ai_base_url: str(req.body.ai_base_url).slice(0, 300),
     };
 
