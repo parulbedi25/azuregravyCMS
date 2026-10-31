@@ -261,7 +261,7 @@
 
       <%
         /*
-          AI drafting card — administrators only.
+          AI drafting card — for whoever an administrator granted access to.
 
           Deliberately not a <form>, and deliberately no name= attributes: this
           card lives inside #editorForm, so a nested form would be invalid HTML
@@ -269,16 +269,32 @@
           publish-419 bug) and any named input would be posted with the post.
           Everything is read by id and sent with fetch. Buttons are
           type="button" so they can never submit the post form.
+
+          `typeof` rather than a bare reference: EJS compiles inside
+          `with(locals)`, so an unpassed local is a ReferenceError, not undefined.
+          This view is only rendered from inside the admin router, which resolves
+          the entitlement, but the guard costs nothing and keeps a future render
+          path from turning into a 500.
         */
-        const aiOn = h.aiStatus.on;
-        // Readiness comes from the shared rule, not from settings.ai_api_key:
-        // a keyless local server is ready, and gating on a key here used to
-        // hide the whole card for exactly those providers.
-        const aiReady = h.aiStatus.ready;
-        const aiReason = h.aiStatus.reason;
+        /*
+          Named `aiEntitlement`, NOT `aiAccess`: EJS compiles the template inside
+          `with(locals)`, and `const aiAccess = typeof aiAccess …` shadows the
+          very binding it reads, which puts it in the temporal dead zone so
+          `typeof` throws "Cannot access before initialization" instead of
+          returning 'undefined'. The guard is only safe while the declared name
+          differs from the local it inspects.
+        */
+        const aiEntitlement = typeof aiAccess !== 'undefined' && aiAccess ? aiAccess : null;
+        // canSee is the administrator's decision about this person; canCompose is
+        // whether they hold anything usable. The second can be false while the
+        // first is true — entitled, but no model assigned yet — and the card then
+        // explains that instead of quietly spending the site-wide key.
+        const aiVisible = !!aiEntitlement && aiEntitlement.canSee;
+        const aiReady = !!aiEntitlement && aiEntitlement.canCompose;
+        const aiReason = aiEntitlement ? aiEntitlement.reason : h.aiStatus.reason;
         const aiSeedTitle = post && post.title ? post.title : '';
       %>
-      <% if (can.admin) { %>
+      <% if (aiVisible) { %>
       <div class="side-card side-card--collapsible side-card--open side-card--ai">
         <div class="side-card__head">
           <h3><%- h.icon('sparkles', '', 13) %> AI assistant</h3>
@@ -289,9 +305,19 @@
             <p class="hint" style="margin:0">
               <%# aiReason is the shared readiness sentence: accurate for a
                   missing model, a key-needing provider with no key, or the
-                  assistant being off — none of which is "add an API key". %>
+                  assistant being off — none of which is "add an API key".
+
+                  Where the link goes depends on who is reading. An administrator
+                  can change the provider; a member can only ever change their
+                  own key; and a member with no approved provider has nothing
+                  they can do themselves, so they get no dead link to a page that
+                  would answer 403 anyway. %>
               <%= aiReason %>
-              <a href="/admin/ai">Configure it</a>, or use the switch in the sidebar.
+              <% if (aiEntitlement.isAdmin) { %>
+                <a href="/admin/ai">Configure it</a>, or use the switch in the sidebar.
+              <% } else if (aiEntitlement.canSelfServe) { %>
+                <a href="/admin/profile">Add your own key</a> on your profile.
+              <% } %>
             </p>
           <% } else { %>
             <label class="field">
@@ -526,10 +552,13 @@
   });
 </script>
 
-<% if (can.admin) { %>
+<%# Gated on exactly the same condition as the card above. If these ever drift,
+    the script runs against elements that are not there, or the card renders with
+    a dead Generate button — both silent, both confusing. %>
+<% if (aiVisible) { %>
 <script>
   /*
-    AI drafting panel — administrators only.
+    AI drafting panel — for whoever an administrator granted access to.
 
     Talks to /admin/ai/compose over fetch with the x-csrf-token header, the same
     contract admin.js already uses. Nothing here is a form control with a name,

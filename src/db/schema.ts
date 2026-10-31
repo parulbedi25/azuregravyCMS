@@ -242,6 +242,47 @@ export const SCHEMA_STATEMENTS: string[] = [
     is_active TINYINT(1) NOT NULL DEFAULT 1,
     target ENUM('_self','_blank') NOT NULL DEFAULT '_self'
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+  /*
+    Per-member AI entitlement.
+
+    One row per user, created only when an administrator grants access — the
+    absence of a row is itself meaningful and means "not entitled". Nothing here
+    is derived from `users.role`, so promoting somebody to editor does not
+    silently hand them the assistant, and a new member of any role starts with
+    no model assigned.
+
+    A new table rather than columns on `users` for the same reason as post_meta:
+    migrate() only runs CREATE TABLE IF NOT EXISTS, so this reaches databases
+    installed by an earlier version, where an ALTER TABLE would not.
+
+    `base_url` + `model` empty means entitled-but-unassigned: the member sees the
+    card and is told no model has been assigned, and compose is refused. They
+    never fall back to the site-wide key, because that key belongs to the
+    administrator's own account and spending it on the member's behalf was never
+    an explicit decision.
+
+    `key_owner` records who supplied `api_key`, which is what lets the member
+    edit their own key on their profile without being able to overwrite one an
+    administrator assigned. `preset_id` keeps a member's own key inside the set
+    of providers the administrator approved, so a member cannot point the CMS at
+    an arbitrary endpoint.
+
+    The CASCADE matches posts.author_id: deleting a member must not leave an
+    entitlement — or a saved API key — behind.
+  */
+  `CREATE TABLE IF NOT EXISTS user_ai (
+    user_id BIGINT UNSIGNED NOT NULL PRIMARY KEY,
+    is_enabled TINYINT(1) NOT NULL DEFAULT 0,
+    base_url VARCHAR(300) NOT NULL DEFAULT '',
+    model VARCHAR(120) NOT NULL DEFAULT '',
+    image_model VARCHAR(120) NOT NULL DEFAULT '',
+    api_key VARCHAR(300) NOT NULL DEFAULT '',
+    key_owner ENUM('admin','member') NOT NULL DEFAULT 'admin',
+    preset_id VARCHAR(60) NOT NULL DEFAULT '',
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT fk_user_ai_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 ];
 
 export const SCHEMA_VERSION = 2;
@@ -330,6 +371,22 @@ export const DEFAULT_SETTINGS: Record<string, string> = {
   ai_image_model: '',
   ai_max_tokens: '1400',
   ai_diagrams: '1',
+  /*
+    Which provider presets a granted member may point their OWN key at, as a
+    comma-separated list of preset ids (for example `groq,openrouter`).
+
+    Empty by default, and empty means closed: until an administrator approves
+    something, no member can self-serve a key at all. That is deliberate. A
+    member's own key still has to travel through this server, and without a
+    list like this they could point the CMS at any OpenAI-compatible endpoint on
+    the internet — including one they control, which would route other people's
+    drafts through it. Restricting the choice to approved presets keeps the base
+    URL an administrator's decision while leaving the key the member's.
+
+    Only presets are ever valid here; a member cannot save a base URL that is not
+    on the list.
+  */
+  ai_member_presets: '',
 };
 
 /** Small, deliberate set of navigation defaults (editable in Admin → Menus). */

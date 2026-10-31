@@ -40,6 +40,120 @@
         <label class="field"><span>LinkedIn</span><input class="input" name="linkedin" value="<%= user && user.linkedin ? user.linkedin : '' %>" placeholder="https://linkedin.com/in/…"></label>
         <label class="field"><span>Avatar URL</span><input class="input" name="avatar" value="<%= user && user.avatar ? user.avatar : '' %>" placeholder="/uploads/… or https://"></label>
       </div>
+      <%#
+        AI assignment — when editing an existing member who is not an
+        administrator.
+
+        No section for a new account: there is no id to attach an entitlement to
+        yet, and nobody is entitled until an administrator says so. None for an
+        administrator either, because they always compose with the site-wide
+        provider, so a per-person assignment for them would be dead weight that
+        looked like it did something.
+
+        Part of this same form on purpose, so one Save writes the account and the
+        entitlement together. The hidden marker tells the route the section was
+        rendered at all: its absence means "leave the entitlement alone", never
+        "clear it", which is what keeps editing an administrator from wiping a
+        member's saved key.
+      %>
+      <% if (user && user.role !== 'admin') { %>
+        <%
+          const granted = !!aiRow && Number(aiRow.is_enabled) === 1;
+          const assignedModel = aiRow ? (aiRow.model || '') : '';
+          const assignedUrl = aiRow ? (aiRow.base_url || '') : '';
+          const assignedImage = aiRow ? (aiRow.image_model || '') : '';
+          const ownKey = !!aiRow && aiRow.key_owner === 'member';
+        %>
+        <input type="hidden" name="ai_assignment_form" value="1">
+
+        <div class="ai-assign">
+          <div class="ai-assign__head">
+            <h3>AI assistant</h3>
+            <span class="pill <%= granted ? 'pill--published' : 'pill--draft' %>">
+              <%= granted ? (assignedModel ? 'access · ' + assignedModel : 'access · no model') : 'no access' %>
+            </span>
+          </div>
+
+          <label class="switch">
+            <input type="checkbox" name="ai_enabled" value="1" <%= granted ? 'checked' : '' %>>
+            <span class="switch__track"></span>
+            <span class="switch__text">
+              <b>Let this person use the assistant</b>
+              <span>Off means the editor card never renders for them and the endpoint refuses them with a 403 even if they call it directly — hiding a button is not authorisation.</span>
+            </span>
+          </label>
+
+          <div class="field">
+            <span>Provider</span>
+            <select class="select" id="aiMemberPreset">
+              <option value="">Fill the two fields below from a provider…</option>
+              <% providers.forEach(function (p) { %>
+                <option value="<%= p.id %>"
+                  data-base-url="<%= p.baseUrl %>"
+                  data-model="<%= p.model %>"
+                  data-requires-key="<%= p.requiresKey ? '1' : '0' %>"
+                  data-label="<%= p.label %>"
+                  <%= aiRow && aiRow.preset_id === p.id ? 'selected' : '' %>>
+                  <%= p.label %> — <%= p.requiresKey ? (p.free ? 'free, key needed' : 'paid') : 'no key needed' %>
+                </option>
+              <% }); %>
+            </select>
+            <span class="hint" id="aiMemberPresetHint"></span>
+          </div>
+
+          <div class="form-grid form-grid--2">
+            <label class="field">
+              <span>Base URL</span>
+              <input class="input mono" type="text" name="ai_base_url" id="aiMemberBaseUrl" value="<%= assignedUrl %>" placeholder="https://api.groq.com/openai/v1">
+            </label>
+            <label class="field">
+              <span>Model</span>
+              <input class="input mono" type="text" name="ai_model" id="aiMemberModel" value="<%= assignedModel %>" placeholder="llama-3.3-70b-versatile">
+            </label>
+          </div>
+
+          <label class="field">
+            <span>Image model <span class="pill pill--plain">optional</span></span>
+            <input class="input mono" type="text" name="ai_image_model" value="<%= assignedImage %>" placeholder="gpt-image-1">
+            <span class="hint">Only used by the <b>Feature Image</b> modes. Blank means the free keyless service draws the cover instead — which sends the draft's subject to a public endpoint, so say so if this person writes anything sensitive.</span>
+          </label>
+
+          <label class="field">
+            <span>API key</span>
+            <input class="input mono" type="password" name="ai_api_key" autocomplete="new-password"
+              placeholder="<%= aiMaskedKey ? 'Saved ' + aiMaskedKey + ' — leave blank to keep it' : 'Leave blank if the provider needs no key' %>">
+            <span class="hint">
+              Never echoed back, for the same reason the site-wide key is not: a live secret in the HTML would sit in
+              view-source, caches and the bfcache.
+              <% if (ownKey) { %>
+                This one was entered by <%= user.name %> on their own profile. Saving a key here takes ownership of it
+                away from them, and they will no longer be able to change it themselves.
+              <% } %>
+            </span>
+          </label>
+
+          <% if (aiMaskedKey) { %>
+            <label class="switch">
+              <input type="checkbox" name="ai_key_clear" value="1">
+              <span class="switch__track"></span>
+              <span class="switch__text">
+                <b>Remove the saved key</b>
+                <span>Switch on when moving this person to a provider that needs no key, so no credential is sent at all.</span>
+              </span>
+            </label>
+          <% } %>
+
+          <div class="row row--between ai-assign__foot">
+            <button class="btn btn--ghost btn--sm" type="submit" name="ai_clear_assignment" value="1">Remove the assignment</button>
+            <span class="hint" style="margin:0">Keeps the access switch above, drops the provider, model and key.</span>
+          </div>
+        </div>
+      <% } else if (!user) { %>
+        <p class="hint" style="margin:0">
+          AI access is granted after the account exists, on this person's own page. Nobody is given a model by default.
+        </p>
+      <% } %>
+
       <div class="row row--between">
         <a class="btn btn--ghost btn--sm" href="/admin/users">Cancel</a>
         <button class="btn btn--accent btn--sm" type="submit"><%- h.icon('save', '', 14) %> <%= user ? 'Save changes' : 'Create account' %></button>
@@ -81,3 +195,40 @@
     <% } %>
   </div>
 </div>
+
+<%#
+  Fills the base URL and model from the chosen provider, mirroring what the AI
+  settings page does for the site-wide provider.
+
+  Progressive enhancement only: both fields are ordinary text inputs, so without
+  this script an administrator can still type a base URL and a model by hand —
+  which is the point, since any OpenAI-compatible endpoint works whether or not
+  it appears in the preset list.
+%>
+<% if (user && user.role !== 'admin') { %>
+<script>
+  (function () {
+    var preset = document.getElementById('aiMemberPreset');
+    if (!preset) return;
+    var baseUrl = document.getElementById('aiMemberBaseUrl');
+    var model = document.getElementById('aiMemberModel');
+    var hint = document.getElementById('aiMemberPresetHint');
+
+    preset.addEventListener('change', function () {
+      var option = preset.options[preset.selectedIndex];
+      if (!option || !option.value) {
+        if (hint) { hint.textContent = ''; hint.style.display = 'none'; }
+        return;
+      }
+      if (baseUrl) baseUrl.value = option.getAttribute('data-base-url') || '';
+      if (model) model.value = option.getAttribute('data-model') || '';
+      if (hint) {
+        hint.textContent = option.getAttribute('data-requires-key') === '1'
+          ? (option.getAttribute('data-label') || 'This provider') + ' needs an API key. Add one below, or this person will see the card but not be able to compose.'
+          : 'No key needed — leave the key field blank.';
+        hint.style.display = '';
+      }
+    });
+  })();
+</script>
+<% } %>

@@ -1,10 +1,14 @@
 <%
   /*
-    Administrators only — routes/admin/ai.ts applies requireRole('admin').
-    The API key is never echoed back: the form shows a mask and a blank
-    password input, because browsers do not round-trip password values and
-    rendering a live secret into HTML would put it in view-source, caches
-    and the bfcache.
+    This *page* is administrators only — routes/admin/ai.ts applies
+    requireRole('admin') to it. The assistant itself is not: who may use it is
+    granted per person in the "Who can use it" panel below, and composing is
+    gated by requireAiCompose rather than by role.
+
+    No API key is ever echoed back, here or on a member's own page: every form
+    shows a mask and a blank password input, because browsers do not round-trip
+    password values and rendering a live secret into HTML would put it in
+    view-source, caches and the bfcache.
   */
   const keySaved = !!maskedKey;
 
@@ -19,24 +23,53 @@
   const paidProviders = providers.filter(function (p) { return !p.free; });
 
   /*
-    One renderer rather than the button markup repeated four times. Every
+    One renderer rather than the card markup repeated four times. Every
     interpolated value goes through h.escapeHtml even though these presets are
     constants of ours, not user input — the attributes land inside quoted HTML,
     and a future preset containing a quote must not be able to break out.
+
+    The data-* attributes stay on the button, not on the card around it, because
+    the script at the foot of this page selects
+    `[data-preset-group] [data-base-url]` and fills the base URL and model from
+    them. Keeping that contract byte-identical is what makes the cards a
+    presentation change rather than a behavioural one.
+
+    keyHint and privacy are printed on the card itself now instead of only
+    appearing after a click: the whole reason to choose between these providers
+    is where the draft goes and what it costs, and that was previously one click
+    of trial and error per provider.
   */
-  function presetButton(p) {
-    return '<button class="btn btn--soft btn--sm" type="button"' +
-      ' data-base-url="' + h.escapeHtml(p.baseUrl) + '"' +
-      ' data-model="' + h.escapeHtml(p.model) + '"' +
-      ' data-key-hint="' + h.escapeHtml(p.keyHint) + '"' +
-      ' data-privacy="' + h.escapeHtml(p.privacy) + '"' +
-      ' data-requires-key="' + (p.requiresKey ? '1' : '0') + '"' +
-      ' data-label="' + h.escapeHtml(p.label) + '">' +
-      h.escapeHtml(p.label) +
-      (p.requiresKey ? '' : ' <span class="pill pill--plain">no key</span>') +
-      '</button>';
+  function costBadge(p) {
+    if (!p.requiresKey) return '<span class="pill pill--plain">no key</span>';
+    return p.free
+      ? '<span class="pill pill--plain">free · key needed</span>'
+      : '<span class="pill pill--plain">paid</span>';
   }
-  function presetRow(list) { return list.map(presetButton).join(''); }
+
+  function presetCard(p) {
+    return '<article class="provider-card">' +
+      '<div class="provider-card__head">' +
+        '<span class="provider-card__name">' + h.escapeHtml(p.label) + '</span>' +
+        '<span class="provider-card__badges">' +
+          costBadge(p) +
+          '<span class="pill pill--plain">' + (p.kind === 'local' ? 'runs locally' : 'hosted') + '</span>' +
+        '</span>' +
+      '</div>' +
+      '<p class="provider-card__model"><span class="mono">' + h.escapeHtml(p.model) + '</span></p>' +
+      '<p class="provider-card__text">' + h.escapeHtml(p.keyHint) + '</p>' +
+      '<p class="provider-card__text provider-card__privacy">' + h.escapeHtml(p.privacy) + '</p>' +
+      '<button class="btn btn--soft btn--sm provider-card__use" type="button"' +
+        ' data-base-url="' + h.escapeHtml(p.baseUrl) + '"' +
+        ' data-model="' + h.escapeHtml(p.model) + '"' +
+        ' data-key-hint="' + h.escapeHtml(p.keyHint) + '"' +
+        ' data-privacy="' + h.escapeHtml(p.privacy) + '"' +
+        ' data-requires-key="' + (p.requiresKey ? '1' : '0') + '"' +
+        ' data-label="' + h.escapeHtml(p.label) + '">' +
+        'Use ' + h.escapeHtml(p.label) +
+      '</button>' +
+    '</article>';
+  }
+  function presetCards(list) { return list.map(presetCard).join(''); }
 %>
 
 <div class="admin-page-head">
@@ -47,7 +80,7 @@
         <%= readiness.ready ? 'ready' : (config.enabled ? 'needs setup' : 'off') %>
       </span>
     </div>
-    <p>Drafting help for administrators. Give it a title and it writes into the editor, drawing draw.io-style diagrams where the subject is genuinely structural.</p>
+    <p>Drafting help for whoever you grant it to below. Give it a title and it writes into the editor, drawing draw.io-style diagrams where the subject is genuinely structural.</p>
     <% if (!readiness.ready) { %>
       <p class="muted" style="margin:6px 0 0"><%= readiness.reason %></p>
     <% } %>
@@ -72,46 +105,75 @@
         </span>
       </label>
 
-      <div class="field">
-        <span>No API key needed — a model server on your own machine</span>
-        <div class="row" style="flex-wrap:wrap;gap:6px" id="aiProviders" data-preset-group>
-          <%- presetRow(keylessLocal) %>
-        </div>
-        <span class="hint">
-          Free, open-weight, and nothing leaves the building. You run the server yourself and it needs no account.
-          The catch: it must be reachable from wherever this CMS runs, so on shared hosting these will not connect —
-          use the hosted option below there.
-        </span>
-      </div>
+      <%#
+        The catalogue. Four groups, ordered by what a provider costs the
+        administrator to start with, because "free" on its own hides the
+        distinction that actually decides the choice: whether an account and a
+        key are needed at all.
 
-      <div class="field">
-        <span>No API key needed — hosted</span>
-        <div class="row" style="flex-wrap:wrap;gap:6px" data-preset-group>
-          <%- presetRow(keylessHosted) %>
-        </div>
-        <span class="hint">
-          Works with no account and no local server, including on shared hosting. In exchange the drafts cross the
-          public internet and the endpoint can rate-limit or change without notice. Press <b>Test connection</b>
-          before relying on one.
-        </span>
-      </div>
-
-      <div class="field">
-        <span>Free with a key — no credit card</span>
-        <div class="row" style="flex-wrap:wrap;gap:6px" data-preset-group>
-          <%- presetRow(keyedFree) %>
-        </div>
-        <span class="hint">Pick one to fill in the base URL and a current model id. Each of these issues a key for an email address alone.</span>
-      </div>
-
-      <% if (paidProviders.length) { %>
-        <div class="field">
-          <span>Paid</span>
-          <div class="row" style="flex-wrap:wrap;gap:6px" data-preset-group>
-            <%- presetRow(paidProviders) %>
+        Each card now states its own key requirement, whether it runs locally,
+        and where the draft goes — previously all of that appeared only after a
+        click, so comparing two providers meant clicking back and forth between
+        them and reading one hint at a time.
+      %>
+      <div class="provider-catalogue">
+        <div class="provider-group">
+          <div class="provider-group__head">
+            <h3>No API key — a model server on your own machine</h3>
+            <span class="pill pill--plain"><%= keylessLocal.length %></span>
+          </div>
+          <p class="hint">
+            Free, open-weight, and nothing leaves the building. You run the server yourself and it needs no account.
+            The catch: it must be reachable from wherever this CMS runs, so on shared hosting these will not connect —
+            use the hosted group below there.
+          </p>
+          <div class="provider-grid" data-preset-group>
+            <%- presetCards(keylessLocal) %>
           </div>
         </div>
-      <% } %>
+
+        <div class="provider-group">
+          <div class="provider-group__head">
+            <h3>No API key — hosted</h3>
+            <span class="pill pill--plain"><%= keylessHosted.length %></span>
+          </div>
+          <p class="hint">
+            Works with no account and no local server, including on shared hosting. In exchange the drafts cross the
+            public internet and the endpoint can rate-limit or change without notice. Press <b>Test connection</b>
+            before relying on one.
+          </p>
+          <div class="provider-grid" data-preset-group>
+            <%- presetCards(keylessHosted) %>
+          </div>
+        </div>
+
+        <div class="provider-group">
+          <div class="provider-group__head">
+            <h3>Free with a key — no credit card</h3>
+            <span class="pill pill--plain"><%= keyedFree.length %></span>
+          </div>
+          <p class="hint">
+            Each of these issues a key for an email address alone. Pick one to fill in the base URL and a current
+            model id, then press <b>Find models</b> to read the real list from the provider.
+          </p>
+          <div class="provider-grid" data-preset-group>
+            <%- presetCards(keyedFree) %>
+          </div>
+        </div>
+
+        <% if (paidProviders.length) { %>
+          <div class="provider-group">
+            <div class="provider-group__head">
+              <h3>Paid</h3>
+              <span class="pill pill--plain"><%= paidProviders.length %></span>
+            </div>
+            <p class="hint">Billed per token against your own account. The strongest output quality, and the one to watch a spend limit on.</p>
+            <div class="provider-grid" data-preset-group>
+              <%- presetCards(paidProviders) %>
+            </div>
+          </div>
+        <% } %>
+      </div>
 
       <span class="hint" id="aiProviderKey" style="display:none"></span>
       <span class="hint" id="aiProviderPrivacy" style="display:none"></span>
@@ -240,13 +302,85 @@
       </div>
     </div>
 
-    <div class="panel">
-      <div class="panel__head"><h2>Who can use it</h2></div>
-      <div class="panel__body">
-        <p class="text-sm text-muted" style="margin-top:0">Administrators only. Editors and authors never see the panel, and the endpoint refuses them with a 403 even if they call it directly — hiding a button is not authorisation.</p>
-      </div>
-    </div>
   </div>
+</div>
+
+<%#
+  Full width, below the two-column grid rather than inside the narrow right-hand
+  column: each row has to carry a name, an email, a role and a description of
+  what that person currently composes with, and squeezing that into the sidebar
+  column would wrap all four on top of each other.
+
+  Only hosted providers are offered for approval. A member bringing their own key
+  to a server running on the administrator's own machine is not a thing that can
+  happen — those endpoints need no key at all, and the base URL would point at
+  localhost from the server's point of view, not the member's.
+%>
+<div class="panel">
+  <div class="panel__head">
+    <h2>Who can use it</h2>
+    <span class="pill pill--plain"><%= members.length %> people</span>
+  </div>
+  <form method="post" action="/admin/ai/members" class="panel__body stack-16">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+
+    <p class="text-sm text-muted" style="margin-top:0">
+      Access is granted per person, not per role. Promoting somebody to editor
+      does not hand them the assistant, and a new member of any role starts with
+      no access and no model assigned. Each person composes with credentials of
+      their own — the site-wide key above is never spent on their behalf.
+    </p>
+
+    <div class="field">
+      <span>Providers members may bring their own key to</span>
+      <div class="preset-picks">
+        <% providers.filter(function (p) { return p.kind === 'hosted'; }).forEach(function (p) { %>
+          <label class="preset-pick">
+            <input type="checkbox" name="ai_member_presets" value="<%= p.id %>"
+              <%= approvedPresetIds.indexOf(p.id) > -1 ? 'checked' : '' %>>
+            <span>
+              <b><%= p.label %></b>
+              <span class="preset-pick__meta"><%= p.requiresKey ? (p.free ? 'free · key needed' : 'paid') : 'no key' %></span>
+            </span>
+          </label>
+        <% }); %>
+      </div>
+      <span class="hint">
+        Tick none and members cannot supply their own key at all — only an administrator can then assign one.
+        A member picks from this list and types a key; the base URL is looked up here on the server and is never
+        taken from their form, so they cannot point the CMS at an endpoint of their own choosing.
+      </span>
+    </div>
+
+    <div class="member-list">
+      <% members.forEach(function (m) { %>
+        <label class="member-row <%= m.isAdmin ? 'member-row--fixed' : '' %>">
+          <input type="checkbox" name="ai_member" value="<%= m.id %>"
+            <%= m.enabled ? 'checked' : '' %> <%= m.isAdmin ? 'disabled' : '' %>>
+          <span class="member-row__who">
+            <b><%= m.name %></b>
+            <span class="member-row__email"><%= m.email %></span>
+          </span>
+          <span class="pill pill--plain member-row__role"><%= m.role %></span>
+          <%# Never the key itself — only whether one exists and whose it is. %>
+          <span class="member-row__state"><%= m.isAdmin ? 'Always — uses the site-wide provider' : m.summary %></span>
+          <% if (!m.isAdmin) { %>
+            <a class="btn btn--ghost btn--sm member-row__edit" href="/admin/users/<%= m.id %>">Assign a model</a>
+          <% } %>
+        </label>
+      <% }); %>
+    </div>
+
+    <%#
+      A checkbox that is unticked posts nothing, so "everybody off" arrives as an
+      absent field rather than an empty list. The route treats absent as empty,
+      which is what makes turning the last person off actually save.
+    %>
+    <div class="row" style="gap:8px;align-items:center">
+      <button class="btn btn--primary" type="submit">Save access</button>
+      <span class="hint" style="margin:0">Granting access here does not assign a model — do that on the person's own page.</span>
+    </div>
+  </form>
 </div>
 
 <script>
@@ -280,9 +414,9 @@
 
     /* ---- presets: fill the two fields, and explain the key + the privacy ---- */
     /*
-      Selected across every group, not just #aiProviders: the presets are now
-      split into four labelled groups and only the first kept that id, so an
-      id-scoped selector would have quietly left three groups doing nothing.
+      Selected by attribute across every group rather than by id. The presets are
+      split into four labelled groups, so an id-scoped selector would have
+      quietly left three of them doing nothing — and no group carries an id now.
     */
     var presets = document.querySelectorAll('[data-preset-group] [data-base-url]');
     var keyBadge = document.getElementById('aiKeyBadge');

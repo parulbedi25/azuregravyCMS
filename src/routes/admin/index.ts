@@ -2,6 +2,9 @@ import { Router } from 'express';
 import { requireAuth } from '../../lib/auth.js';
 import { setFlash } from '../../lib/http.js';
 import { getDb } from '../../db/index.js';
+import { DEFAULT_SETTINGS } from '../../db/schema.js';
+import { resolveAiAccess, unavailableAiAccess } from '../../services/ai-access.js';
+import type { SettingsMap, User } from '../../types.js';
 import authRoutes from './auth.js';
 import setupRoutes from './setup.js';
 import dashboardRoutes from './dashboard.js';
@@ -56,6 +59,39 @@ router.use(async (req, res, next) => {
 });
 
 router.use(requireAuth);
+
+/*
+  Per-member AI entitlement, resolved once per authenticated admin request.
+
+  Two reasons this lives here rather than in `h` (the view helpers):
+
+    - `buildHelpers` runs in app.ts *before* attachUser, so the helpers are built
+      without knowing who is asking. Reordering that middleware would put the
+      session-dependent user lookup ahead of the flash and CSRF handling, for no
+      benefit beyond convenience here.
+    - `h.aiStatus` stays the site-wide truth, which is what the settings page and
+      the public error pages want. Who *this* person may do is a separate answer.
+
+  Mounted after requireAuth, so currentUser always exists, and after the app-level
+  locals middleware, so res.locals.settings is already loaded and this costs one
+  indexed primary-key lookup rather than a second settings read.
+
+  A failure degrades to "no access" instead of propagating: the assistant is
+  optional and the rest of the Studio is not, so an unreadable entitlement table
+  must not take the dashboard down with it. Denying is the safe direction.
+*/
+router.use(async (req, res, next) => {
+  const user = (res.locals.currentUser as User | null) ?? null;
+  const settings = (res.locals.settings as SettingsMap | undefined) ?? (DEFAULT_SETTINGS as SettingsMap);
+  try {
+    res.locals.aiAccess = await resolveAiAccess(user, settings);
+    next();
+  } catch (error) {
+    console.error('[ai] could not resolve AI access; denying rather than failing the request', error);
+    res.locals.aiAccess = unavailableAiAccess(settings, 'The AI assistant is unavailable right now.');
+    next();
+  }
+});
 
 router.use(dashboardRoutes);
 router.use(postRoutes);
