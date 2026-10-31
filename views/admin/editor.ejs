@@ -302,11 +302,13 @@
             <label class="field">
               <span class="label">How much should it write?</span>
               <select class="input" id="aiMode">
-                <option value="full">The whole post</option>
-                <option value="article">The whole article + title ideas</option>
-                <option value="outline">An outline only</option>
+                <option value="title">Title</option>
+                <option value="full">Post</option>
+                <option value="image">Feature Image</option>
+                <option value="title_post_image">Title + Post + Feature Image</option>
                 <option value="continue">Continue from where I am</option>
                 <option value="selection">Rewrite my selection</option>
+                <option value="outline">An outline only</option>
               </select>
             </label>
 
@@ -551,6 +553,15 @@
     var pickerList = document.getElementById('aiTitleList');
     var postTitle = document.getElementById('title');
 
+    /*
+      What each mode touches, declared once. Scattered `mode === 'x'` compares
+      are how a mode ends up half-handled when the list grows.
+    */
+    var REPLACES_BODY = { full: 1, outline: 1, title_post_image: 1 };
+    var WRITES_BODY   = { full: 1, outline: 1, continue: 1, selection: 1, title_post_image: 1 };
+    var OFFERS_TITLES = { title: 1, title_post_image: 1 };
+    var WANTS_IMAGE   = { image: 1, title_post_image: 1 };
+
     function say(message, kind) {
       if (!status) return;
       status.textContent = message;
@@ -630,6 +641,40 @@
       picker.hidden = false;
     }
 
+    /*
+      Mirror admin.js's applyMediaSelection. That function lives inside admin.js's
+      closure and is not exported, so this is the only way to set the featured
+      image without a page reload — and it has to match, or the two ways of
+      choosing an image would leave the panel in different states.
+
+      All three steps are load-bearing: the hidden field that actually posts, the
+      permanent preview <img>, and the .has-image class on the wrapper, which is
+      what drives visibility (never an inline display:none — see the comment on
+      the picker markup above).
+    */
+    function applyImage(image) {
+      if (!image) return false;
+      var field = document.getElementById('featured_image_id');
+      if (field) field.value = String(image.mediaId);
+
+      var preview = document.getElementById('featured_image_id-preview');
+      if (preview) {
+        preview.src = image.url || '';
+        preview.style.display = '';
+        preview.hidden = false;
+      }
+      var wrap = preview && preview.closest ? preview.closest('.image-picker') : null;
+      if (wrap) wrap.classList.toggle('has-image', !!image.url);
+
+      /* An AI image is not one of the quick-pick thumbnails, so none is selected. */
+      var quick = document.querySelectorAll('[data-quick-pick="featured_image_id"]');
+      for (var i = 0; i < quick.length; i += 1) {
+        quick[i].classList.remove('is-selected');
+        quick[i].setAttribute('aria-pressed', 'false');
+      }
+      return true;
+    }
+
     async function generate() {
       if (button.disabled) return;
 
@@ -651,10 +696,10 @@
         return;
       }
       if (mode === 'continue' && textarea && !textarea.value.trim()) {
-        say('There is nothing to continue from yet — write an opening, or choose “The whole post”.', 'error');
+        say('There is nothing to continue from yet — write an opening, or choose “Post”.', 'error');
         return;
       }
-      if ((mode === 'full' || mode === 'article' || mode === 'outline') && textarea && textarea.value.trim()) {
+      if (REPLACES_BODY[mode] && textarea && textarea.value.trim()) {
         if (!window.confirm('Replace everything in the editor with the new draft?')) return;
       }
 
@@ -662,9 +707,13 @@
       clearTitles();
 
       setBusy(true);
-      say(mode === 'article'
-        ? 'Writing the article and its headlines… this can take half a minute.'
-        : 'Writing… this can take half a minute.', 'info');
+      say(WANTS_IMAGE[mode] && !WRITES_BODY[mode]
+        ? 'Drawing the feature image… this can take half a minute.'
+        : OFFERS_TITLES[mode] && !WRITES_BODY[mode]
+          ? 'Writing the headlines… this can take half a minute.'
+          : mode === 'title_post_image'
+            ? 'Writing the article, its headlines and a cover image… this can take a minute.'
+            : 'Writing… this can take half a minute.', 'info');
 
       try {
         var response = await fetch('/admin/ai/compose', {
@@ -689,25 +738,49 @@
           throw new Error(data.error || 'The assistant returned ' + response.status + '.');
         }
 
-        insert(data.markdown, mode, selStart, selEnd);
-        renderTitles(data.titleSuggestions);
+        /*
+          Only the modes that write prose touch the editor. In `title` and
+          `image` mode the body must survive exactly as the author left it —
+          that is the whole point of them being separate options.
+        */
+        if (WRITES_BODY[mode]) insert(data.markdown, mode, selStart, selEnd);
+        renderTitles(OFFERS_TITLES[mode] ? data.titleSuggestions : null);
+        var imageApplied = WANTS_IMAGE[mode] ? applyImage(data.image) : false;
         setBusy(false);
 
-        var note = 'Draft inserted.';
+        var note = WRITES_BODY[mode]
+          ? 'Draft inserted.'
+          : mode === 'image' ? 'Feature image ready.' : 'Headlines ready.';
         if (data.diagramsCreated) {
           note += ' Drew ' + data.diagramsCreated + ' diagram' + (data.diagramsCreated === 1 ? '' : 's') + '.';
         }
         if (data.diagramsSkipped) {
           note += ' Skipped ' + data.diagramsSkipped + ' that did not parse.';
         }
-        if (mode === 'article') {
+        if (OFFERS_TITLES[mode]) {
           var offered = (data.titleSuggestions || []).length;
           note += offered
             ? ' ' + offered + ' headline' + (offered === 1 ? '' : 's') + ' offered below — pick one, or keep your own.'
             : ' The model returned no headlines this time, so the Title field is unchanged.';
         }
-        say(note, 'ok');
-        if (window.GravyStudio) window.GravyStudio.toast('AI draft ready.', 'success');
+        if (WANTS_IMAGE[mode]) {
+          if (imageApplied) {
+            /*
+              Saying which backend drew it is not decoration: the keyless one is
+              a public, unauthenticated service, so the subject of an
+              unpublished draft left the building when it was used.
+            */
+            note += data.image.source === 'provider'
+              ? ' Cover image drawn by your image model and set as the featured image.'
+              : ' Cover image drawn by the free keyless service and set as the featured image.';
+          } else {
+            note += ' ' + (data.imageNote || 'No feature image came back.');
+          }
+        }
+        say(note, imageApplied || !WANTS_IMAGE[mode] ? 'ok' : 'error');
+        if (window.GravyStudio) {
+          window.GravyStudio.toast(WRITES_BODY[mode] ? 'AI draft ready.' : mode === 'image' ? 'Feature image ready.' : 'Headlines ready.', 'success');
+        }
       } catch (error) {
         setBusy(false);
         var message = (error && error.message) || 'The assistant could not finish.';
@@ -718,10 +791,10 @@
 
     button.addEventListener('click', generate);
 
-    /* The picker only means something in `article` mode. */
+    /* The picker only means something in the two headline modes. */
     if (modeSelect) {
       modeSelect.addEventListener('change', function () {
-        if (modeSelect.value !== 'article') clearTitles();
+        if (!OFFERS_TITLES[modeSelect.value]) clearTitles();
       });
     }
 

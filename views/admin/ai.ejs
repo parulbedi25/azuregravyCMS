@@ -141,6 +141,25 @@
           </span>
           <span class="hint" id="aiDiscoverResult" role="status" aria-live="polite" style="display:none"></span>
         </div>
+        <label class="field">
+          <span>
+            Image model
+            <span class="pill pill--plain">optional</span>
+          </span>
+          <input class="input" type="text" name="ai_image_model" id="aiImageModel" value="<%= config.imageModel %>"
+                 placeholder="gpt-image-1" autocomplete="off">
+          <span class="hint">
+            Used by <b>Feature Image</b> and <b>Title + Post + Feature Image</b>. Drawing is a different capability
+            from chatting, so a chat id such as <span class="mono">gpt-4o-mini</span> cannot produce a picture —
+            this needs a model your server serves at
+            <span class="mono">/images/generations</span>.
+          </span>
+          <span class="hint">
+            Leave it blank to use the free keyless image service instead. That is the only option on shared hosting,
+            where no local image server can run — but it is a public, unauthenticated service, so the subject of an
+            unpublished draft does leave the building. The editor tells you which one drew the picture.
+          </span>
+        </label>
       </div>
 
       <label class="field">
